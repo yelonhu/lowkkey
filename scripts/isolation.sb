@@ -1,0 +1,13 @@
+(version 1)
+(allow default)
+(deny file-read* (subpath (param "LEGACY_WRANGLER")))
+(deny file-write*)
+(allow file-write* (subpath (param "PROJECT_ROOT")))
+; Character devices are process I/O, never persistent application storage.
+(allow file-write-data (literal "/dev/null") (literal "/dev/tty") (literal "/dev/stdout") (literal "/dev/stderr"))
+(if (string=? (param "NETWORK_MODE") "local")
+  (begin
+    (deny network-outbound)
+    (allow network-outbound (remote ip "localhost:*"))
+  )
+)

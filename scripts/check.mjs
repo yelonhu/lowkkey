@@ -1,0 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resources } from '../src/i18n/resources.ts';
+import { checkLocales } from './locale-check.mjs';
+import { localDateSchema, scaledSchema } from '../src/domain/primitives.ts';
+checkLocales(resources);
+localDateSchema.parse('2024-02-29');
+if (localDateSchema.safeParse('2026-02-29').success || scaledSchema.safeParse(Number.MAX_SAFE_INTEGER + 1).success) throw new Error('Contract regression');
+const spec = readFileSync('SPEC.md', 'utf8');
+if (!spec.includes('M0 — 工程与契约') || !spec.includes('VAL-ENV')) throw new Error('Specification tracking missing');
+console.log('Shared contracts and locale keys checked.');

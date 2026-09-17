@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+mode=$1
+shift
+case "$mode" in local|install) ;; *) exit 64 ;; esac
+cd "$project_root"
+# This wrapper deliberately has no unsandboxed fallback, including in Codex.
+exec /usr/bin/sandbox-exec -D "PROJECT_ROOT=$project_root" -D "LEGACY_WRANGLER=$HOME/.wrangler" -D "NETWORK_MODE=$mode" -f "$project_root/scripts/isolation.sb" "$@"

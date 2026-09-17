@@ -1,0 +1,1 @@
+ALTER TABLE `scheduled_sessions` ADD `override_mode` text DEFAULT 'additional' NOT NULL;

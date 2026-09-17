@@ -1,0 +1,3333 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "24504f59-df7f-4c58-9be3-6c1dc0c98571",
+  "prevId": "fa9d4663-9f76-45d4-a0c6-fabc4ca2f0e1",
+  "tables": {
+    "change_batches": {
+      "name": "change_batches",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "data_revision": {
+          "name": "data_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "origin_thread_id": {
+          "name": "origin_thread_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "changes_json": {
+          "name": "changes_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "events_json": {
+          "name": "events_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "one_batch_per_operation": {
+          "name": "one_batch_per_operation",
+          "columns": [
+            "owner_id",
+            "operation_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "change_batches_owner_id_operation_id_command_operations_owner_id_operation_id_fk": {
+          "name": "change_batches_owner_id_operation_id_command_operations_owner_id_operation_id_fk",
+          "tableFrom": "change_batches",
+          "tableTo": "command_operations",
+          "columnsFrom": [
+            "owner_id",
+            "operation_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "operation_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "change_batches_owner_id_data_revision_pk": {
+          "columns": [
+            "owner_id",
+            "data_revision"
+          ],
+          "name": "change_batches_owner_id_data_revision_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "change_revision": {
+          "name": "change_revision",
+          "value": "\"change_batches\".\"data_revision\" >= 1 AND \"change_batches\".\"data_revision\" <= 9007199254740991"
+        },
+        "change_source": {
+          "name": "change_source",
+          "value": "\"change_batches\".\"source\" IN ('user','assistant','system')"
+        }
+      }
+    },
+    "command_operations": {
+      "name": "command_operations",
+      "columns": {
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "request_hash": {
+          "name": "request_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_kind": {
+          "name": "actor_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry_point": {
+          "name": "entry_point",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "authorization_json": {
+          "name": "authorization_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_refs_json": {
+          "name": "target_refs_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "response_json": {
+          "name": "response_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'committed'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "undo_until": {
+          "name": "undo_until",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "undone_by": {
+          "name": "undone_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "operations_owner_created": {
+          "name": "operations_owner_created",
+          "columns": [
+            "owner_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "command_operations_owner_id_users_id_fk": {
+          "name": "command_operations_owner_id_users_id_fk",
+          "tableFrom": "command_operations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "command_operations_owner_id_operation_id_pk": {
+          "columns": [
+            "owner_id",
+            "operation_id"
+          ],
+          "name": "command_operations_owner_id_operation_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "operations_status": {
+          "name": "operations_status",
+          "value": "\"command_operations\".\"status\" = 'committed'"
+        },
+        "operations_actor": {
+          "name": "operations_actor",
+          "value": "\"command_operations\".\"actor_kind\" IN ('user','assistant','system')"
+        }
+      }
+    },
+    "day_claims": {
+      "name": "day_claims",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry_timezone": {
+          "name": "entry_timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "training_claim": {
+          "name": "training_claim",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nutrition_completeness": {
+          "name": "nutrition_completeness",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nutrition_reviewed_at": {
+          "name": "nutrition_reviewed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "review_invalidated_reason": {
+          "name": "review_invalidated_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "explicit_zero_intake": {
+          "name": "explicit_zero_intake",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "claims_owner_id": {
+          "name": "claims_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "claims_owner_date": {
+          "name": "claims_owner_date",
+          "columns": [
+            "owner_id",
+            "local_date"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "day_claims_owner_id_users_id_fk": {
+          "name": "day_claims_owner_id_users_id_fk",
+          "tableFrom": "day_claims",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "claim_revision": {
+          "name": "claim_revision",
+          "value": "\"day_claims\".\"revision\" BETWEEN 1 AND 9007199254740991"
+        },
+        "training_claim": {
+          "name": "training_claim",
+          "value": "\"day_claims\".\"training_claim\" IN ('unspecified','rest_confirmed')"
+        },
+        "nutrition_claim": {
+          "name": "nutrition_claim",
+          "value": "\"day_claims\".\"nutrition_completeness\" IN ('unreviewed','partial','complete') AND \"day_claims\".\"explicit_zero_intake\" IN (0,1)"
+        }
+      }
+    },
+    "exercise_aliases": {
+      "name": "exercise_aliases",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "alias_original": {
+          "name": "alias_original",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "alias_normalized": {
+          "name": "alias_normalized",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "locale_hint": {
+          "name": "locale_hint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "exercise_id": {
+          "name": "exercise_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "context_json": {
+          "name": "context_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "exercise_alias_owner_id": {
+          "name": "exercise_alias_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "exercise_alias_lookup": {
+          "name": "exercise_alias_lookup",
+          "columns": [
+            "owner_id",
+            "alias_normalized"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "exercise_aliases_owner_id_users_id_fk": {
+          "name": "exercise_aliases_owner_id_users_id_fk",
+          "tableFrom": "exercise_aliases",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "exercise_aliases_exercise_id_exercise_definitions_id_fk": {
+          "name": "exercise_aliases_exercise_id_exercise_definitions_id_fk",
+          "tableFrom": "exercise_aliases",
+          "tableTo": "exercise_definitions",
+          "columnsFrom": [
+            "exercise_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "alias_revision": {
+          "name": "alias_revision",
+          "value": "\"exercise_aliases\".\"revision\" BETWEEN 1 AND 9007199254740991"
+        },
+        "alias_json": {
+          "name": "alias_json",
+          "value": "\"exercise_aliases\".\"context_json\" IS NULL OR json_valid(\"exercise_aliases\".\"context_json\")"
+        }
+      }
+    },
+    "exercise_definitions": {
+      "name": "exercise_definitions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "catalog_version": {
+          "name": "catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "family_id": {
+          "name": "family_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_exercise_id": {
+          "name": "parent_exercise_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "equipment_type": {
+          "name": "equipment_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "variant_json": {
+          "name": "variant_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "muscle_groups_json": {
+          "name": "muscle_groups_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "personal_name": {
+          "name": "personal_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "personal_locale": {
+          "name": "personal_locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "exercises_owner_id": {
+          "name": "exercises_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "exercises_scope_owner": {
+          "name": "exercises_scope_owner",
+          "columns": [
+            "scope",
+            "owner_id",
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "exercise_definitions_owner_id_users_id_fk": {
+          "name": "exercise_definitions_owner_id_users_id_fk",
+          "tableFrom": "exercise_definitions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "exercise_definitions_parent_exercise_id_exercise_definitions_id_fk": {
+          "name": "exercise_definitions_parent_exercise_id_exercise_definitions_id_fk",
+          "tableFrom": "exercise_definitions",
+          "tableTo": "exercise_definitions",
+          "columnsFrom": [
+            "parent_exercise_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "exercise_ownership": {
+          "name": "exercise_ownership",
+          "value": "(\"exercise_definitions\".\"scope\"='system' AND \"exercise_definitions\".\"owner_id\" IS NULL AND \"exercise_definitions\".\"personal_name\" IS NULL AND \"exercise_definitions\".\"personal_locale\" IS NULL) OR (\"exercise_definitions\".\"scope\"='personal' AND \"exercise_definitions\".\"owner_id\" IS NOT NULL AND \"exercise_definitions\".\"personal_name\" IS NOT NULL AND \"exercise_definitions\".\"personal_locale\" IN ('zh-Hans','zh-Hant','en') AND \"exercise_definitions\".\"operation_id\" IS NOT NULL AND \"exercise_definitions\".\"created_operation_id\" IS NOT NULL)"
+        },
+        "exercise_status": {
+          "name": "exercise_status",
+          "value": "\"exercise_definitions\".\"status\" IN ('active','archived')"
+        },
+        "exercise_revision": {
+          "name": "exercise_revision",
+          "value": "\"exercise_definitions\".\"revision\" BETWEEN 1 AND 9007199254740991"
+        },
+        "exercise_json": {
+          "name": "exercise_json",
+          "value": "json_valid(\"exercise_definitions\".\"variant_json\") AND json_valid(\"exercise_definitions\".\"muscle_groups_json\")"
+        }
+      }
+    },
+    "exercise_labels": {
+      "name": "exercise_labels",
+      "columns": {
+        "exercise_id": {
+          "name": "exercise_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "search_terms": {
+          "name": "search_terms",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "exercise_labels_exercise_id_exercise_definitions_id_fk": {
+          "name": "exercise_labels_exercise_id_exercise_definitions_id_fk",
+          "tableFrom": "exercise_labels",
+          "tableTo": "exercise_definitions",
+          "columnsFrom": [
+            "exercise_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "exercise_labels_exercise_id_locale_pk": {
+          "columns": [
+            "exercise_id",
+            "locale"
+          ],
+          "name": "exercise_labels_exercise_id_locale_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "exercise_label_locale": {
+          "name": "exercise_label_locale",
+          "value": "\"exercise_labels\".\"locale\" IN ('zh-Hans','zh-Hant','en')"
+        }
+      }
+    },
+    "exercise_setups": {
+      "name": "exercise_setups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "exercise_id": {
+          "name": "exercise_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "equipment_instance": {
+          "name": "equipment_instance",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "load_semantics": {
+          "name": "load_semantics",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "load_unit": {
+          "name": "load_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "includes_bar": {
+          "name": "includes_bar",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "bar_weight_decimal": {
+          "name": "bar_weight_decimal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "bar_unit": {
+          "name": "bar_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "increment_decimal": {
+          "name": "increment_decimal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "increment_unit": {
+          "name": "increment_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "available_loads_json": {
+          "name": "available_loads_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "setups_owner_id": {
+          "name": "setups_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "setups_owner_exercise": {
+          "name": "setups_owner_exercise",
+          "columns": [
+            "owner_id",
+            "exercise_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "exercise_setups_owner_id_users_id_fk": {
+          "name": "exercise_setups_owner_id_users_id_fk",
+          "tableFrom": "exercise_setups",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "exercise_setups_exercise_id_exercise_definitions_id_fk": {
+          "name": "exercise_setups_exercise_id_exercise_definitions_id_fk",
+          "tableFrom": "exercise_setups",
+          "tableTo": "exercise_definitions",
+          "columnsFrom": [
+            "exercise_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "setup_revision": {
+          "name": "setup_revision",
+          "value": "\"exercise_setups\".\"revision\" BETWEEN 1 AND 9007199254740991"
+        },
+        "setup_unit": {
+          "name": "setup_unit",
+          "value": "\"exercise_setups\".\"load_unit\" IN ('kg','lb')"
+        },
+        "setup_semantics": {
+          "name": "setup_semantics",
+          "value": "\"exercise_setups\".\"load_semantics\" IN ('external_total','per_side','added_weight','assistance','bodyweight_only','unspecified')"
+        },
+        "setup_bar": {
+          "name": "setup_bar",
+          "value": "(\"exercise_setups\".\"bar_weight_decimal\" IS NULL AND \"exercise_setups\".\"bar_unit\" IS NULL) OR (\"exercise_setups\".\"bar_weight_decimal\" IS NOT NULL AND \"exercise_setups\".\"bar_unit\" IN ('kg','lb'))"
+        },
+        "setup_increment": {
+          "name": "setup_increment",
+          "value": "(\"exercise_setups\".\"increment_decimal\" IS NULL AND \"exercise_setups\".\"increment_unit\" IS NULL) OR (\"exercise_setups\".\"increment_decimal\" IS NOT NULL AND \"exercise_setups\".\"increment_unit\" IN ('kg','lb'))"
+        },
+        "setup_bool": {
+          "name": "setup_bool",
+          "value": "\"exercise_setups\".\"includes_bar\" IS NULL OR \"exercise_setups\".\"includes_bar\" IN (0,1)"
+        },
+        "setup_json": {
+          "name": "setup_json",
+          "value": "\"exercise_setups\".\"available_loads_json\" IS NULL OR json_valid(\"exercise_setups\".\"available_loads_json\")"
+        }
+      }
+    },
+    "goal_versions": {
+      "name": "goal_versions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "goal_type": {
+          "name": "goal_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_local_date": {
+          "name": "effective_local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "energy_target_mkcal": {
+          "name": "energy_target_mkcal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "protein_target_mg": {
+          "name": "protein_target_mg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "carbs_target_mg": {
+          "name": "carbs_target_mg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fat_target_mg": {
+          "name": "fat_target_mg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "weight_min_kg_micros": {
+          "name": "weight_min_kg_micros",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "weight_max_kg_micros": {
+          "name": "weight_max_kg_micros",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "weekly_change_min_pct": {
+          "name": "weekly_change_min_pct",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "weekly_change_max_pct": {
+          "name": "weekly_change_max_pct",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "supersedes_id": {
+          "name": "supersedes_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "raw_input_json": {
+          "name": "raw_input_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_data_revision": {
+          "name": "created_data_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "goals_owner_id": {
+          "name": "goals_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "goals_owner_effective": {
+          "name": "goals_owner_effective",
+          "columns": [
+            "owner_id",
+            "effective_local_date",
+            "created_data_revision"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "goal_versions_owner_id_users_id_fk": {
+          "name": "goal_versions_owner_id_users_id_fk",
+          "tableFrom": "goal_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "goal_versions_owner_id_supersedes_id_goal_versions_owner_id_id_fk": {
+          "name": "goal_versions_owner_id_supersedes_id_goal_versions_owner_id_id_fk",
+          "tableFrom": "goal_versions",
+          "tableTo": "goal_versions",
+          "columnsFrom": [
+            "owner_id",
+            "supersedes_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "goal_immutable_revision": {
+          "name": "goal_immutable_revision",
+          "value": "\"goal_versions\".\"revision\"=1"
+        },
+        "goal_type": {
+          "name": "goal_type",
+          "value": "\"goal_versions\".\"goal_type\" IN ('lean_bulk','fat_loss','maintenance')"
+        },
+        "goal_data_revision": {
+          "name": "goal_data_revision",
+          "value": "\"goal_versions\".\"created_data_revision\" >= 1 AND \"goal_versions\".\"created_data_revision\" <= 9007199254740991"
+        },
+        "goal_energy": {
+          "name": "goal_energy",
+          "value": "\"goal_versions\".\"energy_target_mkcal\" IS NULL OR (\"goal_versions\".\"energy_target_mkcal\">0 AND \"goal_versions\".\"energy_target_mkcal\"<=9007199254740991)"
+        },
+        "goal_macros": {
+          "name": "goal_macros",
+          "value": "(\"goal_versions\".\"protein_target_mg\" IS NULL OR \"goal_versions\".\"protein_target_mg\" BETWEEN 0 AND 9007199254740991) AND (\"goal_versions\".\"carbs_target_mg\" IS NULL OR \"goal_versions\".\"carbs_target_mg\" BETWEEN 0 AND 9007199254740991) AND (\"goal_versions\".\"fat_target_mg\" IS NULL OR \"goal_versions\".\"fat_target_mg\" BETWEEN 0 AND 9007199254740991)"
+        },
+        "goal_weight_band": {
+          "name": "goal_weight_band",
+          "value": "(\"goal_versions\".\"weight_min_kg_micros\" IS NULL OR \"goal_versions\".\"weight_min_kg_micros\" BETWEEN 1000000 AND 500000000) AND (\"goal_versions\".\"weight_max_kg_micros\" IS NULL OR \"goal_versions\".\"weight_max_kg_micros\" BETWEEN 1000000 AND 500000000) AND (\"goal_versions\".\"weight_min_kg_micros\" IS NULL OR \"goal_versions\".\"weight_max_kg_micros\" IS NULL OR \"goal_versions\".\"weight_min_kg_micros\"<=\"goal_versions\".\"weight_max_kg_micros\")"
+        },
+        "goal_change_band": {
+          "name": "goal_change_band",
+          "value": "\"goal_versions\".\"weekly_change_min_pct\" IS NULL OR \"goal_versions\".\"weekly_change_max_pct\" IS NULL OR \"goal_versions\".\"weekly_change_min_pct\"<=\"goal_versions\".\"weekly_change_max_pct\""
+        }
+      }
+    },
+    "invitations": {
+      "name": "invitations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email_normalized": {
+          "name": "email_normalized",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "accepted_user_id": {
+          "name": "accepted_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "invitations_pending_email": {
+          "name": "invitations_pending_email",
+          "columns": [
+            "email_normalized"
+          ],
+          "isUnique": true,
+          "where": "\"invitations\".\"status\" = 'invited'"
+        }
+      },
+      "foreignKeys": {
+        "invitations_created_by_users_id_fk": {
+          "name": "invitations_created_by_users_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "invitations_accepted_user_id_users_id_fk": {
+          "name": "invitations_accepted_user_id_users_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "accepted_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "invitations_status": {
+          "name": "invitations_status",
+          "value": "\"invitations\".\"status\" IN ('invited','accepted','expired','revoked')"
+        }
+      }
+    },
+    "membership_state": {
+      "name": "membership_state",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "membership_singleton": {
+          "name": "membership_singleton",
+          "value": "\"membership_state\".\"id\"=1"
+        },
+        "membership_revision": {
+          "name": "membership_revision",
+          "value": "\"membership_state\".\"revision\" >= 1 AND \"membership_state\".\"revision\" <= 9007199254740991"
+        }
+      }
+    },
+    "mutation_guards": {
+      "name": "mutation_guards",
+      "columns": {
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "condition_ok": {
+          "name": "condition_ok",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "mutation_guards_owner_id_users_id_fk": {
+          "name": "mutation_guards_owner_id_users_id_fk",
+          "tableFrom": "mutation_guards",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "mutation_guards_owner_id_operation_id_pk": {
+          "columns": [
+            "owner_id",
+            "operation_id"
+          ],
+          "name": "mutation_guards_owner_id_operation_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "mutation_guard_passed": {
+          "name": "mutation_guard_passed",
+          "value": "\"mutation_guards\".\"condition_ok\" = 1"
+        }
+      }
+    },
+    "operation_revisions": {
+      "name": "operation_revisions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "before_revision": {
+          "name": "before_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "after_revision": {
+          "name": "after_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "before_snapshot": {
+          "name": "before_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "after_snapshot": {
+          "name": "after_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "operation_entity_once": {
+          "name": "operation_entity_once",
+          "columns": [
+            "owner_id",
+            "operation_id",
+            "target_type",
+            "target_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "operation_revisions_owner_id_operation_id_command_operations_owner_id_operation_id_fk": {
+          "name": "operation_revisions_owner_id_operation_id_command_operations_owner_id_operation_id_fk",
+          "tableFrom": "operation_revisions",
+          "tableTo": "command_operations",
+          "columnsFrom": [
+            "owner_id",
+            "operation_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "operation_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "operation_revision_step": {
+          "name": "operation_revision_step",
+          "value": "\"operation_revisions\".\"after_revision\" >= 1 AND \"operation_revisions\".\"after_revision\" <= 9007199254740991 AND ((\"operation_revisions\".\"before_revision\" IS NULL AND \"operation_revisions\".\"after_revision\"=1) OR \"operation_revisions\".\"after_revision\"=\"operation_revisions\".\"before_revision\"+1)"
+        }
+      }
+    },
+    "plan_selections": {
+      "name": "plan_selections",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plan_version_id": {
+          "name": "plan_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "effective_local_date": {
+          "name": "effective_local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "data_revision": {
+          "name": "data_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "plan_selection_effective": {
+          "name": "plan_selection_effective",
+          "columns": [
+            "owner_id",
+            "effective_local_date",
+            "data_revision"
+          ],
+          "isUnique": false
+        },
+        "plan_selection_operation": {
+          "name": "plan_selection_operation",
+          "columns": [
+            "owner_id",
+            "operation_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "plan_selections_owner_id_users_id_fk": {
+          "name": "plan_selections_owner_id_users_id_fk",
+          "tableFrom": "plan_selections",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_selections_owner_id_plan_version_id_plan_versions_owner_id_id_fk": {
+          "name": "plan_selections_owner_id_plan_version_id_plan_versions_owner_id_id_fk",
+          "tableFrom": "plan_selections",
+          "tableTo": "plan_versions",
+          "columnsFrom": [
+            "owner_id",
+            "plan_version_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "plan_selection_revision": {
+          "name": "plan_selection_revision",
+          "value": "\"plan_selections\".\"data_revision\" BETWEEN 1 AND 9007199254740991"
+        }
+      }
+    },
+    "plan_versions": {
+      "name": "plan_versions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_local_date": {
+          "name": "effective_local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot_json": {
+          "name": "snapshot_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "supersedes_id": {
+          "name": "supersedes_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "plans_owner_id": {
+          "name": "plans_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "plans_owner_date": {
+          "name": "plans_owner_date",
+          "columns": [
+            "owner_id",
+            "effective_local_date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "plan_versions_owner_id_users_id_fk": {
+          "name": "plan_versions_owner_id_users_id_fk",
+          "tableFrom": "plan_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_versions_owner_id_supersedes_id_plan_versions_owner_id_id_fk": {
+          "name": "plan_versions_owner_id_supersedes_id_plan_versions_owner_id_id_fk",
+          "tableFrom": "plan_versions",
+          "tableTo": "plan_versions",
+          "columnsFrom": [
+            "owner_id",
+            "supersedes_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "plan_revision": {
+          "name": "plan_revision",
+          "value": "\"plan_versions\".\"revision\" BETWEEN 1 AND 9007199254740991"
+        },
+        "plan_status": {
+          "name": "plan_status",
+          "value": "\"plan_versions\".\"status\" IN ('draft','published','archived')"
+        },
+        "plan_json": {
+          "name": "plan_json",
+          "value": "json_valid(\"plan_versions\".\"snapshot_json\")"
+        }
+      }
+    },
+    "revoked_sessions": {
+      "name": "revoked_sessions",
+      "columns": {
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "revoked_session_expiry": {
+          "name": "revoked_session_expiry",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "revoked_sessions_owner_id_users_id_fk": {
+          "name": "revoked_sessions_owner_id_users_id_fk",
+          "tableFrom": "revoked_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "scheduled_sessions": {
+      "name": "scheduled_sessions",
+      "columns": {
+        "override_mode": {
+          "name": "override_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'additional'"
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry_timezone": {
+          "name": "entry_timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plan_version_id": {
+          "name": "plan_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "planned_start_local": {
+          "name": "planned_start_local",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "moved_from_id": {
+          "name": "moved_from_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "override_snapshot_json": {
+          "name": "override_snapshot_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "schedules_owner_id": {
+          "name": "schedules_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "schedules_owner_date": {
+          "name": "schedules_owner_date",
+          "columns": [
+            "owner_id",
+            "local_date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "scheduled_sessions_owner_id_users_id_fk": {
+          "name": "scheduled_sessions_owner_id_users_id_fk",
+          "tableFrom": "scheduled_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "scheduled_sessions_owner_id_plan_version_id_plan_versions_owner_id_id_fk": {
+          "name": "scheduled_sessions_owner_id_plan_version_id_plan_versions_owner_id_id_fk",
+          "tableFrom": "scheduled_sessions",
+          "tableTo": "plan_versions",
+          "columnsFrom": [
+            "owner_id",
+            "plan_version_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "scheduled_sessions_owner_id_moved_from_id_scheduled_sessions_owner_id_id_fk": {
+          "name": "scheduled_sessions_owner_id_moved_from_id_scheduled_sessions_owner_id_id_fk",
+          "tableFrom": "scheduled_sessions",
+          "tableTo": "scheduled_sessions",
+          "columnsFrom": [
+            "owner_id",
+            "moved_from_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "schedule_revision": {
+          "name": "schedule_revision",
+          "value": "\"scheduled_sessions\".\"revision\" BETWEEN 1 AND 9007199254740991"
+        },
+        "schedule_status": {
+          "name": "schedule_status",
+          "value": "\"scheduled_sessions\".\"status\" IN ('planned','skipped','moved','cancelled')"
+        },
+        "schedule_source": {
+          "name": "schedule_source",
+          "value": "(\"scheduled_sessions\".\"plan_version_id\" IS NULL) = (\"scheduled_sessions\".\"template_id\" IS NULL)"
+        },
+        "schedule_json": {
+          "name": "schedule_json",
+          "value": "\"scheduled_sessions\".\"override_snapshot_json\" IS NULL OR json_valid(\"scheduled_sessions\".\"override_snapshot_json\")"
+        }
+      }
+    },
+    "session_exercises": {
+      "name": "session_exercises",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "setup_id": {
+          "name": "setup_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ordinal": {
+          "name": "ordinal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_snapshot_json": {
+          "name": "display_snapshot_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_snapshot_json": {
+          "name": "target_snapshot_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "session_exercises_owner_id": {
+          "name": "session_exercises_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "exercise_ordinal": {
+          "name": "exercise_ordinal",
+          "columns": [
+            "owner_id",
+            "session_id",
+            "ordinal"
+          ],
+          "isUnique": true,
+          "where": "\"session_exercises\".\"deleted_at\" IS NULL"
+        },
+        "exercise_history_lookup": {
+          "name": "exercise_history_lookup",
+          "columns": [
+            "owner_id",
+            "setup_id",
+            "session_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "session_exercises_owner_id_users_id_fk": {
+          "name": "session_exercises_owner_id_users_id_fk",
+          "tableFrom": "session_exercises",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "session_exercises_owner_id_session_id_workout_sessions_owner_id_id_fk": {
+          "name": "session_exercises_owner_id_session_id_workout_sessions_owner_id_id_fk",
+          "tableFrom": "session_exercises",
+          "tableTo": "workout_sessions",
+          "columnsFrom": [
+            "owner_id",
+            "session_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "session_exercises_owner_id_setup_id_exercise_setups_owner_id_id_fk": {
+          "name": "session_exercises_owner_id_setup_id_exercise_setups_owner_id_id_fk",
+          "tableFrom": "session_exercises",
+          "tableTo": "exercise_setups",
+          "columnsFrom": [
+            "owner_id",
+            "setup_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "session_exercise_revision": {
+          "name": "session_exercise_revision",
+          "value": "\"session_exercises\".\"revision\" BETWEEN 1 AND 9007199254740991 AND \"session_exercises\".\"ordinal\" BETWEEN 1 AND 9007199254740991"
+        },
+        "session_exercise_json": {
+          "name": "session_exercise_json",
+          "value": "json_valid(\"session_exercises\".\"display_snapshot_json\") AND (\"session_exercises\".\"target_snapshot_json\" IS NULL OR json_valid(\"session_exercises\".\"target_snapshot_json\"))"
+        }
+      }
+    },
+    "user_profiles": {
+      "name": "user_profiles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "body_weight_unit": {
+          "name": "body_weight_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'kg'"
+        },
+        "default_load_unit": {
+          "name": "default_load_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'kg'"
+        },
+        "training_experience": {
+          "name": "training_experience",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'unknown'"
+        },
+        "height_cm": {
+          "name": "height_cm",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "constraints_text": {
+          "name": "constraints_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "digest_enabled": {
+          "name": "digest_enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "next_digest_at": {
+          "name": "next_digest_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pending_timezone": {
+          "name": "pending_timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "timezone_effective_date": {
+          "name": "timezone_effective_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "auto_memory_enabled": {
+          "name": "auto_memory_enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        }
+      },
+      "indexes": {
+        "profiles_owner_unique": {
+          "name": "profiles_owner_unique",
+          "columns": [
+            "owner_id"
+          ],
+          "isUnique": true
+        },
+        "profiles_owner_id_unique": {
+          "name": "profiles_owner_id_unique",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "user_profiles_owner_id_users_id_fk": {
+          "name": "user_profiles_owner_id_users_id_fk",
+          "tableFrom": "user_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "profiles_revision": {
+          "name": "profiles_revision",
+          "value": "\"user_profiles\".\"revision\" >= 1 AND \"user_profiles\".\"revision\" <= 9007199254740991"
+        },
+        "profiles_units": {
+          "name": "profiles_units",
+          "value": "\"user_profiles\".\"body_weight_unit\" IN ('kg','lb') AND \"user_profiles\".\"default_load_unit\" IN ('kg','lb')"
+        },
+        "profiles_experience": {
+          "name": "profiles_experience",
+          "value": "\"user_profiles\".\"training_experience\" IN ('beginner','intermediate','experienced','unknown')"
+        },
+        "profiles_display_name": {
+          "name": "profiles_display_name",
+          "value": "length(\"user_profiles\".\"display_name\") BETWEEN 1 AND 40"
+        },
+        "profiles_height": {
+          "name": "profiles_height",
+          "value": "\"user_profiles\".\"height_cm\" IS NULL OR \"user_profiles\".\"height_cm\" BETWEEN 50 AND 250"
+        },
+        "profiles_constraints": {
+          "name": "profiles_constraints",
+          "value": "\"user_profiles\".\"constraints_text\" IS NULL OR length(\"user_profiles\".\"constraints_text\") <= 2000"
+        },
+        "profiles_digest": {
+          "name": "profiles_digest",
+          "value": "\"user_profiles\".\"digest_enabled\" IN (0,1)"
+        },
+        "profiles_memory": {
+          "name": "profiles_memory",
+          "value": "\"user_profiles\".\"auto_memory_enabled\" IN (0,1)"
+        }
+      }
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "verified_subject": {
+          "name": "verified_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email_normalized": {
+          "name": "email_normalized",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "data_revision": {
+          "name": "data_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "membership_revision": {
+          "name": "membership_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "suspended_at": {
+          "name": "suspended_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            "email_normalized"
+          ],
+          "isUnique": true
+        },
+        "users_subject_unique": {
+          "name": "users_subject_unique",
+          "columns": [
+            "verified_subject"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "users_role": {
+          "name": "users_role",
+          "value": "\"users\".\"role\" IN ('member','admin')"
+        },
+        "users_status": {
+          "name": "users_status",
+          "value": "\"users\".\"status\" IN ('invited','active','suspended','deletion_pending','deleted')"
+        },
+        "users_locale": {
+          "name": "users_locale",
+          "value": "\"users\".\"locale\" IN ('zh-Hans','zh-Hant','en')"
+        },
+        "users_revision": {
+          "name": "users_revision",
+          "value": "\"users\".\"data_revision\" >= 0 AND \"users\".\"data_revision\" <= 9007199254740991"
+        },
+        "users_membership_revision": {
+          "name": "users_membership_revision",
+          "value": "\"users\".\"membership_revision\" >= 1 AND \"users\".\"membership_revision\" <= 9007199254740991"
+        }
+      }
+    },
+    "weight_entries": {
+      "name": "weight_entries",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry_timezone": {
+          "name": "entry_timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "time_precision": {
+          "name": "time_precision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value_decimal": {
+          "name": "value_decimal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kg_micros": {
+          "name": "kg_micros",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "condition": {
+          "name": "condition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_kind": {
+          "name": "source_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_ref": {
+          "name": "source_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "weights_owner_id": {
+          "name": "weights_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "weights_owner_date": {
+          "name": "weights_owner_date",
+          "columns": [
+            "owner_id",
+            "local_date"
+          ],
+          "isUnique": false
+        },
+        "weights_primary_day": {
+          "name": "weights_primary_day",
+          "columns": [
+            "owner_id",
+            "local_date"
+          ],
+          "isUnique": true,
+          "where": "\"weight_entries\".\"is_primary\"=1 AND \"weight_entries\".\"deleted_at\" IS NULL"
+        }
+      },
+      "foreignKeys": {
+        "weight_entries_owner_id_users_id_fk": {
+          "name": "weight_entries_owner_id_users_id_fk",
+          "tableFrom": "weight_entries",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "weight_revision": {
+          "name": "weight_revision",
+          "value": "\"weight_entries\".\"revision\" >= 1 AND \"weight_entries\".\"revision\" <= 9007199254740991"
+        },
+        "weight_kg": {
+          "name": "weight_kg",
+          "value": "\"weight_entries\".\"kg_micros\" BETWEEN 1000000 AND 500000000"
+        },
+        "weight_unit": {
+          "name": "weight_unit",
+          "value": "\"weight_entries\".\"unit\" IN ('kg','lb')"
+        },
+        "weight_condition": {
+          "name": "weight_condition",
+          "value": "\"weight_entries\".\"condition\" IN ('fasted','other','unspecified')"
+        },
+        "weight_primary_bool": {
+          "name": "weight_primary_bool",
+          "value": "\"weight_entries\".\"is_primary\" IN (0,1)"
+        },
+        "weight_precision": {
+          "name": "weight_precision",
+          "value": "(\"weight_entries\".\"time_precision\"='date' AND \"weight_entries\".\"occurred_at\" IS NULL) OR (\"weight_entries\".\"time_precision\"='instant' AND \"weight_entries\".\"occurred_at\" IS NOT NULL)"
+        },
+        "weight_source": {
+          "name": "weight_source",
+          "value": "\"weight_entries\".\"source_kind\" IN ('manual','assistant_explicit','imported_text','imported_image','photo','copied','system')"
+        }
+      }
+    },
+    "workout_sessions": {
+      "name": "workout_sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry_timezone": {
+          "name": "entry_timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "time_precision": {
+          "name": "time_precision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plan_version_id": {
+          "name": "plan_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scheduled_session_id": {
+          "name": "scheduled_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "plan_snapshot_json": {
+          "name": "plan_snapshot_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recovery_json": {
+          "name": "recovery_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_ref": {
+          "name": "source_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_kind": {
+          "name": "source_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "sessions_owner_id": {
+          "name": "sessions_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "sessions_owner_date": {
+          "name": "sessions_owner_date",
+          "columns": [
+            "owner_id",
+            "local_date"
+          ],
+          "isUnique": false
+        },
+        "one_session_in_progress": {
+          "name": "one_session_in_progress",
+          "columns": [
+            "owner_id"
+          ],
+          "isUnique": true,
+          "where": "\"workout_sessions\".\"status\"='in_progress' AND \"workout_sessions\".\"deleted_at\" IS NULL"
+        },
+        "one_actual_per_schedule": {
+          "name": "one_actual_per_schedule",
+          "columns": [
+            "owner_id",
+            "scheduled_session_id"
+          ],
+          "isUnique": true,
+          "where": "\"workout_sessions\".\"deleted_at\" IS NULL AND \"workout_sessions\".\"status\"<>'cancelled'"
+        }
+      },
+      "foreignKeys": {
+        "workout_sessions_owner_id_users_id_fk": {
+          "name": "workout_sessions_owner_id_users_id_fk",
+          "tableFrom": "workout_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "workout_sessions_owner_id_plan_version_id_plan_versions_owner_id_id_fk": {
+          "name": "workout_sessions_owner_id_plan_version_id_plan_versions_owner_id_id_fk",
+          "tableFrom": "workout_sessions",
+          "tableTo": "plan_versions",
+          "columnsFrom": [
+            "owner_id",
+            "plan_version_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "workout_sessions_owner_id_scheduled_session_id_scheduled_sessions_owner_id_id_fk": {
+          "name": "workout_sessions_owner_id_scheduled_session_id_scheduled_sessions_owner_id_id_fk",
+          "tableFrom": "workout_sessions",
+          "tableTo": "scheduled_sessions",
+          "columnsFrom": [
+            "owner_id",
+            "scheduled_session_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "session_revision": {
+          "name": "session_revision",
+          "value": "\"workout_sessions\".\"revision\" BETWEEN 1 AND 9007199254740991"
+        },
+        "session_status": {
+          "name": "session_status",
+          "value": "\"workout_sessions\".\"status\" IN ('draft','in_progress','paused','completed','cancelled','deleted')"
+        },
+        "session_tombstone": {
+          "name": "session_tombstone",
+          "value": "(\"workout_sessions\".\"status\"='deleted') = (\"workout_sessions\".\"deleted_at\" IS NOT NULL)"
+        },
+        "session_precision": {
+          "name": "session_precision",
+          "value": "(\"workout_sessions\".\"time_precision\"='date' AND \"workout_sessions\".\"started_at\" IS NULL AND \"workout_sessions\".\"ended_at\" IS NULL) OR \"workout_sessions\".\"time_precision\"='instant'"
+        },
+        "session_time_order": {
+          "name": "session_time_order",
+          "value": "\"workout_sessions\".\"started_at\" IS NULL OR \"workout_sessions\".\"ended_at\" IS NULL OR \"workout_sessions\".\"started_at\"<=\"workout_sessions\".\"ended_at\""
+        },
+        "session_json": {
+          "name": "session_json",
+          "value": "(\"workout_sessions\".\"plan_snapshot_json\" IS NULL OR json_valid(\"workout_sessions\".\"plan_snapshot_json\")) AND (\"workout_sessions\".\"recovery_json\" IS NULL OR json_valid(\"workout_sessions\".\"recovery_json\"))"
+        }
+      }
+    },
+    "workout_sets": {
+      "name": "workout_sets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "operation_id": {
+          "name": "operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_operation_id": {
+          "name": "created_operation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "session_exercise_id": {
+          "name": "session_exercise_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ordinal": {
+          "name": "ordinal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reps": {
+          "name": "reps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "load_decimal": {
+          "name": "load_decimal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "kg_micros": {
+          "name": "kg_micros",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "load_semantics": {
+          "name": "load_semantics",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "set_type": {
+          "name": "set_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rpe_half_units": {
+          "name": "rpe_half_units",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_row_id": {
+          "name": "source_row_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "sets_owner_id": {
+          "name": "sets_owner_id",
+          "columns": [
+            "owner_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "set_ordinal": {
+          "name": "set_ordinal",
+          "columns": [
+            "owner_id",
+            "session_exercise_id",
+            "ordinal"
+          ],
+          "isUnique": true,
+          "where": "\"workout_sets\".\"deleted_at\" IS NULL"
+        }
+      },
+      "foreignKeys": {
+        "workout_sets_owner_id_users_id_fk": {
+          "name": "workout_sets_owner_id_users_id_fk",
+          "tableFrom": "workout_sets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "workout_sets_owner_id_session_exercise_id_session_exercises_owner_id_id_fk": {
+          "name": "workout_sets_owner_id_session_exercise_id_session_exercises_owner_id_id_fk",
+          "tableFrom": "workout_sets",
+          "tableTo": "session_exercises",
+          "columnsFrom": [
+            "owner_id",
+            "session_exercise_id"
+          ],
+          "columnsTo": [
+            "owner_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "set_revision": {
+          "name": "set_revision",
+          "value": "\"workout_sets\".\"revision\" BETWEEN 1 AND 9007199254740991 AND \"workout_sets\".\"ordinal\" BETWEEN 1 AND 9007199254740991"
+        },
+        "set_reps": {
+          "name": "set_reps",
+          "value": "\"workout_sets\".\"reps\" BETWEEN 1 AND 200"
+        },
+        "set_rpe": {
+          "name": "set_rpe",
+          "value": "\"workout_sets\".\"rpe_half_units\" IS NULL OR \"workout_sets\".\"rpe_half_units\" BETWEEN 2 AND 20"
+        },
+        "set_type": {
+          "name": "set_type",
+          "value": "\"workout_sets\".\"set_type\" IN ('warmup','work','backoff','drop','unknown')"
+        },
+        "set_load": {
+          "name": "set_load",
+          "value": "(\"workout_sets\".\"load_semantics\"='bodyweight_only' AND \"workout_sets\".\"load_decimal\" IS NULL AND \"workout_sets\".\"unit\" IS NULL AND \"workout_sets\".\"kg_micros\" IS NULL) OR (\"workout_sets\".\"load_semantics\" IN ('external_total','per_side','added_weight','assistance','unspecified') AND \"workout_sets\".\"load_decimal\" IS NOT NULL AND \"workout_sets\".\"unit\" IS NOT NULL AND \"workout_sets\".\"kg_micros\" IS NOT NULL AND typeof(\"workout_sets\".\"kg_micros\")='integer' AND \"workout_sets\".\"unit\" IN ('kg','lb') AND \"workout_sets\".\"kg_micros\" BETWEEN 0 AND 1000000000)"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

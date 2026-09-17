@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+if [ "$(/usr/bin/id -u)" = 0 ]; then echo 'Run as your regular user. Only fs_usage may be privileged.' >&2; exit 1; fi
+if [ -e "$project_root/.artifacts/clean-room" ]; then echo 'Clean-room evidence already exists; use a fresh project copy for a complete rerun.' >&2; exit 1; fi
+echo 'Administrator authentication is only for the system read-only fs_usage observer.'
+/usr/bin/sudo -v
+mkdir -p "$project_root/.artifacts/file-audit"
+# Narrow observation to executable names. fs_usage -w suffixes are thread IDs;
+# review project paths and timestamps against launcher logs, not PID equality.
+/usr/bin/sudo -n /usr/bin/fs_usage -w -f filesys -t 240 node workerd curl tar shasum 'Google Chrome' 'chrome-headless-shell' > "$project_root/.artifacts/file-audit/fs-usage.txt" 2>&1 &
+observer=$!
+trap 'wait "$observer" || true' EXIT
+"$project_root/scripts/verify-clean"
+wait "$observer"
+trap - EXIT
+"$project_root/scripts/fence" local "$project_root/.toolchain/node-v24.21.0-darwin-arm64/bin/node" "$project_root/scripts/filter-audit.mjs"
+"$project_root/scripts/fence" local "$project_root/.toolchain/node-v24.21.0-darwin-arm64/bin/node" "$project_root/scripts/review-audit-paths.mjs"
+echo 'Read-only trace saved. VAL-ENV remains pending until process coverage and writes are reviewed.'
