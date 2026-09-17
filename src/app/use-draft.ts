@@ -43,7 +43,7 @@ export function useDraft<T extends Record<string, string>>(database: LocalDataba
     await persist.current(); await database.removeDraft(id); current.current = value; dirty.current = false; lastSaved.current = undefined; setFields(value); setSaved(false);
   }
   function resetAfterSubmit(value: T = initial.current) { current.current = value; dirty.current = false; lastSaved.current = undefined; setFields(value); setSaved(false); }
-  return { fields, ready, error, saved, replace, change: (key: keyof T, value: string) => replace({ ...current.current, [key]: value }), flush: () => persist.current(), clear, resetAfterSubmit };
+  return { fields, read: () => current.current, ready, error, saved, replace, change: (key: keyof T, value: string) => replace({ ...current.current, [key]: value }), flush: () => persist.current(), clear, resetAfterSubmit };
 }
 export async function flushDrafts() {
   const tasks: Array<Promise<unknown>> = [];

@@ -117,13 +117,13 @@ export const exerciseLabels = sqliteTable('exercise_labels', {
 export const exerciseSetups = sqliteTable('exercise_setups', {
   ...ownedColumns(), exerciseId: text('exercise_id').notNull().references(() => exerciseDefinitions.id), equipmentInstance: text('equipment_instance'),
   loadSemantics: text('load_semantics').notNull(), loadUnit: text('load_unit').notNull(), includesBar: integer('includes_bar', { mode: 'boolean' }),
-  barWeightDecimal: text('bar_weight_decimal'), barUnit: text('bar_unit'), incrementDecimal: text('increment_decimal'), incrementUnit: text('increment_unit'), availableLoadsJson: text('available_loads_json'),
+  barWeightDecimal: text('bar_weight_decimal'), barUnit: text('bar_unit'), incrementDecimal: text('increment_decimal'), incrementUnit: text('increment_unit'), availableLoadsJson: text('available_loads_json'), defaultsOriginJson: text('defaults_origin_json'),
 }, table => [uniqueIndex('setups_owner_id').on(table.ownerId, table.id), index('setups_owner_exercise').on(table.ownerId, table.exerciseId),
   check('setup_revision', sql`${table.revision} BETWEEN 1 AND 9007199254740991`), check('setup_unit', sql`${table.loadUnit} IN ('kg','lb')`),
   check('setup_semantics', sql`${table.loadSemantics} IN ('external_total','per_side','added_weight','assistance','bodyweight_only','unspecified')`),
   check('setup_bar', sql`(${table.barWeightDecimal} IS NULL AND ${table.barUnit} IS NULL) OR (${table.barWeightDecimal} IS NOT NULL AND ${table.barUnit} IN ('kg','lb'))`),
   check('setup_increment', sql`(${table.incrementDecimal} IS NULL AND ${table.incrementUnit} IS NULL) OR (${table.incrementDecimal} IS NOT NULL AND ${table.incrementUnit} IN ('kg','lb'))`),
-  check('setup_bool', sql`${table.includesBar} IS NULL OR ${table.includesBar} IN (0,1)`), check('setup_json', sql`${table.availableLoadsJson} IS NULL OR json_valid(${table.availableLoadsJson})`),
+  check('setup_defaults_json', sql`${table.defaultsOriginJson} IS NULL OR json_valid(${table.defaultsOriginJson})`), check('setup_bool', sql`${table.includesBar} IS NULL OR ${table.includesBar} IN (0,1)`), check('setup_json', sql`${table.availableLoadsJson} IS NULL OR json_valid(${table.availableLoadsJson})`),
 ]);
 export const exerciseAliases = sqliteTable('exercise_aliases', {
   ...ownedColumns(), aliasOriginal: text('alias_original').notNull(), aliasNormalized: text('alias_normalized').notNull(), localeHint: text('locale_hint'),

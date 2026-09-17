@@ -1,8 +1,29 @@
 const strings: Record<string, [string, string, string]> = {
+"rowNumber": ["Set","组","組"],
+"rowOptions": ["Set options","组详情","組詳情"],
+"repsShort": ["Reps","次数","次數"],
+"done": ["Done","完成","完成"],
+"rowIncomplete": ["Finish the load and reps to record this row.","填好重量和次数后记录这一行。","填好重量和次數後記錄這一行。"],
+"reviewRow": ["Saved: {{current}}. Your edit: {{proposed}}.","当前记录：{{current}}。你的修改：{{proposed}}。","目前紀錄：{{current}}。你的修改：{{proposed}}。"],
+"applyEdit": ["Apply my edit","应用我的修改","套用我的修改"],
+"addSet": ["Add set","加一组","加一組"],
+"barIncluded": ["Bar included","含杆","含槓"],
+"loadStep": ["Load step","重量档位","重量檔位"],
+"addLoad": ["Add","添加","新增"],
+"defaultSource": ["Defaults from {{version}}. Changes stay with this configuration.","默认来源：{{version}}，修改保留在此配置。","預設來源：{{version}}，修改保留在此設定。"],
+"applySetup": ["Apply configuration","应用配置","套用設定"],
+"sessionOptions": ["Workout options","训练选项","訓練選項"],
+"minutes": ["min","分钟","分鐘"],
+"short_external_total": ["Total","总重","總重"],
+"short_per_side": ["Per side","单侧","單側"],
+"short_assistance": ["Assistance","助力","助力"],
+"short_added_weight": ["Added load","额外负重","額外負重"],
+"short_bodyweight_only": ["Bodyweight","自重","自重"],
+"short_unspecified": ["Load","负重","負重"],
   deleteCompleted: ['A completed workout must keep at least one set. To remove all sets, use Delete this workout above.', '已结束的训练至少保留一组；如需全部移除，请使用上方“删除这次记录”。', '已結束的訓練至少保留一組；如需全部移除，請使用上方「刪除此訓練紀錄」。'],
-  configurationOptions: ['Optional load increments', '可选重量档位', '選填重量檔位'],
+  configurationOptions: ['More details', '更多详情', '更多詳情'],
   increment: ['Increment (optional)', '最小增量（选填）', '最小增量（選填）'],
-  available: ['Available loads, one per line (optional)', '可用档位，每行一个（选填）', '可用檔位，每行一個（選填）'],
+  available: ['Available loads', '可用档位', '可用檔位'],
   fixedUnits: ['These units stay with the increments when the display unit changes.', '切换显示单位不会改变这些增量和档位的原单位。', '切換顯示單位不會改變這些增量和檔位的原單位。'],
   "title": [
     "Training",
@@ -55,9 +76,9 @@ const strings: Record<string, [string, string, string]> = {
     "請選擇動作"
   ],
   "search": [
-    "Search names in any language",
-    "搜索三语动作名称",
-    "搜尋三語動作名稱"
+    "Search exercises",
+    "搜索动作",
+    "搜尋動作"
   ],
   "custom": [
     "Create personal exercise",
@@ -315,7 +336,7 @@ const strings: Record<string, [string, string, string]> = {
     "本次結果"
   ],
   "totalSets": [
-    "{{count}} recorded sets",
+    "Recorded sets: {{count}}",
     "已记录 {{count}} 组",
     "已記錄 {{count}} 組"
   ],

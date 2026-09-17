@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Locale } from '../domain/primitives.ts';
 import { customExerciseInputSchema, exerciseAliasInputSchema, exerciseAliasPatchSchema, exerciseDefinitionSchema, exerciseDisplaySnapshotSchema, normalizeAlias, personalExerciseSchema, setupInputSchema, setupPatchSchema } from '../domain/training.ts';
+import { defaultSetup } from '../domain/training-defaults.ts';
 import type { ExerciseSetup } from '../domain/training.ts';
 import type { AuthContext } from './auth.ts';
 import { executeCommand } from './commands.ts';
@@ -23,7 +24,7 @@ export async function displaySnapshot(context: CommandContext, setup: ExerciseSe
   const exercise = await readExercise(context.db, context.auth.id, setup.exerciseId);
   const label = exercise.scope === 'personal' ? { name: exercise.personalName!, locale: exercise.personalLocale! } : await context.db.prepare("SELECT display_name AS name,locale FROM exercise_labels WHERE exercise_id=? AND locale IN (?,'en') ORDER BY CASE WHEN locale=? THEN 0 ELSE 1 END LIMIT 1").bind(exercise.id, context.auth.locale, context.auth.locale).first<{ name: string; locale: Locale }>();
   if (!label) throw new DomainError('TEMPORARY_FAILURE', 503, { reason: 'catalogLabelMissing' });
-  return { snapshot: exerciseDisplaySnapshotSchema.parse({ schemaVersion: 1, exerciseId: exercise.id, catalogVersion: exercise.catalogVersion, name: label.name, locale: label.locale, equipmentType: exercise.equipmentType, equipmentInstance: setup.equipmentInstance, variant: exercise.variant, muscles: exercise.muscles, movementPattern: exercise.movementPattern, loadSemantics: setup.loadSemantics, includesBar: setup.includesBar, barWeightDecimal: setup.barWeightDecimal, barUnit: setup.barUnit }), guard: exerciseGuard(context.auth.id, exercise.id, exercise.revision) };
+  return { snapshot: exerciseDisplaySnapshotSchema.parse({ schemaVersion: 1, exerciseId: exercise.id, catalogVersion: exercise.catalogVersion, name: label.name, locale: label.locale, equipmentType: exercise.equipmentType, equipmentInstance: setup.equipmentInstance, variant: exercise.variant, muscles: exercise.muscles, movementPattern: exercise.movementPattern, loadSemantics: setup.loadSemantics, includesBar: setup.includesBar, barWeightDecimal: setup.barWeightDecimal, barUnit: setup.barUnit, defaultsOrigin: setup.defaultsOrigin ?? null }), guard: exerciseGuard(context.auth.id, exercise.id, exercise.revision) };
 }
 export function createCustomExercise(db: D1Database, auth: AuthContext, operationId: string, payload: unknown, clock?: () => Date) {
   const input = customExerciseInputSchema.parse(payload);
@@ -40,7 +41,12 @@ export function createSetup(db: D1Database, auth: AuthContext, operationId: stri
   const input = setupInputSchema.parse(payload);
   return executeCommand(db, auth, { operationId, kind: 'setup.create', payload: input, entryPoint: 'manual', plan: async context => {
     const exercise = await readExercise(db, auth.id, input.exerciseId);
-    const plan = setups.plan(context, null, { ...input, ...newMetadata(context, input.id) });
+    if (input.defaultsOrigin) {
+      const expected = defaultSetup(exercise, input.barUnit ?? input.loadUnit, input.id);
+      if (!expected.defaultsOrigin || input.defaultsOrigin.catalogVersion !== exercise.catalogVersion || input.defaultsOrigin.defaultedFields.some(field => !expected.defaultsOrigin!.defaultedFields.includes(field) || JSON.stringify(input[field]) !== JSON.stringify(expected[field])))
+        throw new DomainError('INVALID_INPUT', 400);
+    }
+    const plan = setups.plan(context, null, { ...input, defaultsOrigin: input.defaultsOrigin ?? null, ...newMetadata(context, input.id) });
     plan.guards.push(exerciseGuard(auth.id, exercise.id, exercise.revision)); plan.undoable = false;
     return plan;
   } }, clock);
@@ -49,7 +55,7 @@ export function patchSetup(db: D1Database, auth: AuthContext, operationId: strin
   const input = setupPatchSchema.parse(payload);
   return executeCommand(db, auth, { operationId, kind: 'setup.patch', payload: { id, ...input }, expectedRevision: revision, entryPoint: 'manual', plan: async context => {
     const before = await setups.read(db, auth.id, id); expectRevision(before, revision);
-    const plan = setups.plan(context, before, reviseRecord(before, context, input)); plan.undoable = false; return plan;
+    const plan = setups.plan(context, before, reviseRecord(before, context, { ...input, defaultsOrigin: before.defaultsOrigin ? { ...before.defaultsOrigin, defaultedFields: before.defaultsOrigin.defaultedFields.filter(field => !(field in input)), overriddenFields: [...new Set([...before.defaultsOrigin.overriddenFields, ...Object.keys(input) as Array<'loadUnit' | 'incrementDecimal' | 'incrementUnit' | 'availableLoads'>])] } : null })); plan.undoable = false; return plan;
   } }, clock);
 }
 export function createExerciseAlias(db: D1Database, auth: AuthContext, operationId: string, payload: unknown, clock?: () => Date) {

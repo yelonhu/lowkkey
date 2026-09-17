@@ -1,6 +1,6 @@
-# lowkkey Product & Engineering Specification v1.1.4
+# lowkkey Product & Engineering Specification v1.1.5
 
-> **Version:** 1.1.4 · **Status:** Implementation baseline / 开发基线（M0 已完成，M1 进度见 docs/M1.md）<br>
+> **Version:** 1.1.5 · **Status:** Implementation baseline / 开发基线（M0 已完成，M1 进度见 docs/M1.md）<br>
 > **Specification date:** 2026-09-17 UTC<br>
 > **Audience:** 产品负责人、设计者、开发者、测试者、后续接手的 AI coding agents<br>
 > **Language:** 中文正文，英文标识、字段、接口及需求编号<br>
@@ -226,7 +226,7 @@
 | /settings | 头像内的设置，含档案、三语、通知、记忆与导出 | 无AI前置；记忆可修改/忘记 |
 | /admin | 成员、额度和非内容错误摘要 | 非管理员403；不展示他人健康内容 |
 
-有唯一 `in_progress` 训练时，常规重开恢复该训练现场；本机离线候选与服务器进行中记录不一致时，首页显示本人选择/冲突入口，不猜一个。明确深链接优先于恢复逻辑。没有进行中训练时重开到三舱概览；本次使用中的返回保留原详情。首页、专注视图与报告共享同一数据源。桌面可增加留白和排版列数，但沿用同一个正面/对话切换模型，不默认常驻第二个聊天栏。
+有唯一 `in_progress` 训练时，常规重开恢复该训练现场；本机离线候选与服务器进行中记录不一致时，首页显示本人选择/冲突入口，不猜一个。明确深链接（包括三舱首页 /today）优先于恢复逻辑；仅普通根路径重开恢复进行中的训练。没有进行中训练时重开到三舱概览；本次使用中的返回保留原详情。首页、专注视图与报告共享同一数据源。桌面可增加留白和排版列数，但沿用同一个正面/对话切换模型，不默认常驻第二个聊天栏。
 
 **UX-04 页头入口**：在已有页头右侧固定显示 `对话 / 對話 / Chat` 文字按钮，DEF 14px、普通字重、无强调色底、无边框胶囊装饰，文字对比度至少4.5:1，触控区域至少44×44 CSS px。位置在概览和详情一致；小屏为标题截断留出该按钮位置。不要用低对比度来表达克制。无呼吸动效、未读红点、连续提示、悬浮助手、独立AI底栏或正面常驻输入框。按钮有键盘焦点和三语读屏名称“打开对话”等，首版不以双击/长按/滑动为发现前提。
 
@@ -337,9 +337,11 @@ stateDiagram-v2
 
 ### 5.5 视觉与布局
 
-**DEF** lowkkey 基础色采用微冷白底 `#F8FAFC`、纯白卡面 `#FFFFFF`、正文 `#0F172A`、次要文字 `#64748B`、主蓝 `#0071E3`。卡片采用 `#E2E8F0` 80% 细边框、18px 圆角与两层浅阴影；输入和按钮为10px圆角。主要按钮允许从主蓝至 `#0064D1` 的轻微同色渐变，不使用蓝紫装饰或持续流光。错误、警告与同步状态具有独立语义色及文字提示，文字和控件对比度须验证。此决定取代早期暖色衬线参考 [S03](#sources)。
+**DEF** lowkkey 基础色采用微冷白底 `#F8FAFC`、纯白卡面 `#FFFFFF`、正文 `#0F172A`、次要文字 `#64748B`、主蓝 `#0071E3`。卡片采用24px圆角与轻柔弥散阴影，不使用灰色细描边；输入和按钮为10px圆角。主要按钮允许从主蓝至 `#0064D1` 的轻微同色渐变，不使用蓝紫装饰或持续流光。错误、警告与同步状态具有独立语义色及文字提示，文字和控件对比度须验证。此决定取代早期暖色衬线参考 [S03](#sources)。
 
-全局界面、品牌与标题采用系统无衬线；标题适度收紧字距，不使用衬线体或宋体。核心读数、数字输入、日期与图表刻度采用系统等宽字体栈（ui-monospace / SF Mono / Menlo）及 tabular-nums，单位和解释文字保持无衬线，无外部字体请求。首页采用“今日状态 / 今日狀態 / Today”等状态导向文案。三语均检查 320/375/430px 与桌面、英文长按钮、键盘焦点、读屏标签和大型数字。首版跟随系统明暗偏好；深色采用石墨灰表面和蓝色强调。动效约160ms，尊重减少动态效果设置；不因视觉升级改变记录、单位或日期语义。
+全局界面、品牌与标题采用系统无衬线；标题适度收紧字距，不使用衬线体或宋体。核心读数、数字输入、日期与图表刻度采用项目内固定版本 JetBrains Mono WOFF2（保留官方许可与文件校验信息），系统等宽字体作为加载回退，并启用 tabular-nums，单位和解释文字保持无衬线，无外部字体请求。首页采用“今日状态 / 今日狀態 / Today”等状态导向文案。三语均检查 320/375/430px 与桌面、英文长按钮、键盘焦点、读屏标签和大型数字。首版跟随系统明暗偏好；深色采用石墨灰表面和蓝色强调。动效约160ms，尊重减少动态效果设置；不因视觉升级改变记录、单位或日期语义。
+
+**DEF 首页与触控**：首页三舱保持训练、体重、饮食顺序；窄屏默认训练占整行、体重与饮食并排，进行中的训练获得主要视觉强调。整张卡片使用单一语义化导航入口，不嵌套按钮；卡片以外的输入行不作为整行点击区。默认字体下以375×667首屏可见三舱入口为验证目标，放大字体与更窄窗口允许自然滚动，不压缩44px触控目标。动作、数字输入、语言切换和错误提示需要检查焦点、键盘与布局稳定性。
 
 <a id="weight"></a>
 ## 6. 体重与趋势
@@ -399,6 +401,9 @@ stateDiagram-v2
 
 器械增量保存 `increment_decimal + increment_unit`，可用档位保存带 `schemaVersion/unit/values` 的快照；不能用当前显示偏好重新解释原有档位。切换 load_unit 不把 5 lb 增量变成 5 kg。关键器械或重量含义变更创建新 setup。
 
+**DEF 智能默认与来源**：优先沿用本人最近使用的动作配置；无个人配置时使用受审目录与个人负重单位。标准杠铃默认 external_total、includes_bar=true，初始按单位建议20 kg或45 lb；哑铃默认per_side，明确辅助动作采用assistance，纯自重load为null。自定义动作不能凭名称推断语义。杆重是配置元数据，换显示单位不能把45 lb重新解释为20 kg。
+配置及动作快照以 defaultsOrigin 保存 schemaVersion、ruleVersion、catalogVersion、defaultedFields、overriddenFields；来源字段互斥且共享schema校验。目录默认必须匹配指定目录版本和规则；旧数据缺失来源按未知处理，不补为本人确认。默认器械实例、RPE、组类型和实际次数保持未知。常用语义以“总重／单侧／助力 · 单位”的可点击短标签呈现，其余在二级面板逐项维护；关键改变新建setup，保留已发生组的快照。
+
 ### 7.2 计划与日程
 
 **TRN-03** 每人可持有多个计划版本，只有一个 active 计划。计划包含训练模板、模板中的动作与目标组、次数下上沿、可选目标 RPE、训练日程；未填目标不妨碍记录。
@@ -416,7 +421,7 @@ stateDiagram-v2
 
 ### 7.3 逐组输入与生命周期
 
-**TRN-04** 手动开始训练时选模板或空白训练。动作卡显示：标准名及设备、单位/重量含义、上次可比较成绩、今日计划目标、实际组列表。预填数字采用上次同 setup 的值；没有历史则留空，不能伪造默认成绩。
+**TRN-04** 手动开始训练时选模板或空白训练。动作卡显示：标准名及设备、单位/重量含义、上次可比较成绩、今日计划目标、实际组列表。上次同 setup 的数字只作参考，不预填成实际完成组；首行无历史时留空。新加一行可沿用上一实际组的重量及原单位，次数和 RPE 留空，不能伪造默认成绩。
 
 | 组字段 | 必填 / 默认 | 校验 |
 |---|---|---|
@@ -431,6 +436,10 @@ stateDiagram-v2
 | note | 可选 | 最多 500 字符 |
 
 **DEF** 单组外部重量规范化不超过 1,000 kg；该值是错误输入防护，允许产品负责人修改。单位切换后的值超界时要求核对，不截断。非次数活动可作为 session note 保存，v1 不将时间/距离型活动混入 repetitions 字段或生成重量递进。
+
+**DEF 填写即记录**：动作以组号、重量、次数、选填RPE的紧凑行列表呈现，不设置完成勾选。只有本人编辑且有效的实际输入，在主动离开该行时提交；行内移动焦点不提交。加组、切动作、打开对话和结束训练先保存有效行；后台切换、刷新只保留草稿。空行、历史参考和半填行不生成事实。
+每行稳定ID、独立原始草稿，兼容旧草稿；本机入队与确切草稿消费原子提交，连续操作沿本人的回执依赖串联，不静默覆盖跨设备修改。编辑已保存行仍遵循版本保护；清空数字不等于删除。删除通过二级入口明确执行。反馈不得在指针按下和松开之间移动触控目标；同步失败/冲突靠近对应行显示。
+当前动作展开，其他动作以名称与组数折叠；顶部只保留当前动作、总历时、已记录组数与结束操作。空白开始不要求填写名称和配置，设置及日期在二级入口。半填内容可以保留为草稿后结束；服务器合计仅取真实成功回执对应事实。
 
 **TRN-05** 首版允许不记 RPE。动作结束可显示轻量“最后一组感觉如何”入口，默认不强制弹窗。疼痛/不适是本人描述，系统不能将“很累”自动变成受伤诊断，也不能将未填恢复等同恢复良好。
 
@@ -1106,7 +1115,7 @@ flowchart TD
 | exercise_definitions | id、scope=system/personal、owner_id?、catalog_version、family_id、equipment_type、variant_json、muscle_groups_json、status | system owner=null；personal owner必填；系统更新用发布版本 |
 | exercise_labels | exercise_id、locale、display_name、search_terms | UNIQUE(exercise_id,locale)；三语完整；名称非 PK |
 | exercise_aliases | P、alias_original、alias_normalized、locale_hint?、exercise_id、context_json?、confirmed_at | 不同目标可同名，返回候选而非覆盖 |
-| exercise_setups | P、exercise_id、equipment_instance?、load_semantics、load_unit、includes_bar?、bar_weight_decimal?、bar_unit?、increment_decimal?、increment_unit?、available_loads_json? | setup 不得引用他人 personal 动作；更换关键语义创建新 setup；增量/档位各自保留单位 |
+| exercise_setups | P、exercise_id、equipment_instance?、load_semantics、load_unit、includes_bar?、bar_weight_decimal?、bar_unit?、increment_decimal?、increment_unit?、available_loads_json?、defaults_origin_json? | setup 不得引用他人 personal 动作；更换关键语义创建新 setup；增量/档位各自保留单位 |
 | plan_versions | P、title、effective_local_date、status、templates_json、weekly_schedule_json、supersedes_id? | 完整 schema 快照，历史不可变；见下面 PlanSnapshot |
 | plan_selections | id、owner_id、plan_version_id?、effective_local_date、data_revision、operation_id | 计划命令的生效时间线；同一owner/operation唯一，null表示该日起无有效计划；与根版本、回执和事件在同一事务提交 |
 | scheduled_sessions | P、local_date、entry_timezone、plan_version_id?、template_id?、planned_start_local?、status=planned/skipped/moved/cancelled、moved_from_id?、override_mode=additional/template/day、override_snapshot? | 日程事实独立于实际 session；多个日程允许，但唯一明确来源 |
@@ -2227,6 +2236,7 @@ PR描述至少说明问题、最终行为、影响范围、对应需求与验收
 
 | 1.1.3 | 2026-09-17 | 按批准顺序先工程收整、训练快录、手动饮食，再完成计划／复用和共同能力；保留原 M1 编号与全部门槛；本次仅交付第0批基线与缺口清单，未开始两舱界面 |
 | 1.1.4 | 2026-09-17 | M1.4 训练快录接通独立页面、原始草稿、依赖队列和生命周期；产品负责人批准六条目录，追加动作模式／审核元数据及版本化目录迁移；完成边界和实际证据见 docs/M1.4.md，整个 M1 仍未验收 |
+| 1.1.5 | 2026-09-17 | 按批准计划修订训练为离行自动记录、独立逐行草稿和有来源的智能默认；首页卡片导航、24px无边框表面与本地JetBrains Mono；验证见 docs/M1-training-rows.md，保留全部M1剩余要求 |
 
 **文档完成标准**：目录与锚点可用；核心需求可追踪；字段/状态/接口/异常/权限/费用/三语不互相矛盾；所有必须行为有验收；未验证项明确对应实验、保守默认与阻塞阶段。后续开发进度由实现与测试证据维护，本规范不是完成进度的替代物。
 

@@ -6,8 +6,8 @@ export const personalExercises = new RecordStore<PersonalExercise>('exercise_def
   ...recordColumns, scope: 'scope', catalogVersion: 'catalog_version', familyId: 'family_id', parentExerciseId: 'parent_exercise_id', equipmentType: 'equipment_type', movementPattern: 'movement_pattern', catalogReview: 'catalog_review_json', variant: 'variant_json', muscles: 'muscle_groups_json', status: 'status', personalName: 'personal_name', personalLocale: 'personal_locale',
 }, ['variant', 'muscles', 'catalogReview']);
 export const setups = new RecordStore<ExerciseSetup>('exercise_setups', 'exercise_setup', exerciseSetupSchema, {
-  ...recordColumns, exerciseId: 'exercise_id', equipmentInstance: 'equipment_instance', loadSemantics: 'load_semantics', loadUnit: 'load_unit', includesBar: 'includes_bar', barWeightDecimal: 'bar_weight_decimal', barUnit: 'bar_unit', incrementDecimal: 'increment_decimal', incrementUnit: 'increment_unit', availableLoads: 'available_loads_json',
-}, ['availableLoads'], ['includesBar'], { availableLoads: 'available_loads_revision' });
+  ...recordColumns, exerciseId: 'exercise_id', equipmentInstance: 'equipment_instance', loadSemantics: 'load_semantics', loadUnit: 'load_unit', includesBar: 'includes_bar', barWeightDecimal: 'bar_weight_decimal', barUnit: 'bar_unit', incrementDecimal: 'increment_decimal', incrementUnit: 'increment_unit', availableLoads: 'available_loads_json', defaultsOrigin: 'defaults_origin_json',
+}, ['availableLoads', 'defaultsOrigin'], ['includesBar'], { availableLoads: 'available_loads_revision' });
 export const exerciseAliases = new RecordStore<ExerciseAlias>('exercise_aliases', 'exercise_alias', exerciseAliasSchema, {
   ...recordColumns, aliasOriginal: 'alias_original', aliasNormalized: 'alias_normalized', localeHint: 'locale_hint', exerciseId: 'exercise_id', context: 'context_json', confirmedAt: 'confirmed_at',
 }, ['context']);

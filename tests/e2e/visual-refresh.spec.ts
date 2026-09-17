@@ -29,20 +29,21 @@ test('visual refresh keeps readable themes, numeric typography and accessible la
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const colors = await page.locator('[data-artifact=WeightArtifact]').evaluate(card => {
         const root = getComputedStyle(document.documentElement), style = getComputedStyle(card), muted = getComputedStyle(card.querySelector('.muted')!);
-        const button = getComputedStyle(card.querySelector('button')!);
+        const action = getComputedStyle(card.querySelector('.card-action')!);
         const toRgb = (value: string) => { const node = document.createElement('span'); node.style.color = value; card.append(node); const color = getComputedStyle(node).color; node.remove(); return color; };
-        return { ink: style.color, surface: style.backgroundColor, canvas: root.backgroundColor, muted: muted.color, accent: toRgb(root.getPropertyValue('--accent')), accentEnd: toRgb(root.getPropertyValue('--accent-end')), buttonText: button.color, shadow: style.boxShadow };
+        return { ink: style.color, surface: style.backgroundColor, canvas: root.backgroundColor, muted: muted.color, accent: toRgb(root.getPropertyValue('--accent')), accentEnd: toRgb(root.getPropertyValue('--accent-end')), buttonText: toRgb(root.getPropertyValue('--accent-text')), actionText: action.color, shadow: style.boxShadow, border: style.borderTopWidth, radius: style.borderTopLeftRadius };
       });
       expect(contrast(colors.ink, colors.surface)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(colors.muted, colors.surface)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(colors.muted, colors.canvas)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(colors.buttonText, colors.accent)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(colors.buttonText, colors.accentEnd)).toBeGreaterThanOrEqual(4.5);
-      expect(colors.shadow).not.toBe('none');
+      expect(contrast(colors.actionText, colors.surface)).toBeGreaterThanOrEqual(4.5);
+      expect(colors.shadow).not.toBe('none'); expect(colors.border).toBe('0px'); expect(colors.radius).toBe('24px');
       await expect(page.locator('h1')).not.toHaveCSS('font-family', /Georgia|Songti|, serif(?:,|$)/);
       await expect(page.locator('.overview-heading time')).toHaveCSS('font-variant-numeric', /tabular-nums/);
       await page.screenshot({ path: prefix + '-' + theme + '-' + width + '-overview.png', fullPage: true });
-      await page.locator('[data-artifact=WeightArtifact] button').click();
+      await page.locator('[data-artifact=WeightArtifact]').click();
       const input = page.locator('#weight-value');
       await expect(input).toBeVisible();
       await input.fill('500.000');

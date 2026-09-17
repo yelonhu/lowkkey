@@ -25,14 +25,14 @@ async function readWeight(page: Page, id: string) { return page.evaluate(async i
 
 test('home to 110 lb, unit changes and reload keep the original measurement', async ({ page }, info) => {
   const text = words(info.project.name); await openWorkspace(page, info.project.name);
-  await page.locator('[data-artifact=WeightArtifact] button').click(); await expect(page).toHaveURL(/\/weight$/);
+  await page.locator('[data-artifact=WeightArtifact]').click(); await expect(page).toHaveURL(/\/weight$/);
   const receipt = await saveWeight(page, '110', dateFor(1990, info.project.name), 'lb'), id = receipt.result.id;
   await expect(page.getByTestId('weight-feedback')).toContainText(text.weight.created);
   await expect(page.locator(`[data-weight-id="${id}"] .record-value`)).toContainText('49.9');
   expect(await readWeight(page, id)).toMatchObject({ value: '110', unit: 'lb', kgMicros: 49895161, occurredAt: null, timePrecision: 'date', revision: 1 });
   await page.locator('.avatar').click(); await page.locator('#weight-display-unit').selectOption('lb');
   await expect(page.locator('#weight-display-unit')).toHaveValue('lb'); await expect(page.locator('[data-sync-state=synced]')).toBeVisible();
-  await page.locator('.brand').click(); await page.locator('[data-artifact=WeightArtifact] button').click();
+  await page.locator('.brand').click(); await page.locator('[data-artifact=WeightArtifact]').click();
   await showHistory(page);
   await expect(page.locator(`[data-weight-id="${id}"] .record-value`)).toContainText('110');
   await page.reload(); await showHistory(page); await expect(page.locator(`[data-weight-id="${id}"]`)).toBeVisible();

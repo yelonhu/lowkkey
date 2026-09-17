@@ -17,6 +17,7 @@ import { flushDrafts, useDraft } from './use-draft.ts';
 import { displayMass, WeightView } from './WeightView.tsx';
 import { SettingsView } from './SettingsView.tsx';
 import { NumericText } from './NumericText.tsx';
+import { commitTrainingRows } from './training/save-coordinator.ts';
 import { TrainingView } from './training/TrainingView.tsx';
 
 function currentPath() { return window.location.pathname + window.location.search; }
@@ -43,17 +44,17 @@ export function Workspace({ ownerId, onSignedOut }: { ownerId: string; onSignedO
   }, [commands, locale, profile, i18n]);
   useEffect(() => {
     if (!runtime || !ledger || restored.current) return; restored.current = true;
-    if (path === '/' || path === '/today') { const destination = active ? `/training/sessions/${active.value.id}` : '/today'; history.replaceState(null, '', destination); setPath(destination); setFrontPath(destination); }
+    if (path === '/') { const destination = active ? `/training/sessions/${active.value.id}` : '/today'; history.replaceState(null, '', destination); setPath(destination); setFrontPath(destination); }
     else if (path.startsWith('/assistant')) void runtime.database.readScene().then(scene => setFrontPath(scenePath(scene))).catch(() => setNotice('storageFailed'));
   }, [runtime, ledger, path, active]);
   async function navigate(destination: string) {
-    try { await flushDrafts(); history.pushState(null, '', destination); setPath(destination); if (!destination.startsWith('/assistant')) setFrontPath(destination); window.scrollTo(0, 0); if (runtime) void runtime.synchronizer.refresh(); }
+    try { await commitTrainingRows(); await flushDrafts(); history.pushState(null, '', destination); setPath(destination); if (!destination.startsWith('/assistant')) setFrontPath(destination); window.scrollTo(0, 0); if (runtime) void runtime.synchronizer.refresh(); }
     catch { setNotice('storageFailed'); }
   }
   async function openChat() {
     if (!runtime) return;
     try {
-      await flushDrafts(); const previous = await runtime.database.readScene(), selectedSession = /^\/training\/sessions\/([^/?]+)/.exec(frontPath)?.[1];
+      await commitTrainingRows(); await flushDrafts(); const previous = await runtime.database.readScene(), selectedSession = /^\/training\/sessions\/([^/?]+)/.exec(frontPath)?.[1];
       const scene: ReturnScene = { ownerId, view: frontPath.startsWith('/training') ? 'session' : frontPath.startsWith('/weight') ? 'weight' : frontPath.startsWith('/nutrition') ? 'diet' : frontPath.startsWith('/settings') ? 'settings' : 'overview', localDate: new URL(frontPath, location.origin).searchParams.get('date') ?? today, sessionId: selectedSession && uuidSchema.safeParse(selectedSession).success ? selectedSession : null, currentGroupId: previous && previous.sessionId === selectedSession ? previous.currentGroupId : null, scrollY: window.scrollY, timerStartedAt: previous && previous.sessionId === selectedSession ? previous.timerStartedAt : null, draftId: frontPath.startsWith('/weight') ? 'weight-form' : previous && previous.sessionId === selectedSession ? previous.draftId : null, updatedAt: new Date().toISOString() };
       await runtime.database.saveScene(scene); await navigate('/assistant');
     } catch { setNotice('storageFailed'); }
@@ -96,14 +97,18 @@ function Overview({ ledger, profile, navigate }: { ledger: LocalLedger; profile:
   const active = entries.filter(item => item.kind === 'workout_session').find(item => item.value.status === 'in_progress'), mealIds = new Set(entries.flatMap(item => item.kind === 'meal' && item.value.localDate === today ? [item.value.id] : []));
   const claim = entries.filter(item => item.kind === 'day_claim').find(item => item.value.localDate === today), pending = entries.filter(item => item.kind === 'import_draft' && item.value.localDate === today && item.value.status !== 'confirmed');
   const nutrients = summarizeNutrients(entries.flatMap(item => item.kind === 'meal_item' && mealIds.has(item.value.mealId) ? [item.value.snapshot.nutrientSnapshot] : []), claim?.value.explicitZeroIntake ?? false);
-  const goal = entries.flatMap(item => item.kind === 'goal_version' && item.value.effectiveLocalDate <= today ? [item.value] : []).sort((a, b) => b.effectiveLocalDate.localeCompare(a.effectiveLocalDate) || b.createdDataRevision - a.createdDataRevision)[0];
-  const protein = nutrients.knownSum.proteinMg, remaining = goal?.proteinTargetMg !== null && goal?.proteinTargetMg !== undefined && protein !== null ? goal.proteinTargetMg - protein : null;
-  return <><div className="page-heading overview-heading"><p className="eyebrow"><time dateTime={today}>{formatDate(new Date(), locale, timezone)}</time></p><h1>{t('today:title')}</h1><p>{t('today:hello', { name: profile.displayName })}</p></div><div className="artifact-grid">
-    <section className="artifact-card" data-artifact="SessionArtifact"><p className="card-index">01</p><h2>{t('today:training')}</h2><p className="card-main">{active ? active.value.title ?? t('today:trainingContinue') : t('today:trainingEmpty')}</p><button className={active ? undefined : 'secondary'} onClick={() => navigate(active ? `/training/sessions/${active.value.id}` : '/training')}>{t(active ? 'today:trainingContinue' : 'today:trainingStart')} <span aria-hidden="true">↗</span></button></section>
-    <section className="artifact-card" data-artifact="WeightArtifact"><p className="card-index">02</p><h2>{t('today:weight')}</h2><p className="muted">{t('today:latestWeight')}</p><p className="metric">{latest ? displayMass(latest.kgMicros, profile.bodyWeightUnit, locale) : '—'} {latest && <span className="unit">{profile.bodyWeightUnit}</span>}</p><p>{latest ? <time dateTime={latest.localDate}>{formatDate(new Date(`${latest.localDate}T12:00:00Z`), locale, 'UTC')}</time> : t('noRecords')}</p><button onClick={() => navigate('/weight')}>{t('today:weigh')} <span aria-hidden="true">↗</span></button></section>
-    <section className="artifact-card" data-artifact="DietArtifact"><p className="card-index">03</p><h2>{t('today:nutrition')}</h2><p className="muted">{t('today:loggedEnergy')}</p><p className="metric">{nutrients.knownSum.energyMkcal === null ? '—' : formatNumber(nutrients.knownSum.energyMkcal / 1000, locale)} <span className="unit">kcal</span></p><p>{t('today:protein')}: {protein === null ? t('unknown') : <><span className="numeric">{formatNumber(protein / 1000, locale)}</span> g</>}</p>{remaining !== null && <p><NumericText>{t(remaining < 0 ? 'today:overProtein' : 'today:remainingProtein', { amount: formatNumber(Math.abs(remaining) / 1000, locale) })}</NumericText></p>}{(!goal || (goal.energyTargetMkcal === null && goal.proteinTargetMg === null)) && <p>{t('today:noGoal')}</p>}<p className="muted">{t(`today:${claim?.value.nutritionCompleteness ?? 'unreviewed'}`)}</p>{nutrients.knownSum.estimated && <p>{t('today:estimated')}</p>}{nutrients.unknownCounts.energy > 0 && <p><NumericText>{t('today:unknownEnergy', { count: nutrients.unknownCounts.energy })}</NumericText></p>}{nutrients.unknownCounts.protein > 0 && <p><NumericText>{t('today:unknownProtein', { count: nutrients.unknownCounts.protein })}</NumericText></p>}{pending.length > 0 && <p><NumericText>{t('today:pendingMeals', { count: pending.length })}</NumericText></p>}<button className="secondary" onClick={() => navigate(`/nutrition?date=${today}`)}>{t('today:recordMeal')} <span aria-hidden="true">↗</span></button></section>
+  const link = (destination: string) => ({ href: destination, onClick: (event: React.MouseEvent<HTMLAnchorElement>) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); navigate(destination); } } });
+  return <><div className="page-heading overview-heading"><p className="eyebrow"><time dateTime={today}>{formatDate(new Date(), locale, timezone)}</time></p><h1>{t('today:title')}</h1></div><div className="artifact-grid">
+    <a {...link(active ? '/training/sessions/' + active.value.id : '/training')} className={'artifact-card training-artifact' + (active ? ' is-active' : '')} data-artifact="SessionArtifact">
+      <h2>{t('today:training')}</h2><p className="card-main">{active ? active.value.title ?? t('today:trainingContinue') : t('today:trainingEmpty')}</p><span className="card-action">{t(active ? 'today:trainingContinue' : 'today:trainingStart')} <span aria-hidden="true">↗</span></span>
+    </a>
+    <a {...link('/weight')} className="artifact-card" data-artifact="WeightArtifact"><h2>{t('today:weight')}</h2><p className="metric">{latest ? displayMass(latest.kgMicros, profile.bodyWeightUnit, locale) : '—'} <span className="unit">{latest ? profile.bodyWeightUnit : ''}</span></p><p className="muted">{latest ? <time dateTime={latest.localDate}>{formatDate(new Date(latest.localDate + 'T12:00:00Z'), locale, 'UTC')}</time> : t('noRecords')}</p><span className="card-action">{t('today:weigh')}</span></a>
+    <a {...link('/nutrition?date=' + today)} className="artifact-card" data-artifact="DietArtifact"><h2>{t('today:nutrition')}</h2><p className="metric">{nutrients.knownSum.energyMkcal === null ? '—' : formatNumber(nutrients.knownSum.energyMkcal / 1000, locale)} <span className="unit">kcal</span></p><p className="muted">{t('today:' + (claim?.value.nutritionCompleteness ?? 'unreviewed'))}</p>
+      {nutrients.knownSum.estimated && <p>{t('today:estimated')}</p>}{nutrients.unknownCounts.energy > 0 && <p><NumericText>{t('today:unknownEnergy', { count: nutrients.unknownCounts.energy })}</NumericText></p>}{pending.length > 0 && <p><NumericText>{t('today:pendingMeals', { count: pending.length })}</NumericText></p>}
+      <span className="card-action">{t('today:recordMeal')}</span></a>
   </div></>;
 }
+
 function ConversationDraft({ runtime, timezone, back }: { runtime: WorkspaceRuntime; timezone: string; back: () => void }) {
   const { t } = useTranslation(), draft = useDraft(runtime.database, 'conversation-unsubmitted', 'conversation', { text: '' }, timezone);
   return <section className="workspace-face conversation"><button className="quiet back-link" onClick={back}>← {t('assistant:back')}</button><h1>{t('assistant:title')}</h1><p>{t('assistant:unavailable')}</p><label htmlFor="conversation-draft">{t('assistant:draft')}</label><textarea id="conversation-draft" disabled={!draft.ready} maxLength={8000} value={draft.fields.text} onChange={event => draft.change('text', event.target.value)} onBlur={() => { void draft.flush().catch(() => {}); }}/><p className="muted">{t('assistant:offline')}</p><p role="status">{draft.error ? t('storageFailed') : draft.saved ? t('savedDraft') : ''}</p></section>;
