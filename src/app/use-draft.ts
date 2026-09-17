@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LocalDatabase, LocalDraft } from '../client/local-database.ts';
+import type { EntityRef } from '../domain/artifacts.ts';
 import { localDateSchema, revisionSchema, uuidSchema } from '../domain/primitives.ts';
 
 /** Raw input is independent of submitted commands and the shared entity cache.
  * Serialize saves so a slow earlier edit cannot overwrite newer input. */
-export function useDraft<T extends Record<string, string>>(database: LocalDatabase, id: string, kind: LocalDraft['kind'], defaults: T, timezone: string) {
+export function useDraft<T extends Record<string, string>>(database: LocalDatabase, id: string, kind: LocalDraft['kind'], defaults: T, timezone: string, describe?: (fields: T) => { baseRefs: EntityRef[]; localDate?: string | null }) {
   const [fields, setFields] = useState(defaults), [ready, setReady] = useState(false), [error, setError] = useState(false), [saved, setSaved] = useState(false);
   const current = useRef(defaults), initial = useRef(defaults), timer = useRef<ReturnType<typeof setTimeout> | null>(null), writing = useRef<Promise<void>>(Promise.resolve()), dirty = useRef(false), alive = useRef(true);
   const persist = useRef<() => Promise<{ id: string; updatedAt: string } | undefined>>(async () => undefined);
@@ -14,7 +15,8 @@ export function useDraft<T extends Record<string, string>>(database: LocalDataba
     if (!dirty.current) { await writing.current; return lastSaved.current; }
     const rawFields = { ...current.current }, updatedAt = new Date().toISOString(); dirty.current = false;
     const targetId = uuidSchema.safeParse(rawFields.targetId), revision = revisionSchema.safeParse(Number(rawFields.targetRevision));
-    const draft: LocalDraft = { id, ownerId: database.ownerId, kind, rawFields, baseRefs: kind === 'weight' && targetId.success && revision.success ? [{ type: 'weight_entry', id: targetId.data, revision: revision.data }] : [], localDate: localDateSchema.safeParse(rawFields.date).success ? rawFields.date : null, entryTimezone: timezone, updatedAt };
+    const described = describe?.(rawFields);
+    const draft: LocalDraft = { id, ownerId: database.ownerId, kind, rawFields, baseRefs: described?.baseRefs ?? (kind === 'weight' && targetId.success && revision.success ? [{ type: 'weight_entry', id: targetId.data, revision: revision.data }] : []), localDate: described?.localDate ?? (localDateSchema.safeParse(rawFields.date).success ? rawFields.date : null), entryTimezone: timezone, updatedAt };
     const save = writing.current.catch(() => { /* The previous failure is already visible; retry the newest input. */ }).then(() => database.saveDraft(draft));
     writing.current = save;
     try { await save; lastSaved.current = { id, updatedAt }; if (alive.current) { setError(false); setSaved(true); } return lastSaved.current; }

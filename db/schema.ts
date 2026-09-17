@@ -102,6 +102,7 @@ export const exerciseDefinitions = sqliteTable('exercise_definitions', {
   id: text('id').primaryKey(), ownerId: text('owner_id').references(() => users.id), revision: integer('revision').notNull(),
   createdAt: text('created_at').notNull(), updatedAt: text('updated_at').notNull(), deletedAt: text('deleted_at'),
   scope: text('scope').notNull(), catalogVersion: text('catalog_version').notNull(), familyId: text('family_id').notNull(), parentExerciseId: text('parent_exercise_id'),
+  movementPattern: text('movement_pattern').notNull().default('unspecified'), catalogReviewJson: text('catalog_review_json'),
   equipmentType: text('equipment_type').notNull(), variantJson: text('variant_json').notNull(), muscleGroupsJson: text('muscle_groups_json').notNull(), status: text('status').notNull(),
   personalName: text('personal_name'), personalLocale: text('personal_locale'), operationId: text('operation_id'), createdOperationId: text('created_operation_id'),
 }, table => [uniqueIndex('exercises_owner_id').on(table.ownerId, table.id), index('exercises_scope_owner').on(table.scope, table.ownerId, table.status),

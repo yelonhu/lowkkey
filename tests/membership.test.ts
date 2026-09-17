@@ -256,7 +256,7 @@ describe('logout and migration continuity', () => {
       await binding.prepare("INSERT INTO users(id,email_normalized,role,status,locale,timezone,created_at) VALUES (?,?,'admin','active','en','UTC',?)").bind(admin, email(admin), start).run();
       await binding.prepare('INSERT INTO user_profiles(id,owner_id,created_at,updated_at,display_name,next_digest_at) VALUES (?,?,?,?,?,?)').bind(other, admin, start, start, 'Retained profile', start).run();
       await binding.prepare("INSERT INTO invitations(id,email_normalized,expires_at,status,created_by,created_at) VALUES (?,?,'2026-09-23T20:00:00.000Z','invited',?,?)").bind(invited, email(invited), admin, start).run();
-      expect(await applyMigrations(binding)).toEqual(['0001_youthful_professor_monster.sql', '0002_cloudy_angel.sql', '0003_charming_cyclops.sql', '0004_keen_night_thrasher.sql', '0005_polite_jackpot.sql']);
+      expect(await applyMigrations(binding)).toEqual(['0001_youthful_professor_monster.sql', '0002_cloudy_angel.sql', '0003_charming_cyclops.sql', '0004_keen_night_thrasher.sql', '0005_polite_jackpot.sql', '0006_low_adam_destine.sql', '0007_training_catalog.sql']);
       expect(await applyMigrations(binding)).toEqual([]);
       expect(await binding.prepare('SELECT display_name,auto_memory_enabled FROM user_profiles').first()).toEqual({ display_name: 'Retained profile', auto_memory_enabled: 1 });
       expect(await binding.prepare('SELECT membership_revision FROM users').first('membership_revision')).toBe(1);

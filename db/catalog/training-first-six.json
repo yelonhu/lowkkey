@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 1,
+  "version": "training-2026-09-17.1",
+  "entries": [
+    {
+      "id": "bdeba6ce-c5ba-4a1b-9910-000000000001",
+      "slug": "lat-pulldown",
+      "labels": {
+        "zh-Hans": "高位下拉（绳索）",
+        "zh-Hant": "高位下拉（滑輪）",
+        "en": "Lat pulldown (cable)"
+      },
+      "equipmentType": "cable",
+      "movementPattern": "vertical_pull",
+      "muscles": {
+        "schemaVersion": 1,
+        "primary": [
+          "lats"
+        ],
+        "secondary": [
+          "biceps"
+        ]
+      },
+      "variant": {
+        "schemaVersion": 1,
+        "angle": "unspecified",
+        "grip": "unspecified",
+        "laterality": "unspecified",
+        "note": null
+      },
+      "suggestedSetup": {
+        "loadSemantics": "external_total",
+        "loadUnit": "kg",
+        "includesBar": null,
+        "barWeightDecimal": null,
+        "barUnit": null
+      },
+      "sourceUrls": [
+        "https://contentcdn.eacefitness.com/April2018/ACE_BackExerStudy.pdf"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewedBy": "product-owner",
+        "reviewedAt": "2026-09-17T20:36:00.714Z",
+        "record": "docs/catalog-training-first-six.md"
+      }
+    },
+    {
+      "id": "bdeba6ce-c5ba-4a1b-9910-000000000002",
+      "slug": "seated-row",
+      "labels": {
+        "zh-Hans": "坐姿划船（绳索）",
+        "zh-Hant": "坐姿划船（滑輪）",
+        "en": "Seated cable row"
+      },
+      "equipmentType": "cable",
+      "movementPattern": "horizontal_pull",
+      "muscles": {
+        "schemaVersion": 1,
+        "primary": [
+          "upper_back"
+        ],
+        "secondary": [
+          "lats",
+          "biceps"
+        ]
+      },
+      "variant": {
+        "schemaVersion": 1,
+        "angle": "unspecified",
+        "grip": "unspecified",
+        "laterality": "unspecified",
+        "note": null
+      },
+      "suggestedSetup": {
+        "loadSemantics": "external_total",
+        "loadUnit": "kg",
+        "includesBar": null,
+        "barWeightDecimal": null,
+        "barUnit": null
+      },
+      "sourceUrls": [
+        "https://www.acefitness.org/resources/everyone/exercise-library/48/seated-row/"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewedBy": "product-owner",
+        "reviewedAt": "2026-09-17T20:36:00.714Z",
+        "record": "docs/catalog-training-first-six.md"
+      }
+    },
+    {
+      "id": "bdeba6ce-c5ba-4a1b-9910-000000000003",
+      "slug": "assisted-pull-up",
+      "labels": {
+        "zh-Hans": "辅助引体向上",
+        "zh-Hant": "輔助引體向上",
+        "en": "Assisted pull-up"
+      },
+      "equipmentType": "machine",
+      "movementPattern": "vertical_pull",
+      "muscles": {
+        "schemaVersion": 1,
+        "primary": [
+          "lats"
+        ],
+        "secondary": [
+          "biceps"
+        ]
+      },
+      "variant": {
+        "schemaVersion": 1,
+        "angle": "unspecified",
+        "grip": "unspecified",
+        "laterality": "unspecified",
+        "note": null
+      },
+      "suggestedSetup": {
+        "loadSemantics": "assistance",
+        "loadUnit": "kg",
+        "includesBar": null,
+        "barWeightDecimal": null,
+        "barUnit": null
+      },
+      "sourceUrls": [
+        "https://www.intenzafitness.com/wp-content/uploads/2025/11/Intenza-EL12-Assisted-Chin-Dip-Owners-Manual.pdf"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewedBy": "product-owner",
+        "reviewedAt": "2026-09-17T20:36:00.714Z",
+        "record": "docs/catalog-training-first-six.md"
+      }
+    },
+    {
+      "id": "bdeba6ce-c5ba-4a1b-9910-000000000004",
+      "slug": "barbell-bench-press",
+      "labels": {
+        "zh-Hans": "杠铃平板卧推",
+        "zh-Hant": "槓鈴平板臥推",
+        "en": "Barbell bench press"
+      },
+      "equipmentType": "barbell",
+      "movementPattern": "horizontal_push",
+      "muscles": {
+        "schemaVersion": 1,
+        "primary": [
+          "chest"
+        ],
+        "secondary": [
+          "triceps",
+          "shoulders"
+        ]
+      },
+      "variant": {
+        "schemaVersion": 1,
+        "angle": "flat",
+        "grip": "unspecified",
+        "laterality": "unspecified",
+        "note": null
+      },
+      "suggestedSetup": {
+        "loadSemantics": "external_total",
+        "loadUnit": "lb",
+        "includesBar": true,
+        "barWeightDecimal": "45",
+        "barUnit": "lb"
+      },
+      "sourceUrls": [
+        "https://www.acefitness.org/resources/pros/expert-articles/8972/be-a-chest-day-champion-an-evidence-based-approach-to-training-the-chest/"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewedBy": "product-owner",
+        "reviewedAt": "2026-09-17T20:36:00.714Z",
+        "record": "docs/catalog-training-first-six.md"
+      }
+    },
+    {
+      "id": "bdeba6ce-c5ba-4a1b-9910-000000000005",
+      "slug": "incline-dumbbell-press",
+      "labels": {
+        "zh-Hans": "哑铃上斜卧推",
+        "zh-Hant": "啞鈴上斜臥推",
+        "en": "Incline dumbbell press"
+      },
+      "equipmentType": "dumbbell",
+      "movementPattern": "horizontal_push",
+      "muscles": {
+        "schemaVersion": 1,
+        "primary": [
+          "chest"
+        ],
+        "secondary": [
+          "shoulders",
+          "triceps"
+        ]
+      },
+      "variant": {
+        "schemaVersion": 1,
+        "angle": "incline",
+        "grip": "unspecified",
+        "laterality": "unspecified",
+        "note": null
+      },
+      "suggestedSetup": {
+        "loadSemantics": "per_side",
+        "loadUnit": "lb",
+        "includesBar": null,
+        "barWeightDecimal": null,
+        "barUnit": null
+      },
+      "sourceUrls": [
+        "https://www.nasm.org/resource-center/exercise-library/two-arm-incline-dumbbell-chest-press"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewedBy": "product-owner",
+        "reviewedAt": "2026-09-17T20:36:00.714Z",
+        "record": "docs/catalog-training-first-six.md"
+      }
+    },
+    {
+      "id": "bdeba6ce-c5ba-4a1b-9910-000000000006",
+      "slug": "assisted-dip",
+      "labels": {
+        "zh-Hans": "辅助双杠臂屈伸",
+        "zh-Hant": "輔助雙槓臂屈伸",
+        "en": "Assisted dip"
+      },
+      "equipmentType": "machine",
+      "movementPattern": "vertical_push",
+      "muscles": {
+        "schemaVersion": 1,
+        "primary": [
+          "triceps",
+          "chest"
+        ],
+        "secondary": [
+          "shoulders"
+        ]
+      },
+      "variant": {
+        "schemaVersion": 1,
+        "angle": "unspecified",
+        "grip": "unspecified",
+        "laterality": "unspecified",
+        "note": null
+      },
+      "suggestedSetup": {
+        "loadSemantics": "assistance",
+        "loadUnit": "kg",
+        "includesBar": null,
+        "barWeightDecimal": null,
+        "barUnit": null
+      },
+      "sourceUrls": [
+        "https://www.intenzafitness.com/wp-content/uploads/2025/11/Intenza-EL12-Assisted-Chin-Dip-Owners-Manual.pdf"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewedBy": "product-owner",
+        "reviewedAt": "2026-09-17T20:36:00.714Z",
+        "record": "docs/catalog-training-first-six.md"
+      }
+    }
+  ]
+}

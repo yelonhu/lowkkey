@@ -11,10 +11,10 @@ import { exerciseAliases, personalExercises, setups } from './training-store.ts'
 import { pageAfter, pageResult } from './pagination.ts';
 
 export async function readExercise(db: D1Database, owner: string, id: string, includeArchived = false) {
-  const row = await db.prepare(`SELECT id,owner_id AS ownerId,revision,created_at AS createdAt,updated_at AS updatedAt,deleted_at AS deletedAt,scope,catalog_version AS catalogVersion,family_id AS familyId,parent_exercise_id AS parentExerciseId,equipment_type AS equipmentType,variant_json,muscle_groups_json,status,personal_name AS personalName,personal_locale AS personalLocale FROM exercise_definitions WHERE id=? AND (scope='system' OR owner_id=?) AND deleted_at IS NULL${includeArchived ? '' : " AND status='active'"}`).bind(id, owner).first<Record<string, unknown>>();
+  const row = await db.prepare(`SELECT id,owner_id AS ownerId,revision,created_at AS createdAt,updated_at AS updatedAt,deleted_at AS deletedAt,scope,catalog_version AS catalogVersion,family_id AS familyId,parent_exercise_id AS parentExerciseId,equipment_type AS equipmentType,movement_pattern AS movementPattern,catalog_review_json,variant_json,muscle_groups_json,status,personal_name AS personalName,personal_locale AS personalLocale FROM exercise_definitions WHERE id=? AND (scope='system' OR owner_id=?) AND deleted_at IS NULL${includeArchived ? '' : " AND status='active'"}`).bind(id, owner).first<Record<string, unknown>>();
   if (!row) throw new DomainError('RECORD_NOT_FOUND', 404);
-  const { variant_json, muscle_groups_json, ...fields } = row;
-  return exerciseDefinitionSchema.parse({ ...fields, variant: JSON.parse(String(variant_json)), muscles: JSON.parse(String(muscle_groups_json)) });
+  const { variant_json, muscle_groups_json, catalog_review_json, ...fields } = row;
+  return exerciseDefinitionSchema.parse({ ...fields, variant: JSON.parse(String(variant_json)), muscles: JSON.parse(String(muscle_groups_json)), catalogReview: catalog_review_json === null ? null : JSON.parse(String(catalog_review_json)) });
 }
 export function exerciseGuard(owner: string, id: string, revision: number): Guard {
   return { predicate: "EXISTS(SELECT 1 FROM exercise_definitions WHERE id=? AND revision=? AND (scope='system' OR owner_id=?) AND status='active' AND deleted_at IS NULL)", values: [id, revision, owner], error: new DomainError('CONTEXT_STALE', 422) };
@@ -23,13 +23,13 @@ export async function displaySnapshot(context: CommandContext, setup: ExerciseSe
   const exercise = await readExercise(context.db, context.auth.id, setup.exerciseId);
   const label = exercise.scope === 'personal' ? { name: exercise.personalName!, locale: exercise.personalLocale! } : await context.db.prepare("SELECT display_name AS name,locale FROM exercise_labels WHERE exercise_id=? AND locale IN (?,'en') ORDER BY CASE WHEN locale=? THEN 0 ELSE 1 END LIMIT 1").bind(exercise.id, context.auth.locale, context.auth.locale).first<{ name: string; locale: Locale }>();
   if (!label) throw new DomainError('TEMPORARY_FAILURE', 503, { reason: 'catalogLabelMissing' });
-  return { snapshot: exerciseDisplaySnapshotSchema.parse({ schemaVersion: 1, exerciseId: exercise.id, catalogVersion: exercise.catalogVersion, name: label.name, locale: label.locale, equipmentType: exercise.equipmentType, equipmentInstance: setup.equipmentInstance, variant: exercise.variant, muscles: exercise.muscles, loadSemantics: setup.loadSemantics, includesBar: setup.includesBar, barWeightDecimal: setup.barWeightDecimal, barUnit: setup.barUnit }), guard: exerciseGuard(context.auth.id, exercise.id, exercise.revision) };
+  return { snapshot: exerciseDisplaySnapshotSchema.parse({ schemaVersion: 1, exerciseId: exercise.id, catalogVersion: exercise.catalogVersion, name: label.name, locale: label.locale, equipmentType: exercise.equipmentType, equipmentInstance: setup.equipmentInstance, variant: exercise.variant, muscles: exercise.muscles, movementPattern: exercise.movementPattern, loadSemantics: setup.loadSemantics, includesBar: setup.includesBar, barWeightDecimal: setup.barWeightDecimal, barUnit: setup.barUnit }), guard: exerciseGuard(context.auth.id, exercise.id, exercise.revision) };
 }
 export function createCustomExercise(db: D1Database, auth: AuthContext, operationId: string, payload: unknown, clock?: () => Date) {
   const input = customExerciseInputSchema.parse(payload);
   return executeCommand(db, auth, { operationId, kind: 'exercise.create', payload: input, entryPoint: 'manual', plan: async context => {
     const parent = input.parentExerciseId ? await readExercise(db, auth.id, input.parentExerciseId) : null;
-    const record = personalExerciseSchema.parse({ ...newMetadata(context, input.id), scope: 'personal', catalogVersion: 'personal-v1', familyId: parent?.familyId ?? input.id, parentExerciseId: input.parentExerciseId, equipmentType: input.equipmentType, variant: input.variant, muscles: input.muscles, status: 'active', personalName: input.name, personalLocale: input.locale });
+    const record = personalExerciseSchema.parse({ ...newMetadata(context, input.id), scope: 'personal', catalogVersion: 'personal-v1', familyId: parent?.familyId ?? input.id, parentExerciseId: input.parentExerciseId, equipmentType: input.equipmentType, variant: input.variant, muscles: input.muscles, movementPattern: input.movementPattern ?? 'unspecified', catalogReview: null, status: 'active', personalName: input.name, personalLocale: input.locale });
     const plan = personalExercises.plan(context, null, record);
     if (parent) plan.guards.push(exerciseGuard(auth.id, parent.id, parent.revision));
     plan.undoable = false;

@@ -174,27 +174,39 @@ export class LocalDatabase {
   /** The command and removal of the exact submitted draft commit together. A
    * newer draft from another tab is never erased by an older submit. */
   async enqueueCommand(raw: unknown, draft?: { id: string; updatedAt: string }): Promise<QueuedCommand> {
-    const next = newQueuedCommand(raw);
-    if (next.ownerId !== this.ownerId) throw new QueueError('OWNER_MISMATCH');
+    return (await this.enqueueCommands([raw], draft))[0];
+  }
+  /** Compound UI intent (custom exercise → setup → session exercise) is saved
+   * locally all-or-nothing. Server commands retain their own atomic receipts. */
+  async enqueueCommands(raw: unknown[], draft?: { id: string; updatedAt: string }): Promise<QueuedCommand[]> {
+    if (!raw.length || raw.length > 20) throw new QueueError('LOCAL_COMMAND_CHANGED');
+    const next = raw.map(newQueuedCommand);
+    if (next.some(command => command.ownerId !== this.ownerId)) throw new QueueError('OWNER_MISMATCH');
+    if (new Set(next.map(command => command.operationId)).size !== next.length) throw new QueueError('LOCAL_COMMAND_CHANGED');
     return this.transaction(['commands', 'drafts'], 'readwrite', async transaction => {
-      const commands = transaction.objectStore('commands'), currentRaw = await request(commands.get(next.operationId));
-      if (currentRaw) {
-        const current = this.checkedCommand(currentRaw);
-        if (JSON.stringify(commandInput(current)) !== JSON.stringify(commandInput(next))) throw new QueueError('LOCAL_COMMAND_CHANGED');
-        return current;
+      const commands = transaction.objectStore('commands'), result: QueuedCommand[] = [];
+      let added = false;
+      for (const command of next) {
+        const currentRaw = await request(commands.get(command.operationId));
+        if (currentRaw) {
+          const current = this.checkedCommand(currentRaw);
+          if (JSON.stringify(commandInput(current)) !== JSON.stringify(commandInput(command))) throw new QueueError('LOCAL_COMMAND_CHANGED');
+          result.push(current); continue;
+        }
+        // Dependencies must precede successors, ruling out local dependency cycles.
+        for (const id of command.dependencies) {
+          const dependencyRaw = await request(commands.get(id));
+          if (!dependencyRaw) throw new QueueError('DEPENDENCY_MISSING');
+          if (this.checkedCommand(dependencyRaw).state === 'discarded') throw new QueueError('DEPENDENCY_BLOCKED');
+        }
+        await request(commands.add(command, command.operationId));
+        result.push(command); added = true;
       }
-      // Dependencies must already exist, so a newly queued command cannot form a cycle.
-      for (const id of next.dependencies) {
-        const dependencyRaw = await request(commands.get(id));
-        if (!dependencyRaw) throw new QueueError('DEPENDENCY_MISSING');
-        if (this.checkedCommand(dependencyRaw).state === 'discarded') throw new QueueError('DEPENDENCY_BLOCKED');
-      }
-      await request(commands.add(next, next.operationId));
-      if (draft) {
+      if (added && draft) {
         const drafts = transaction.objectStore('drafts'), currentDraft = await request(drafts.get(draft.id));
         if (currentDraft && localDraftSchema.parse(currentDraft).updatedAt === draft.updatedAt) await request(drafts.delete(draft.id));
       }
-      return next;
+      return result;
     });
   }
   async listCommands(): Promise<QueuedCommand[]> {

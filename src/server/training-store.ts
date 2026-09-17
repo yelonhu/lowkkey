@@ -3,8 +3,8 @@ import type { DayClaim, ExerciseAlias, ExerciseSetup, PersonalExercise, PlanVers
 import { RecordStore, recordColumns } from './record-store.ts';
 
 export const personalExercises = new RecordStore<PersonalExercise>('exercise_definitions', 'exercise_definition', personalExerciseSchema, {
-  ...recordColumns, scope: 'scope', catalogVersion: 'catalog_version', familyId: 'family_id', parentExerciseId: 'parent_exercise_id', equipmentType: 'equipment_type', variant: 'variant_json', muscles: 'muscle_groups_json', status: 'status', personalName: 'personal_name', personalLocale: 'personal_locale',
-}, ['variant', 'muscles']);
+  ...recordColumns, scope: 'scope', catalogVersion: 'catalog_version', familyId: 'family_id', parentExerciseId: 'parent_exercise_id', equipmentType: 'equipment_type', movementPattern: 'movement_pattern', catalogReview: 'catalog_review_json', variant: 'variant_json', muscles: 'muscle_groups_json', status: 'status', personalName: 'personal_name', personalLocale: 'personal_locale',
+}, ['variant', 'muscles', 'catalogReview']);
 export const setups = new RecordStore<ExerciseSetup>('exercise_setups', 'exercise_setup', exerciseSetupSchema, {
   ...recordColumns, exerciseId: 'exercise_id', equipmentInstance: 'equipment_instance', loadSemantics: 'load_semantics', loadUnit: 'load_unit', includesBar: 'includes_bar', barWeightDecimal: 'bar_weight_decimal', barUnit: 'bar_unit', incrementDecimal: 'increment_decimal', incrementUnit: 'increment_unit', availableLoads: 'available_loads_json',
 }, ['availableLoads'], ['includesBar'], { availableLoads: 'available_loads_revision' });

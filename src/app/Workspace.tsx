@@ -17,6 +17,7 @@ import { flushDrafts, useDraft } from './use-draft.ts';
 import { displayMass, WeightView } from './WeightView.tsx';
 import { SettingsView } from './SettingsView.tsx';
 import { NumericText } from './NumericText.tsx';
+import { TrainingView } from './training/TrainingView.tsx';
 
 function currentPath() { return window.location.pathname + window.location.search; }
 function scenePath(scene: ReturnScene | null): string {
@@ -53,7 +54,7 @@ export function Workspace({ ownerId, onSignedOut }: { ownerId: string; onSignedO
     if (!runtime) return;
     try {
       await flushDrafts(); const previous = await runtime.database.readScene(), selectedSession = /^\/training\/sessions\/([^/?]+)/.exec(frontPath)?.[1];
-      const scene: ReturnScene = { ownerId, view: frontPath.startsWith('/training') ? 'session' : frontPath.startsWith('/weight') ? 'weight' : frontPath.startsWith('/nutrition') ? 'diet' : frontPath.startsWith('/settings') ? 'settings' : 'overview', localDate: new URL(frontPath, location.origin).searchParams.get('date') ?? today, sessionId: selectedSession && uuidSchema.safeParse(selectedSession).success ? selectedSession : null, currentGroupId: previous && previous.sessionId === selectedSession ? previous.currentGroupId : null, scrollY: window.scrollY, timerStartedAt: previous && previous.sessionId === selectedSession ? previous.timerStartedAt : null, draftId: frontPath.startsWith('/weight') ? 'weight-form' : null, updatedAt: new Date().toISOString() };
+      const scene: ReturnScene = { ownerId, view: frontPath.startsWith('/training') ? 'session' : frontPath.startsWith('/weight') ? 'weight' : frontPath.startsWith('/nutrition') ? 'diet' : frontPath.startsWith('/settings') ? 'settings' : 'overview', localDate: new URL(frontPath, location.origin).searchParams.get('date') ?? today, sessionId: selectedSession && uuidSchema.safeParse(selectedSession).success ? selectedSession : null, currentGroupId: previous && previous.sessionId === selectedSession ? previous.currentGroupId : null, scrollY: window.scrollY, timerStartedAt: previous && previous.sessionId === selectedSession ? previous.timerStartedAt : null, draftId: frontPath.startsWith('/weight') ? 'weight-form' : previous && previous.sessionId === selectedSession ? previous.draftId : null, updatedAt: new Date().toISOString() };
       await runtime.database.saveScene(scene); await navigate('/assistant');
     } catch { setNotice('storageFailed'); }
   }
@@ -83,7 +84,7 @@ export function Workspace({ ownerId, onSignedOut }: { ownerId: string; onSignedO
       <div className="sync-bar" role="status" data-sync-state={syncText}><span><NumericText>{t(syncText, { count: pendingCount })}</NumericText></span>{disconnected && pendingCount > 0 && <span><NumericText>{t('pendingCount', { count: pendingCount })}</NumericText></span>}{(state.syncStatus.errorCode || state.queueStatus.errorCode) && <button className="quiet" onClick={() => { void runtime.queue.retry(); }}>{t('retry')}</button>}</div>
       <main id="main-content" aria-label={t('a11y:main')}><div hidden={chat} className="workspace-face" key="front">
         {frontPath !== '/today' && frontPath !== '/' && <button className="quiet back-link" onClick={() => { void navigate('/today'); }}>← {t('today')}</button>}
-        {frontPath.startsWith('/weight') ? <WeightView runtime={runtime} ledger={ledger} profile={profile} commands={commands}/> : frontPath.startsWith('/settings') ? <SettingsView runtime={runtime} ledger={ledger} profile={profile} commands={commands} preference={preference} onSignedOut={onSignedOut}/> : frontPath.startsWith('/training') || frontPath.startsWith('/nutrition') ? <section className="panel"><h1>{t(frontPath.startsWith('/training') ? 'today:training' : 'today:nutrition')}</h1><p>{t('unavailableFeature')}</p></section> : <Overview ledger={ledger} profile={profile} navigate={destination => { void navigate(destination); }}/>}
+        {frontPath.startsWith('/weight') ? <WeightView runtime={runtime} ledger={ledger} profile={profile} commands={commands}/> : frontPath.startsWith('/settings') ? <SettingsView runtime={runtime} ledger={ledger} profile={profile} commands={commands} preference={preference} onSignedOut={onSignedOut}/> : frontPath.startsWith('/training') ? <TrainingView runtime={runtime} ledger={ledger} profile={profile} commands={commands} sessionId={/^\/training\/sessions\/([^/?]+)/.exec(frontPath)?.[1] ?? null} navigate={navigate}/> : frontPath.startsWith('/nutrition') ? <section className="panel"><h1>{t(frontPath.startsWith('/training') ? 'today:training' : 'today:nutrition')}</h1><p>{t('unavailableFeature')}</p></section> : <Overview ledger={ledger} profile={profile} navigate={destination => { void navigate(destination); }}/>}
       </div>{chat && <ConversationDraft runtime={runtime} timezone={timezone} back={() => { void returnToFront(); }}/>}</main>
       <footer className="app-footer"><LanguagePicker value={locale} onChange={value => { void preference({ locale: value }); }}/><button className="quiet" onClick={() => { void runtime.synchronizer.refresh(); }}>{t('refresh')}</button></footer>
     </>}

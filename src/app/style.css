@@ -163,3 +163,29 @@ input[aria-invalid=true] { border-color: var(--danger); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   button:active:not(:disabled) { transform: none; }
 }
+
+/* Training quick recording shares the existing surfaces and numeric scale. */
+.training-view { max-width: 880px; margin-inline: auto; }
+.training-view .panel { margin-block: 20px; }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.section-heading > div { min-width: 0; }
+.section-heading h2 { margin-bottom: 8px; }
+.training-fields { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 12px; }
+.training-fields label { min-width: 0; }
+.training-fields input, .training-fields select, .training-fields .joined-input { min-width: 0; width: 100%; }
+.joined-input { display: flex; gap: 8px; }
+.joined-input input { flex: 1; min-width: 0; }
+.joined-input select { width: auto; flex: 0 0 76px; }
+.training-history { border-left: 2px solid var(--line); padding-left: 16px; margin-block: 24px; }
+.training-sets .record-value { font-size: 24px; }
+.training-view form { scroll-margin-top: 100px; }
+.training-view input[inputmode=numeric] { font-family: var(--font-numeric); font-variant-numeric: tabular-nums; }
+.training-view details { margin-block: 16px; }
+.training-view summary { cursor: pointer; min-height: 44px; }
+.training-view .warning { background: var(--warning-soft); color: var(--warning); }
+@media (max-width: 540px) {
+ .training-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ .training-fields > label:first-child { grid-column: 1 / -1; }
+ .training-view .section-heading { flex-wrap: wrap; gap: 8px; }
+ .training-view .actions { flex-wrap: wrap; }
+}
