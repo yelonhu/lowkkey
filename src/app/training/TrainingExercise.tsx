@@ -7,21 +7,21 @@ import { setupInputSchema } from '../../domain/training.ts';
 import type { z } from 'zod';
 import type { WorkspaceRuntime } from '../workspace-state.ts';
 import { commandFor } from '../workspace-state.ts';
-import { latestHistory, nextOrdinal, trainingProjection, versionFor } from './training-state.ts';
+import { latestHistory, nextOrdinal, trainingProjection, versionFor, localExercise } from './training-state.ts';
 import type { TrainingProjection } from './training-state.ts';
 import { SetRow } from './SetRow.tsx';
 import { SetupEditor } from './SetupEditor.tsx';
 import { commitTrainingRows, serializeTraining } from './save-coordinator.ts';
 
 type LocalRow = { id: string; draftId: string; ordinal: number; load?: string; unit?: 'kg' | 'lb' };
-export function TrainingExercise({ runtime, ledger, model, session, exercise, setup, commands, blocked, expanded, onExpand, onRemove, onAdded }: {
+export function TrainingExercise({ runtime, ledger, model, session, exercise, setup, commands, blocked, expanded, onExpand, onRemove, onAdded, onDraft }: {
   runtime: WorkspaceRuntime; ledger: LocalLedger; model: TrainingProjection; session: WorkoutSession; exercise: SessionExercise; setup: ExerciseSetup;
-  commands: QueuedCommand[]; blocked: boolean; expanded: boolean; onExpand: () => void; onRemove: () => void; onAdded: (id: string) => void;
+  commands: QueuedCommand[]; blocked: boolean; expanded: boolean; onExpand: () => void; onRemove: () => void; onAdded: (id: string) => void; onDraft: (exercise: SessionExercise) => Promise<void>;
 }) {
   const { t, i18n } = useTranslation(), [local, setLocal] = useState<LocalRow[]>([]), [ready, setReady] = useState(false), [settings, setSettings] = useState<ExerciseSetup | null>(null), [message, setMessage] = useState<string | null>(null);
   const adding = useRef(false);
   const rows = model.sets.filter(item => item.sessionExerciseId === exercise.id);
-  const issues = commands.filter(command => { const mutation = command.mutation; return ['conflict', 'needs_review', 'rejected'].includes(command.state) && ((mutation.kind === 'set.create' && mutation.input.sessionExerciseId === exercise.id) || (mutation.kind === 'set.update' && rows.some(row => row.id === mutation.target.id))); });
+  const issues = commands.filter(command => { const mutation = command.mutation; return ['conflict', 'needs_review', 'rejected'].includes(command.state) && (((mutation.kind === 'set.create' || mutation.kind === 'day-set.create') && mutation.input.sessionExerciseId === exercise.id) || ((mutation.kind === 'set.update' || mutation.kind === 'day-set.update' || mutation.kind === 'set.delete' || mutation.kind === 'day-set.delete') && rows.some(row => row.id === mutation.target.id))); });
   const prefix = 'training:' + session.id + ':' + exercise.id, history = latestHistory(ledger, session.id, setup.id, session);
   const name = model.labels.get(exercise.displaySnapshot.exerciseId)?.[i18n.resolvedLanguage ?? 'en'] ?? exercise.displaySnapshot.name;
   useEffect(() => {
@@ -29,7 +29,7 @@ export function TrainingExercise({ runtime, ledger, model, session, exercise, se
     void runtime.database.listDrafts().then(drafts => {
       if (cancelled) return;
       const restored = drafts.filter(item => item.id.startsWith(prefix + ':row:') || item.id === prefix + ':set').map(item => ({ id: item.rawFields.targetId || item.rawFields.rowId || item.rawFields.newId || crypto.randomUUID(), draftId: item.id, ordinal: Number(item.rawFields.ordinal) || nextOrdinal(rows) }));
-      if (!restored.length && !rows.length && session.status !== 'completed') { const id = crypto.randomUUID(); restored.push({ id, draftId: prefix + ':row:' + id, ordinal: 1 }); }
+      if (!restored.length && !rows.length) { const id = crypto.randomUUID(); restored.push({ id, draftId: prefix + ':row:' + id, ordinal: 1 }); }
       setLocal(restored); setReady(true);
     }).catch(() => setMessage('storageFailed'));
     return () => { cancelled = true; };
@@ -37,7 +37,7 @@ export function TrainingExercise({ runtime, ledger, model, session, exercise, se
   }, [runtime, prefix]);
   const merged = new Map<string, LocalRow>(rows.map(row => [row.id, { id: row.id, draftId: prefix + ':row:' + row.id, ordinal: row.ordinal }]));
   for (const row of local) merged.set(row.id, row);
-  for (const command of issues) if (command.mutation.kind === 'set.create' && !merged.has(command.mutation.input.id)) merged.set(command.mutation.input.id, { id: command.mutation.input.id, draftId: prefix + ':row:' + command.mutation.input.id, ordinal: command.mutation.input.ordinal });
+  for (const command of issues) if ((command.mutation.kind === 'set.create' || command.mutation.kind === 'day-set.create') && !merged.has(command.mutation.input.id)) merged.set(command.mutation.input.id, { id: command.mutation.input.id, draftId: prefix + ':row:' + command.mutation.input.id, ordinal: command.mutation.input.ordinal });
   const presented = [...merged.values()].sort((a,b) => a.ordinal - b.ordinal);
   async function addRow() {
     if (adding.current) return; adding.current = true;
@@ -57,24 +57,21 @@ export function TrainingExercise({ runtime, ledger, model, session, exercise, se
     await commitTrainingRows();
     await serializeTraining(runtime.database, async () => {
       const current = await runtime.database.readLedger(); if (!current) throw Error('Storage');
-      const commands = await runtime.database.listCommands(), projection = trainingProjection(current, commands), root = projection.sessions.find(item => item.id === session.id);
+      const commands = await runtime.database.listCommands(), projection = trainingProjection(current, commands), root = projection.sessions.find(item => item.id === session.id) ?? session;
       if (!root) throw Error('Gone');
       const critical = (['equipmentInstance', 'loadSemantics', 'includesBar', 'barWeightDecimal', 'barUnit'] as const).some(key => input[key] !== original[key]);
       if (!critical) {
         const target = versionFor({ type: 'exercise_setup', id: original.id, revision: original.revision }, commands);
         await runtime.database.enqueueCommand(commandFor(current, { kind: 'setup.update', target: { ...target, type: 'exercise_setup' }, input: { loadUnit: input.loadUnit, incrementDecimal: input.incrementDecimal, incrementUnit: input.incrementUnit, availableLoads: input.availableLoads } }, setup.id, root.localDate, root.entryTimezone));
       } else {
-        const setupId = crypto.randomUUID(), id = crypto.randomUUID(), parent = versionFor({ type: 'workout_session', id: root.id, revision: root.revision }, commands);
+        const setupId = crypto.randomUUID(), id = crypto.randomUUID();
         const create = commandFor(current, { kind: 'setup.create', input: { ...input, id: setupId } }, setupId, root.localDate, root.entryTimezone);
-        const add = commandFor(current, { kind: 'session-exercise.create', session: { ...parent, type: 'workout_session' }, input: { id, setupId, ordinal: nextOrdinal(projection.exercises.filter(item => item.sessionId === root.id)), target: exercise.targetSnapshot } }, id, root.localDate, root.entryTimezone);
-        add.dependencies.push(create.operationId);
-        const batch = [create, add];
-        const drafts = await runtime.database.listDrafts(), hasDraft = drafts.some(item => item.id.startsWith(prefix) && item.rawFields.dirty === 'yes');
-        if (!projection.sets.some(item => item.sessionExerciseId === exercise.id) && !hasDraft) {
-          const target = versionFor({ type: 'session_exercise', id: exercise.id, revision: exercise.revision }, commands);
-          batch.push(commandFor(current, { kind: 'session-exercise.delete', session: { type: 'workout_session', id: root.id, source: { kind: 'receipt', operationId: add.operationId } }, target: { ...target, type: 'session_exercise' } }, exercise.id, root.localDate, root.entryTimezone));
-        }
-        await runtime.database.enqueueCommands(batch); onAdded(id);
+        await runtime.database.enqueueCommand(create);
+        const fresh = trainingProjection(current, await runtime.database.listCommands()), selected = fresh.setups.find(item => item.id === setupId);
+        const definition = fresh.definitions.find(item => item.id === input.exerciseId);
+        if (!selected || !definition) throw Error('Missing setup');
+        await onDraft(localExercise(root, selected, definition, fresh.labels, id, nextOrdinal(model.exercises.filter(item => item.sessionId === root.id))));
+        onAdded(id);
       }
       void runtime.queue.flush();
     });
@@ -87,9 +84,9 @@ export function TrainingExercise({ runtime, ledger, model, session, exercise, se
       {exercise.targetSnapshot && <p className="training-reference">{t('training:target', { sets: exercise.targetSnapshot.plannedSets ?? '—', min: exercise.targetSnapshot.repMin ?? '—', max: exercise.targetSnapshot.repMax ?? '—' })}</p>}
       <div role="table" aria-label={name + ' · ' + t('training:sets')} className="set-table">
         <div role="row" className="set-row set-table-head"><span role="columnheader">{t('training:rowNumber')}</span><span role="columnheader">{t('training:load')}</span><span role="columnheader">{t('training:repsShort')}</span><span role="columnheader">RPE</span></div>
-        {ready && presented.map(row => <SetRow key={row.id} runtime={runtime} session={session} exercise={exercise} setup={setup} rowId={row.id} ordinal={row.ordinal} record={rows.find(item => item.id === row.id)} draftId={row.draftId} initialLoad={row.load} initialUnit={row.unit} issue={issues.find(command => command.clientEntityId === row.id)} pending={model.pending.get(row.id)} onRemoved={() => setLocal(current => current.filter(item => item.id !== row.id))}/>)}
+        {ready && presented.map(row => <SetRow key={row.id} runtime={runtime} session={session} exercise={exercise} setup={setup} rowId={row.id} ordinal={row.ordinal} record={rows.find(item => item.id === row.id)} draftId={row.draftId} initialLoad={row.load} initialUnit={row.unit} issue={issues.find(command => command.clientEntityId === row.id)} pending={model.pending.get(row.id) ?? commands.findLast(command => command.clientEntityId === row.id && command.state === 'committed')} dataRevision={ledger.dataRevision} onRemoved={() => setLocal(current => current.filter(item => item.id !== row.id))}/>)}
       </div>
-      {session.status !== 'completed' && <button className="add-set quiet" disabled={!ready || blocked} onClick={() => { void addRow(); }}>＋ {t('training:addSet')}</button>}
+      {<button className="add-set quiet" disabled={!ready || blocked} onClick={() => { void addRow(); }}>＋ {t('training:addSet')}</button>}
       {message && <p role="alert">{t(message)}</p>}
     </div>
     {settings && <SetupEditor initial={setupInputSchema.parse(Object.fromEntries(Object.keys(setupInputSchema.shape).map(key => [key, settings[key as keyof ExerciseSetup]])))} onApply={applySetup} onClose={() => setSettings(null)}/>}

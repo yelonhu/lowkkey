@@ -1,3 +1,4 @@
+import { dailySetRequestSchema } from '../domain/daily-records.ts';
 import type { D1Database } from '@cloudflare/workers-types';
 import { z } from 'zod';
 import { localDateAt, validateActualDate } from '../domain/primitives.ts';
@@ -13,7 +14,7 @@ import { expectRevision, mergePlans, newMetadata, reviseRecord } from './record-
 import { plans, schedules, sessionExercises, sessions, sets, setups } from './training-store.ts';
 import { pageAfter, pageResult } from './pagination.ts';
 
-const editable = new Set(['in_progress', 'paused', 'completed']);
+const editable = new Set(['in_progress', 'paused', 'completed', 'recorded']);
 function validActualDate(localDate: string, occurredAt: string | null, context: CommandContext, entryTimezone: string) {
   try {
     validateActualDate({ localDate, occurredAt }, context.auth.timezone, new Date(context.now));
@@ -26,9 +27,9 @@ export function versionGuard(table: 'exercise_setups' | 'plan_versions' | 'sched
 function runningGuard(owner: string, id: string): Guard {
   return { predicate: "NOT EXISTS(SELECT 1 FROM workout_sessions WHERE owner_id=? AND status='in_progress' AND deleted_at IS NULL AND id<>?)", values: [owner, id], error: new DomainError('DAY_STATE_CONFLICT', 409, { reason: 'sessionInProgress' }) };
 }
-async function root(context: CommandContext, id: string, revision: number, requireEditable = true) {
+async function root(context: CommandContext, id: string, revision: number, requireEditable = true, allowLegacyDraft = false) {
   const value = await sessions.read(context.db, context.auth.id, id); expectRevision(value, revision);
-  if (requireEditable && !editable.has(value.status)) throw new DomainError('DAY_STATE_CONFLICT', 409, { reason: 'sessionNotEditable' });
+  if (requireEditable && !editable.has(value.status) && !(allowLegacyDraft && value.status === 'draft')) throw new DomainError('DAY_STATE_CONFLICT', 409, { reason: 'sessionNotEditable' });
   return value;
 }
 async function child(context: CommandContext, session: WorkoutSession, id: string) {
@@ -115,12 +116,13 @@ export function addExercise(db: D1Database, auth: AuthContext, operationId: stri
     return mergePlans([sessions.plan(context, before, reviseRecord(before, context, {})), await newExercise(context, id, input)], { sessionId: id, exerciseId: input.id });
   } }, clock);
 }
-export function editExercise(db: D1Database, auth: AuthContext, operationId: string, sessionId: string, revision: number, id: string, payload: unknown, deleting = false, clock?: () => Date) {
+export function editExercise(db: D1Database, auth: AuthContext, operationId: string, sessionId: string, revision: number, id: string, payload: unknown, deleting = false, clock?: () => Date, dailyDate?: string) {
   const input: z.infer<typeof sessionExercisePatchSchema> = deleting ? z.strictObject({ expectedRevision: z.number().int().positive() }).parse(payload) : sessionExercisePatchSchema.parse(payload);
   return executeCommand(db, auth, { operationId, kind: deleting ? 'training.exercise.delete' : 'training.exercise.patch', payload: { sessionId, id, ...input }, expectedRevision: revision, entryPoint: 'manual', plan: async context => {
     const session = await root(context, sessionId, revision, false), before = await child(context, session, id); expectRevision(before, input.expectedRevision);
     if (session.status === 'cancelled') throw new DomainError('DAY_STATE_CONFLICT', 409);
-    if (deleting && session.status === 'completed' && !(await setCount(db, auth.id, sessionId, id))) throw new DomainError('NEEDS_CONFIRMATION', 422, { reason: 'deleteCompletedSessionInstead' });
+    if (dailyDate && session.localDate !== dailyDate) throw new DomainError('RECORD_NOT_FOUND', 404);
+    if (!dailyDate && deleting && session.status === 'completed' && !(await setCount(db, auth.id, sessionId, id))) throw new DomainError('NEEDS_CONFIRMATION', 422, { reason: 'deleteCompletedSessionInstead' });
     const after = reviseRecord(before, context, deleting ? { deletedAt: context.now } : { ordinal: input.ordinal ?? before.ordinal, targetSnapshot: input.target === undefined ? before.targetSnapshot : input.target });
     const plan = mergePlans([sessions.plan(context, session, reviseRecord(session, context, {})), sessionExercises.plan(context, before, after)], { sessionId, exerciseId: id });
     if (!deleting) plan.guards.push(ordinalGuard('session_exercises', 'session_id', auth.id, sessionId, after.ordinal, id));
@@ -149,12 +151,13 @@ export function addSet(db: D1Database, auth: AuthContext, operationId: string, i
     return plan;
   } }, clock);
 }
-export function editSet(db: D1Database, auth: AuthContext, operationId: string, sessionId: string, revision: number, id: string, payload: unknown, deleting = false, clock?: () => Date) {
+export function editSet(db: D1Database, auth: AuthContext, operationId: string, sessionId: string, revision: number, id: string, payload: unknown, deleting = false, clock?: () => Date, dailyDate?: string) {
   const input: z.infer<typeof trainingSetPatchSchema> = deleting ? z.strictObject({ expectedRevision: z.number().int().positive() }).parse(payload) : trainingSetPatchSchema.parse(payload);
   return executeCommand(db, auth, { operationId, kind: deleting ? 'training.set.delete' : 'training.set.patch', payload: { sessionId, id, ...input }, expectedRevision: revision, entryPoint: 'manual', plan: async context => {
-    const session = await root(context, sessionId, revision), before = await sets.read(db, auth.id, id); expectRevision(before, input.expectedRevision);
+    const session = await root(context, sessionId, revision, true, !!dailyDate), before = await sets.read(db, auth.id, id); expectRevision(before, input.expectedRevision);
+    if (dailyDate && session.localDate !== dailyDate) throw new DomainError('RECORD_NOT_FOUND', 404);
     const exercise = await child(context, session, before.sessionExerciseId);
-    if (deleting && session.status === 'completed' && !(await setCount(db, auth.id, sessionId, undefined, id))) throw new DomainError('NEEDS_CONFIRMATION', 422, { reason: 'deleteCompletedSessionInstead' });
+    if (!dailyDate && deleting && session.status === 'completed' && !(await setCount(db, auth.id, sessionId, undefined, id))) throw new DomainError('NEEDS_CONFIRMATION', 422, { reason: 'deleteCompletedSessionInstead' });
     const patch = input;
     const after = reviseRecord(before, context, deleting ? { deletedAt: context.now } : {
       ordinal: patch.ordinal ?? before.ordinal, reps: patch.reps ?? before.reps, ...(patch.load === undefined ? {} : loadFields(patch.load, exercise.displaySnapshot.loadSemantics)), setType: patch.setType ?? before.setType,
@@ -195,11 +198,40 @@ export async function trainingHistory(db: D1Database, owner: string, setupId: st
   const setup = await setups.read(db, owner, setupId);
   const binding = { setupId, from, to }, after = pageAfter(owner, 'training-history', binding, cursor);
   const previous = after ? await sessions.read(db, owner, after, true) : null;
-  const roots = await db.prepare("SELECT DISTINCT w.id,w.local_date FROM workout_sessions w JOIN session_exercises e ON e.owner_id=w.owner_id AND e.session_id=w.id JOIN workout_sets s ON s.owner_id=e.owner_id AND s.session_exercise_id=e.id WHERE w.owner_id=? AND e.setup_id=? AND w.local_date BETWEEN ? AND ? AND w.deleted_at IS NULL AND e.deleted_at IS NULL AND s.deleted_at IS NULL AND w.status IN ('in_progress','paused','completed') AND (? IS NULL OR w.local_date<? OR (w.local_date=? AND w.id<?)) ORDER BY w.local_date DESC,w.id DESC LIMIT ?").bind(owner, setupId, from, to, after, previous?.localDate ?? null, previous?.localDate ?? null, after, limit + 1).all<{ id: string; local_date: string }>();
+  const roots = await db.prepare("SELECT DISTINCT w.id,w.local_date FROM workout_sessions w JOIN session_exercises e ON e.owner_id=w.owner_id AND e.session_id=w.id JOIN workout_sets s ON s.owner_id=e.owner_id AND s.session_exercise_id=e.id WHERE w.owner_id=? AND e.setup_id=? AND w.local_date BETWEEN ? AND ? AND w.deleted_at IS NULL AND e.deleted_at IS NULL AND s.deleted_at IS NULL AND w.status IN ('draft','in_progress','paused','completed','recorded') AND (? IS NULL OR w.local_date<? OR (w.local_date=? AND w.id<?)) ORDER BY w.local_date DESC,w.id DESC LIMIT ?").bind(owner, setupId, from, to, after, previous?.localDate ?? null, previous?.localDate ?? null, after, limit + 1).all<{ id: string; local_date: string }>();
   const reason = setup.loadSemantics === 'unspecified' ? 'loadSemanticsUnspecified' : setup.equipmentInstance === null && setup.loadSemantics !== 'bodyweight_only' ? 'equipmentUnspecified' : null;
   const items = await Promise.all(roots.results.map(async row => {
     const tree = await readSessionTree(db, owner, row.id), exercises = tree.exercises.filter(item => item.setupId === setupId), ids = new Set(exercises.map(item => item.id));
     return { id: row.id, session: tree.session, exercises, sets: tree.sets.filter(item => ids.has(item.sessionExerciseId)) };
   }));
   return { ...pageResult(items, limit, owner, 'training-history', binding), comparable: reason === null, comparisonUnavailableReason: reason };
+}
+
+/** First fact, frozen exercise and day container share one ledger transaction. */
+export function addDailySet(db: D1Database, auth: AuthContext, operationId: string, date: string, payload: unknown, clock?: () => Date) {
+  const input = dailySetRequestSchema.parse(payload);
+  if (date !== input.localDate) throw new DomainError('INVALID_INPUT', 400);
+  return executeCommand(db, auth, { operationId, kind: 'training.day.set.create', payload: input, expectedRevision: input.expectedSessionRevision ?? undefined, entryPoint: 'manual', plan: async context => {
+    validActualDate(date, null, context, input.entryTimezone); await noRest(context, date);
+    const session: WorkoutSession = input.createSession
+      ? { ...newMetadata(context, input.sessionId), localDate: date, entryTimezone: input.entryTimezone, timePrecision: 'date', status: 'recorded', startedAt: null, endedAt: null, planVersionId: null, scheduledSessionId: null, planSnapshot: null, title: null, note: null, recovery: null, sourceRef: null, sourceKind: 'manual' }
+      : await root(context, input.sessionId, input.expectedSessionRevision!, true, true);
+    if (session.localDate !== date) throw new DomainError('RECORD_NOT_FOUND', 404);
+    const parentPlan = sessions.plan(context, input.createSession ? null : session, input.createSession ? session : reviseRecord(session, context, {}));
+    parentPlan.guards.push({ predicate: "NOT EXISTS(SELECT 1 FROM day_claims WHERE owner_id=? AND local_date=? AND training_claim='rest_confirmed' AND deleted_at IS NULL)", values: [auth.id, date], error: new DomainError('DAY_STATE_CONFLICT', 409) });
+    if (input.createSession) parentPlan.guards.push({ predicate: "NOT EXISTS(SELECT 1 FROM workout_sessions WHERE owner_id=? AND local_date=? AND status='recorded' AND deleted_at IS NULL)", values: [auth.id, date], error: new DomainError('REVISION_CONFLICT', 409, { reason: 'dayAlreadyExists' }) });
+    const existing = await sessionExercises.list(db, auth.id, 'id=?', [input.exercise.id]);
+    const exercisePlan = existing.length ? null : await newExercise(context, session.id, input.exercise);
+    const exercise = existing[0] ?? exercisePlan!.entities[0].after as SessionExercise;
+    if (exercise.sessionId !== session.id || exercise.setupId !== input.exercise.setupId) throw new DomainError('RECORD_NOT_FOUND', 404);
+    const record = workoutSetSchema.parse({ ...newMetadata(context, input.id), sessionExerciseId: exercise.id, ordinal: input.ordinal, reps: input.reps, ...loadFields(input.load, exercise.displaySnapshot.loadSemantics), setType: input.setType, rpeHalfUnits: input.rpe === null ? null : input.rpe * 2, completedAt: null, note: input.note, sourceRowId: null });
+    const plan = mergePlans([parentPlan, ...(exercisePlan ? [exercisePlan] : []), sets.plan(context, null, record)], { sessionId: session.id, setId: input.id });
+    plan.guards.push(ordinalGuard('workout_sets', 'session_exercise_id', auth.id, exercise.id, input.ordinal, input.id));
+    return plan;
+  } }, clock);
+}
+export async function readTrainingDay(db: D1Database, owner: string, date: string) {
+  const roots = await sessions.list(db, owner, "local_date=? AND status NOT IN ('cancelled','deleted')", [date], 'created_at,id');
+  const trees = await Promise.all(roots.map(root => readSessionTree(db, owner, root.id)));
+  return { localDate: date, sessions: roots, exercises: trees.flatMap(tree => tree.exercises), sets: trees.flatMap(tree => tree.sets) };
 }

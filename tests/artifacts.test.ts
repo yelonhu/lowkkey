@@ -9,7 +9,7 @@ const event = { schemaVersion: 1, eventId: `${operationId}:0`, operationId, data
 describe('fixed shared state contracts', () => {
   it('accepts three empty views while keeping unknown values null', () => {
     const views = [
-      { ...meta, kind: 'SessionArtifact', props: { activeSessionId: null, selectedSessionId: null, plannedSessionIds: [], completedWorkingSets: 0, unknownTypeSets: 0, muscleVolume: [] } },
+      { ...meta, kind: 'SessionArtifact', props: { daySessionIds: [], dayExerciseCount: 0, daySetCount: 0, activeSessionId: null, selectedSessionId: null, plannedSessionIds: [], completedWorkingSets: 0, unknownTypeSets: 0, muscleVolume: [] } },
       { ...meta, kind: 'WeightArtifact', props: { primaryEntryId: null, primaryKgMicros: null, trend: [], algorithmVersion: 'weight-trailing-7d-v1', goalVersionId: null } },
       { ...meta, kind: 'DietArtifact', props: { mealIds: [], knownSum: { schemaVersion: 1, energyMkcal: null, proteinMg: null, carbsMg: null, fatMg: null, estimated: false, provenance: 'calculated', referenceVersion: null, calculationVersion: 'nutrition-v1' }, unknownCounts: { energy: 0, protein: 0, carbs: 0, fat: 0 }, completeness: 'unreviewed', goalVersionId: null } },
     ];

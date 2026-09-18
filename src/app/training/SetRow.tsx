@@ -8,17 +8,18 @@ import type { QueuedCommand } from '../../domain/manual-commands.ts';
 import type { WorkspaceRuntime } from '../workspace-state.ts';
 import { commandFor } from '../workspace-state.ts';
 import { useDraft } from '../use-draft.ts';
+import { SaveStatus } from '../SaveStatus.tsx';
 import { ConfirmDialog } from '../ConfirmDialog.tsx';
 import type { Binding } from './training-state.ts';
 import { trainingProjection, versionFor, observedDraftRefs } from './training-state.ts';
 import { advanceOwnBinding, serializeTraining } from './save-coordinator.ts';
 
-export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, record, draftId, initialLoad = '', initialUnit, issue, pending, onRemoved }: {
+export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, record, draftId, initialLoad = '', initialUnit, issue, pending, dataRevision, onRemoved }: {
   runtime: WorkspaceRuntime; session: WorkoutSession; exercise: SessionExercise; setup: ExerciseSetup; rowId: string; ordinal: number;
-  record?: WorkoutSet; draftId: string; initialLoad?: string; initialUnit?: 'kg' | 'lb'; issue?: QueuedCommand; pending?: QueuedCommand; onRemoved: () => void;
+  record?: WorkoutSet; draftId: string; initialLoad?: string; initialUnit?: 'kg' | 'lb'; issue?: QueuedCommand; pending?: QueuedCommand; dataRevision: number; onRemoved: () => void;
 }) {
   const { t } = useTranslation();
-  const candidate = issue?.mutation.kind === 'set.create' || issue?.mutation.kind === 'set.update' ? issue.mutation.input : null;
+  const candidate = issue?.mutation.kind === 'set.create' || issue?.mutation.kind === 'set.update' || issue?.mutation.kind === 'day-set.create' || issue?.mutation.kind === 'day-set.update' ? issue.mutation.input : null;
   const values = () => ({ rowId, load: candidate?.load?.value ?? record?.loadDecimal ?? initialLoad, unit: candidate?.load?.unit ?? record?.unit ?? initialUnit ?? setup.loadUnit,
     reps: String(candidate?.reps ?? record?.reps ?? ''), rpe: candidate?.rpe === null ? '' : candidate?.rpe !== undefined ? String(candidate.rpe) : record?.rpeHalfUnits == null ? '' : String(record.rpeHalfUnits / 2),
     setType: candidate?.setType ?? record?.setType ?? 'unknown', note: candidate?.note ?? record?.note ?? '', targetId: record?.id ?? '', rootBinding: '', targetBinding: '', dirty: 'no', ordinal: String(ordinal) });
@@ -74,18 +75,24 @@ export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, reco
         const token = await draft.flush();
         const ledger = await runtime.database.readLedger(); if (!ledger) throw Error('Storage');
         const commands = await runtime.database.listCommands(), model = trainingProjection(ledger, commands);
-        const root = model.sessions.find(item => item.id === session.id);
-        if (!root || !['in_progress', 'paused', 'completed'].includes(root.status)) throw Error('Gone');
+        const root = (acceptedReview && issue?.mutation.kind === 'day-set.create' && issue.mutation.input.createSession ? model.sessions.find(item => item.localDate === session.localDate && item.status === 'recorded') : null) ?? model.sessions.find(item => item.id === session.id) ?? session;
+        if (!root || !['draft', 'in_progress', 'paused', 'completed', 'recorded'].includes(root.status)) throw Error('Gone');
         const problem = commands.find(command => ['conflict', 'needs_review', 'rejected'].includes(command.state) && 'session' in command.mutation && command.mutation.session.id === root.id);
         if (problem && !acceptedReview) { await draft.flush(); setMessage('training:blocked'); return; }
         const current = model.sets.find(item => item.id === rowId);
-        if ((fields.targetId || issue?.mutation.kind === 'set.update') && !current) throw Error('Gone');
+        if ((fields.targetId || issue?.mutation.kind === 'set.update' || issue?.mutation.kind === 'day-set.update') && !current) throw Error('Gone');
+        if (current && !acceptedReview && current.loadDecimal === (input.load?.value ?? null) && current.unit === (input.load?.unit ?? null) && current.reps === input.reps && current.rpeHalfUnits === (input.rpe === null ? null : input.rpe * 2) && current.setType === input.setType && current.note === input.note) {
+          if (JSON.stringify(draft.read()) === JSON.stringify(fields)) await draft.clear({ ...fields, dirty: 'no' });
+          setMessage(null); return;
+        }
         const rootBase = acceptedReview ? observed({ type: 'workout_session', id: root.id, revision: root.revision }) : fields.rootBinding ? advanceOwnBinding(versionBindingSchema.parse(JSON.parse(fields.rootBinding)), commands) : versionFor({ type: 'workout_session', id: root.id, revision: root.revision }, commands);
         const target = current ? acceptedReview ? observed({ type: 'workout_set', id: rowId, revision: current.revision }) : fields.targetBinding ? advanceOwnBinding(versionBindingSchema.parse(JSON.parse(fields.targetBinding)), commands) : versionFor({ type: 'workout_set', id: rowId, revision: current.revision }, commands) : null;
-        const mutation = target ? { kind: 'set.update' as const, session: { ...rootBase, type: 'workout_session' as const }, target: { ...target, type: 'workout_set' as const },
+        const mutation = target ? { kind: 'day-set.update' as const, localDate: root.localDate, session: { ...rootBase, type: 'workout_session' as const }, target: { ...target, type: 'workout_set' as const },
           input: { reps: input.reps, load: input.load, rpe: input.rpe, setType: input.setType, note: input.note } }
-          : { kind: 'set.create' as const, session: { ...rootBase, type: 'workout_session' as const }, input };
+          : { kind: 'day-set.create' as const, session: { ...rootBase, type: 'workout_session' as const }, input: { ...input, completedAt: null, localDate: root.localDate, entryTimezone: root.entryTimezone, createSession: !model.sessions.some(item => item.id === root.id), exercise: { id: exercise.id, setupId: exercise.setupId, ordinal: exercise.ordinal, target: exercise.targetSnapshot } } };
         const command = commandFor(ledger, mutation, rowId, root.localDate, root.entryTimezone);
+        const setupBinding = versionFor({ type: 'exercise_setup', id: setup.id, revision: setup.revision }, commands);
+        if (setupBinding.source.kind === 'receipt' && !command.dependencies.includes(setupBinding.source.operationId)) command.dependencies.push(setupBinding.source.operationId);
         if (acceptedReview && issue) {
           const previous = await runtime.database.readCommand(issue.operationId); if (!previous) throw Error('Gone');
           await runtime.database.resolveCommand(previous.operationId, previous.localRevision, command, token);
@@ -104,22 +111,21 @@ export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, reco
     window.addEventListener('lowkkey:commit-training', commit);
     return () => window.removeEventListener('lowkkey:commit-training', commit);
   }, []);
-  async function remove() {
+  async function remove(acceptedReview = false) {
     try {
       await serializeTraining(runtime.database, async () => {
         const ledger = await runtime.database.readLedger(); if (!ledger) throw Error('Storage');
         const commands = await runtime.database.listCommands(), model = trainingProjection(ledger, commands);
-        const root = model.sessions.find(item => item.id === session.id), actual = model.sets.find(item => item.id === rowId);
+        const root = model.sessions.find(item => item.id === session.id) ?? session, actual = model.sets.find(item => item.id === rowId);
         if (!root) throw Error('Gone');
-        if (issue) { setMessage('training:blocked'); return; }
+        if (issue && !acceptedReview) { setMessage('training:blocked'); return; }
         if (actual) {
-          const all = model.sets.filter(item => model.exercises.some(ex => ex.id === item.sessionExerciseId && ex.sessionId === session.id));
-          if (root.status === 'completed' && all.length === 1) { setMessage('training:deleteCompleted'); setConfirmDelete(false); return; }
-          const parent = deletionBaseline.current ? advanceOwnBinding(deletionBaseline.current.root, commands) : versionFor({ type: 'workout_session', id: root.id, revision: root.revision }, commands);
-          const target = deletionBaseline.current?.target ? advanceOwnBinding(deletionBaseline.current.target, commands) : versionFor({ type: 'workout_set', id: actual.id, revision: actual.revision }, commands);
-          await runtime.database.enqueueCommand(commandFor(ledger, { kind: 'set.delete', session: { ...parent, type: 'workout_session' }, target: { ...target, type: 'workout_set' } }, rowId, root.localDate, root.entryTimezone));
+          const parent = acceptedReview ? observed({ type: 'workout_session', id: root.id, revision: root.revision }) : deletionBaseline.current ? advanceOwnBinding(deletionBaseline.current.root, commands) : versionFor({ type: 'workout_session', id: root.id, revision: root.revision }, commands);
+          const target = acceptedReview ? observed({ type: 'workout_set', id: actual.id, revision: actual.revision }) : deletionBaseline.current?.target ? advanceOwnBinding(deletionBaseline.current.target, commands) : versionFor({ type: 'workout_set', id: actual.id, revision: actual.revision }, commands);
+          const command = commandFor(ledger, { kind: 'day-set.delete', localDate: root.localDate, session: { ...parent, type: 'workout_session' }, target: { ...target, type: 'workout_set' } }, rowId, root.localDate, root.entryTimezone);
+          if (acceptedReview && issue) await runtime.database.resolveCommand(issue.operationId, issue.localRevision, command); else await runtime.database.enqueueCommand(command);
         }
-        await draft.clear(); setMore(false); onRemoved(); void runtime.queue.flush();
+        await draft.clear(); setMore(false); setReviewing(false); onRemoved(); void runtime.queue.flush();
       });
     } catch { setMessage('training:saveError'); }
   }
@@ -128,7 +134,6 @@ export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, reco
   }
   const syncFailed = pending?.state === 'uncertain';
   const label = (field: string) => t('training:setNumber', { number: ordinal }) + ' · ' + t('training:' + field);
-  if (session.status === 'completed' && !record && !issue && draft.fields.dirty !== 'yes') return null;
   return <div className={'set-row-wrap' + (issue ? ' has-issue' : '')} data-set-id={rowId} data-recorded={!!record}>
     <div role="row" ref={rowElement} className="set-row" aria-busy={busy} onFocus={remember} onBlur={event => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !document.hidden && document.hasFocus() && !more && !reviewing) rowExit();
@@ -138,10 +143,11 @@ export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, reco
       <div role="cell"><input aria-label={label('reps')} inputMode="numeric" autoComplete="off" placeholder="—" disabled={!draft.ready} value={draft.fields.reps} onChange={event => change('reps', event.target.value)}/></div>
       <div role="cell"><input aria-label={label('rpe')} inputMode="decimal" autoComplete="off" placeholder="—" disabled={!draft.ready} value={draft.fields.rpe} onChange={event => change('rpe', event.target.value)}/></div>
     </div>
+    <SaveStatus command={pending} dataRevision={dataRevision}/>
     {(message || draft.error || issue || syncFailed) && <div className="row-status" role={message || draft.error || issue ? 'alert' : 'status'}>
       {t(draft.error ? 'storageFailed' : message ?? (issue ? 'conflict' : syncFailed ? 'syncFailed' : 'syncing'))}
       {syncFailed && <button className="quiet" onClick={() => { void runtime.queue.retry(); }}>{t('retry')}</button>}
-      {issue && <button className="quiet" onClick={() => setReviewing(true)}>{t('training:review')}</button>}
+      {issue && <><button className="quiet" onClick={() => setReviewing(true)}>{t('training:review')}</button><button className="quiet" onClick={() => { void runtime.database.resolveCommand(issue.operationId, issue.localRevision).then(() => setMessage(null)).catch(() => setMessage('storageFailed')); }}>{t('discard')}</button></>}
       {message === 'training:saveError' && <button className="quiet" onClick={() => { void save().catch(() => undefined); }}>{t('retry')}</button>}
     </div>}
     {more && <ConfirmDialog title={label('rowOptions')} onCancel={() => { setMore(false); void save().catch(() => undefined); }}>
@@ -154,8 +160,7 @@ export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, reco
       <button className="secondary" onClick={() => { setMore(false); setConfirmDelete(false); void save().catch(() => undefined); }}>{t('training:done')}</button>
     </ConfirmDialog>}
     {reviewing && <ConfirmDialog title={t('training:review')} onCancel={() => setReviewing(false)}>
-      <p>{t('training:reviewRow', { current: record ? (record.loadDecimal ?? '—') + ' × ' + record.reps : '—', proposed: draft.fields.load + ' × ' + draft.fields.reps })}</p>
-      <button disabled={busy} onClick={() => { void save(true).catch(() => undefined); }}>{t('training:applyEdit')}</button>
+      {issue?.mutation.kind === 'day-set.delete' || issue?.mutation.kind === 'set.delete' ? <><p>{t('training:confirmDeleteSet')} {record ? (record.loadDecimal ?? '—') + ' × ' + record.reps : '—'}</p><button className="danger" onClick={() => { void remove(true); }}>{t('training:remove')}</button></> : <><p>{t('training:reviewRow', { current: record ? (record.loadDecimal ?? '—') + ' × ' + record.reps : '—', proposed: draft.fields.load + ' × ' + draft.fields.reps })}</p><button disabled={busy} onClick={() => { void save(true).catch(() => undefined); }}>{t('training:applyEdit')}</button></>}
       <button className="secondary" onClick={() => setReviewing(false)}>{t('cancel')}</button>
     </ConfirmDialog>}
   </div>;

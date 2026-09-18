@@ -4,16 +4,16 @@ import type * as Pull from '../../src/client/synchronizer.ts';
 import type * as Queue from '../../src/client/command-queue.ts';
 import type * as Commands from '../../src/domain/manual-commands.ts';
 
-test('a lost write receipt survives reload and is recovered without another POST', async ({ page }) => {
+test('a lost write receipt survives reload and is recovered without another POST', async ({ page }, info) => {
   const account = await localLogin(page);
-  const operation = await page.evaluate(async account => {
+  const operation = await page.evaluate(async ({ account, date }) => {
     const storagePath = '/src/client/local-database.ts', pullPath = '/src/client/synchronizer.ts', queuePath = '/src/client/command-queue.ts';
     const { LocalDatabase } = await import(storagePath) as typeof Storage;
     const { LedgerSynchronizer } = await import(pullPath) as typeof Pull;
     const { CommandQueue } = await import(queuePath) as typeof Queue;
     const db = await LocalDatabase.open(account.ownerId), sync = new LedgerSynchronizer(db);
     await sync.refresh(); const ledger = (await db.readLedger())!;
-    const id = crypto.randomUUID(), operationId = crypto.randomUUID(), createdAt = new Date().toISOString(), date = '1990-01-01';
+    const id = crypto.randomUUID(), operationId = crypto.randomUUID(), createdAt = new Date().toISOString();
     await db.enqueueCommand({ schemaVersion: 1, ownerId: account.ownerId, operationId, clientEntityId: id, mutation: { kind: 'weight.create', input: { id, localDate: date, entryTimezone: account.timezone, timePrecision: 'date', occurredAt: null, value: '70.00', unit: 'kg', condition: 'unspecified', primaryChoice: 'extra' } }, localDate: date, entryTimezone: account.timezone, createdAt, dependencies: [], restoreEpoch: ledger.restoreEpoch, baseDataRevision: ledger.dataRevision });
     const queue = new CommandQueue(db, sync, { fetch: async (url, init) => {
       const response = await fetch(url, init);
@@ -23,7 +23,7 @@ test('a lost write receipt survives reload and is recovered without another POST
     await queue.flush(); const pending = await db.readCommand(operationId);
     queue.stop(); sync.stop(); db.close();
     return { id, operationId, state: pending?.state, attempts: pending?.attempts };
-  }, account);
+  }, { account, date: '1970-' + (info.project.name === 'en' ? '09' : info.project.name === 'zh-Hant' ? '05' : '01') + '-01' });
   expect(operation).toMatchObject({ state: 'uncertain', attempts: 1 });
   await page.reload();
   const recovered = await page.evaluate(async ({ account, operation }) => {

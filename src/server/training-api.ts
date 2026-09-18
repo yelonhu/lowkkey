@@ -2,7 +2,7 @@ import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { addDays, localDateAt, localeSchema, localDateSchema, uuidSchema } from '../domain/primitives.ts';
 import { createCustomExercise, createSetup, patchSetup, searchExercises } from './exercises.ts';
-import { addExercise, addSet, createSession, editExercise, editSet, patchSession, trainingHistory, transitionSession } from './training.ts';
+import { addDailySet, readTrainingDay, addExercise, addSet, createSession, editExercise, editSet, patchSession, trainingHistory, transitionSession } from './training.ts';
 import { patchDayClaim, readDay } from './days.ts';
 import { changePlanSelection, createPlan, createSchedule, editSchedule, readActivePlan, readPlanSelection, readScheduleDay } from './plans.ts';
 import { plans, schedules, sessionExercises, sessions, sets, setups } from './training-store.ts';
@@ -66,8 +66,15 @@ export function registerTrainingRoutes(app: Hono<ApiEnvironment>, { bodies, cloc
   });
   app.post('/api/v1/schedule', async context => receipt(context, await createSchedule(context.env.DB, context.get('auth'), write(context).operationId, body(context), clock), true));
   app.patch('/api/v1/schedule/:id', async context => { const headers = write(context, true); return receipt(context, await editSchedule(context.env.DB, context.get('auth'), headers.operationId, id(context), headers.expectedRevision!, body(context), clock)); });
+  app.delete('/api/v1/training/days/:date/:id/exercises/:exerciseId', async context => { const headers = write(context, true); return receipt(context, await editExercise(context.env.DB, context.get('auth'), headers.operationId, id(context), headers.expectedRevision!, id(context, 'exerciseId'), body(context), true, clock, localDateSchema.parse(context.req.param('date')))); });
+  app.get('/api/v1/training/days/:date', context => read(context, () => readTrainingDay(context.env.DB, context.get('auth').id, localDateSchema.parse(context.req.param('date')))));
+  app.post('/api/v1/training/days/:date/sets', async context => receipt(context, await addDailySet(context.env.DB, context.get('auth'), write(context).operationId, localDateSchema.parse(context.req.param('date')), body(context), clock), true));
+  for (const method of ['patch', 'delete'] as const) app[method]('/api/v1/training/days/:date/:id/sets/:setId', async context => {
+    const headers = write(context, true);
+    return receipt(context, await editSet(context.env.DB, context.get('auth'), headers.operationId, id(context), headers.expectedRevision!, id(context, 'setId'), body(context), method === 'delete', clock, localDateSchema.parse(context.req.param('date'))));
+  });
   app.get('/api/v1/training/sessions', context => {
-    const query = z.strictObject({ ...pageQueryFields, ...rangeFields, status: z.enum(['draft', 'in_progress', 'paused', 'completed', 'cancelled']).optional() }).parse(context.req.query()), bounds = range(context, query);
+    const query = z.strictObject({ ...pageQueryFields, ...rangeFields, status: z.enum(['draft', 'in_progress', 'paused', 'completed', 'recorded', 'cancelled']).optional() }).parse(context.req.query()), bounds = range(context, query);
     return read(context, () => listing(context, sessions, query, `local_date BETWEEN ? AND ?${query.status ? ' AND status=?' : ''}`, [bounds.from, bounds.to, ...(query.status ? [query.status] : [])], { ...bounds, status: query.status ?? null }));
   });
   app.post('/api/v1/training/sessions', async context => receipt(context, await createSession(context.env.DB, context.get('auth'), write(context).operationId, body(context), clock), true));

@@ -9,11 +9,13 @@ export function useDraft<T extends Record<string, string>>(database: LocalDataba
   const [fields, setFields] = useState(defaults), [ready, setReady] = useState(false), [error, setError] = useState(false), [saved, setSaved] = useState(false);
   const current = useRef(defaults), initial = useRef(defaults), timer = useRef<ReturnType<typeof setTimeout> | null>(null), writing = useRef<Promise<void>>(Promise.resolve()), dirty = useRef(false), alive = useRef(true);
   const persist = useRef<() => Promise<{ id: string; updatedAt: string } | undefined>>(async () => undefined);
+  const lastTick = useRef(0);
   const lastSaved = useRef<{ id: string; updatedAt: string } | undefined>(undefined);
   persist.current = async () => {
     if (timer.current !== null) clearTimeout(timer.current); timer.current = null;
     if (!dirty.current) { await writing.current; return lastSaved.current; }
-    const rawFields = { ...current.current }, updatedAt = new Date().toISOString(); dirty.current = false;
+    lastTick.current = Math.max(Date.now(), lastTick.current + 1);
+    const rawFields = { ...current.current }, updatedAt = new Date(lastTick.current).toISOString(); dirty.current = false;
     const targetId = uuidSchema.safeParse(rawFields.targetId), revision = revisionSchema.safeParse(Number(rawFields.targetRevision));
     const described = describe?.(rawFields);
     const draft: LocalDraft = { id, ownerId: database.ownerId, kind, rawFields, baseRefs: described?.baseRefs ?? (kind === 'weight' && targetId.success && revision.success ? [{ type: 'weight_entry', id: targetId.data, revision: revision.data }] : []), localDate: described?.localDate ?? (localDateSchema.safeParse(rawFields.date).success ? rawFields.date : null), entryTimezone: timezone, updatedAt };
@@ -37,10 +39,13 @@ export function useDraft<T extends Record<string, string>>(database: LocalDataba
   function replace(value: T) {
     current.current = value; dirty.current = true; setFields(value); setSaved(false);
     if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = setTimeout(() => { void persist.current().catch(() => { /* The hook presents the storage failure. */ }); }, 300);
+    timer.current = setTimeout(() => { void persist.current().catch(() => { /* The hook presents the storage failure. */ }); }, 0);
   }
   async function clear(value: T = initial.current) {
-    await persist.current(); await database.removeDraft(id); current.current = value; dirty.current = false; lastSaved.current = undefined; setFields(value); setSaved(false);
+    const before = current.current, token = await persist.current();
+    if (token) await database.removeDraft(id, token.updatedAt);
+    if (current.current !== before) return false;
+    current.current = value; dirty.current = false; lastSaved.current = undefined; setFields(value); setSaved(false); return true;
   }
   function resetAfterSubmit(value: T = initial.current) { current.current = value; dirty.current = false; lastSaved.current = undefined; setFields(value); setSaved(false); }
   return { fields, read: () => current.current, ready, error, saved, replace, change: (key: keyof T, value: string) => replace({ ...current.current, [key]: value }), flush: () => persist.current(), clear, resetAfterSubmit };

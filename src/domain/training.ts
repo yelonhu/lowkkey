@@ -62,8 +62,9 @@ export const schedulePatchSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.enum(['skip', 'cancel']) }),
 ]);
 
-export const sessionStatusSchema = z.enum(['draft', 'in_progress', 'paused', 'completed', 'cancelled', 'deleted']);
+export const sessionStatusSchema = z.enum(['draft', 'in_progress', 'paused', 'completed', 'recorded', 'cancelled', 'deleted']);
 export const workoutSessionSchema = entityMetadataSchema.extend({ localDate: localDateSchema, entryTimezone: timezoneSchema, startedAt: utcSchema.nullable(), endedAt: utcSchema.nullable(), timePrecision: z.enum(['instant', 'date']), status: sessionStatusSchema, planVersionId: uuidSchema.nullable(), scheduledSessionId: uuidSchema.nullable(), planSnapshot: planSnapshotSchema.nullable(), title: z.string().max(120).nullable(), note: z.string().max(2000).nullable(), recovery: recoveryNoteSchema.nullable(), sourceRef: uuidSchema.nullable(), sourceKind: sourceKindSchema, ...operationFields }).superRefine((value, ctx) => {
+  if (value.status === 'recorded' && value.timePrecision !== 'date') ctx.addIssue({ code: 'custom', message: 'Daily training is date-only' });
   if (value.timePrecision === 'date' && (value.startedAt !== null || value.endedAt !== null)) ctx.addIssue({ code: 'custom', message: 'Date-only training cannot fabricate timestamps' });
   if (value.startedAt && value.endedAt && value.startedAt > value.endedAt) ctx.addIssue({ code: 'custom', message: 'Session ends before it begins' });
   if ((value.status === 'deleted') !== (value.deletedAt !== null)) ctx.addIssue({ code: 'custom', message: 'Deleted session must retain a tombstone' });

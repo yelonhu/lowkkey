@@ -113,3 +113,16 @@ test('rejects foreign drafts and health facts in return state and exposes storag
   });
   expect(result.foreign).toBe(true); expect(result.forgedScene).toBe(true); expect(result.quota).toBe(true); expect(result.absent).toBeNull(); expect(result.cleared).toBeNull(); expect(result.retained).toMatchObject({ rawFields: { reps: '2' } });
 });
+
+test('conditional draft removal never erases a newer local edit', async ({ page }) => {
+  const account = await localLogin(page);
+  const retained = await page.evaluate(async ownerId => {
+    const path='/src/client/local-database.ts';const {LocalDatabase}=await import(path);const db=await LocalDatabase.open(ownerId);
+    try {
+      const draft={id:'conditional-draft',ownerId,kind:'weight',rawFields:{value:'70'},baseRefs:[],localDate:'2000-01-01',entryTimezone:'UTC',updatedAt:'2026-09-17T00:00:00.000Z'};
+      await db.saveDraft(draft);await db.saveDraft({...draft,rawFields:{value:'70.2'},updatedAt:'2026-09-17T00:00:00.001Z'});
+      await db.removeDraft(draft.id,draft.updatedAt);return(await db.readDraft(draft.id))?.rawFields.value;
+    } finally {db.close();}
+  },account.ownerId);
+  expect(retained).toBe('70.2');
+});

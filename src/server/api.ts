@@ -9,7 +9,7 @@ import { parseWriteHeaders } from '../domain/contracts.ts';
 import { addDays, localDateAt, localDateSchema, uuidSchema } from '../domain/primitives.ts';
 import { effectiveTimezone } from '../domain/time.ts';
 import { DomainError } from './errors.ts';
-import { createWeight, deleteWeight, patchWeight, readWeight, undoWeight } from './weights.ts';
+import { createDailyWeight, editDailyWeight, readDailyWeight, createWeight, deleteWeight, patchWeight, readWeight, undoWeight } from './weights.ts';
 import { readOperation } from './commands.ts';
 import { patchProfile, readProfile } from './profiles.ts';
 import { createGoal, readGoal } from './goals.ts';
@@ -151,6 +151,21 @@ export function createApi(options: Options = {}) {
     const headers = writeHeaders(context.req.raw.headers, true);
     const receipt = await changeMember(context.env.DB, context.get('auth'), headers.operationId, context.req.param('id'), headers.expectedRevision!, bodies.get(context.req.raw), clock);
     return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId }) });
+  });
+  app.get('/api/v1/weights/days/:date', async context => {
+    const result = await readConsistent(context.env.DB, context.get('auth').id, () => readDailyWeight(context.env.DB, context.get('auth').id, localDateSchema.parse(context.req.param('date'))));
+    return context.json({ data: result.data, meta: meta(context.env, { dataRevision: result.dataRevision }) });
+  });
+  app.post('/api/v1/weights/days/:date', async context => {
+    const headers = writeHeaders(context.req.raw.headers);
+    const receipt = await createDailyWeight(context.env.DB, context.get('auth'), headers.operationId, localDateSchema.parse(context.req.param('date')), bodies.get(context.req.raw), clock);
+    return context.json({ data: receipt, meta: meta(context.env, { dataRevision: receipt.dataRevision }) }, 201);
+  });
+  for (const method of ['patch', 'delete'] as const) app[method]('/api/v1/weights/days/:date/:id', async context => {
+    const headers = writeHeaders(context.req.raw.headers, true);
+    if (method === 'delete') z.strictObject({}).parse(bodies.get(context.req.raw));
+    const receipt = await editDailyWeight(context.env.DB, context.get('auth'), headers.operationId, localDateSchema.parse(context.req.param('date')), uuidSchema.parse(context.req.param('id')), headers.expectedRevision!, bodies.get(context.req.raw), method === 'delete', clock);
+    return context.json({ data: receipt, meta: meta(context.env, { dataRevision: receipt.dataRevision }) });
   });
   app.post('/api/v1/weights', async context => {
     const headers = writeHeaders(context.req.raw.headers);

@@ -14,6 +14,7 @@ const meta = {
 };
 export const artifactViewSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...meta, kind: z.literal('SessionArtifact'), props: z.strictObject({
+    daySessionIds: z.array(uuidSchema).max(100).default([]), dayExerciseCount: scaledSchema.default(0), daySetCount: scaledSchema.default(0),
     activeSessionId: uuidSchema.nullable(), selectedSessionId: uuidSchema.nullable(), plannedSessionIds: z.array(uuidSchema).max(100),
     completedWorkingSets: scaledSchema, unknownTypeSets: scaledSchema,
     muscleVolume: z.array(z.strictObject({ muscleId: z.string().min(1).max(80), directSets: scaledSchema, secondarySets: scaledSchema })).max(100),

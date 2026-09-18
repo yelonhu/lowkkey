@@ -271,3 +271,42 @@ input[aria-invalid=true] { outline: 2px solid var(--danger); }
 
 .row-load { position: relative; }
 .row-original-unit { display: block; font-size: 14px; text-align: center; color: var(--muted); line-height: 1; }
+
+/* Daily recording: compact hierarchy, one reading, one unbroken chart surface. */
+.daily-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 12px; }
+.daily-heading h1 { font-size:clamp(25px,4vw,32px); letter-spacing:-.04em; margin:0; line-height:1.2; }
+.daily-heading input[type=date] { width:auto; min-width:0; max-width:55%; height:44px; min-height:44px; padding:8px 10px; margin:0; font-size:14px; background:transparent; box-shadow:none; }
+.daily-training, .daily-weight { width:100%; max-width:760px; margin:0 auto; }
+.day-summary { color:var(--muted); margin:0 0 20px; font-size:14px; font-variant-numeric:tabular-nums; }
+.daily-training .training-exercise { margin-bottom:14px; }
+.add-exercise { margin-top:8px; min-height:48px; }
+.daily-weight .weight-hero { padding:12px 0 4px; }
+.weight-reading { display:flex; align-items:center; min-height:90px; gap:8px; }
+.weight-number { display:flex; align-items:baseline; gap:12px; padding:0; text-align:left; min-height:84px; color:var(--ink); box-shadow:none; }
+.weight-number .numeric { font-size:clamp(46px,10vw,68px); letter-spacing:-.065em; font-weight:500; line-height:1.15; }
+.weight-number .unit { font-size:22px; color:var(--muted); }
+.weight-reading #weight-value { font-family:var(--font-numeric); font-size:clamp(36px,9vw,60px); line-height:1.2; min-width:0; max-width:calc(100% - 130px); width:5ch; flex:1; height:84px; padding:8px; margin:0; font-variant-numeric:tabular-nums; }
+.weight-reading select { width:66px; padding:10px 6px; margin:0; background:transparent; font-size:18px; }
+.weight-more { margin-left:auto; width:44px; height:44px; min-height:44px; padding:0; flex-shrink:0; }
+.weight-feedback { min-height:24px; display:flex; align-items:center; gap:12px; font-size:13px; }
+.weight-feedback .quiet { min-height:44px; padding:4px 8px; }
+.save-status { display:inline-block; color:var(--muted); font-size:12px; padding:2px 0; }
+.weight-trend { margin:12px 0 26px; }
+.trend-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.trend-heading h2, .weight-history h2 { font-size:16px; font-weight:600; margin:0; letter-spacing:-.02em; }
+.trend-heading .muted, .chart-caption { font-size:12px; }
+.daily-weight .trend-chart { display:block; width:100%; height:auto; max-height:320px; margin:8px 0 0; }
+.chart-caption { margin:4px 0 0; color:var(--muted); }
+.weight-history .record-list { padding:0; margin-top:8px; }
+.weight-history .record-list li { display:block; padding:0; border:0; }
+.weight-history-row { display:flex; width:100%; justify-content:space-between; align-items:center; gap:12px; min-height:52px; padding:10px 0; text-align:left; font-size:14px; }
+.weight-history-row time { color:var(--muted); font-size:13px; }
+.weight-history-row .unit { font-family:var(--font-ui); color:var(--muted); }
+@media(max-width:600px) {
+ .app-header { padding-top:12px; padding-bottom:12px; min-height:64px; }
+ .app-header .brand { font-size:28px; }
+ .back-link { margin:0 0 8px; min-height:44px; padding-top:6px; padding-bottom:6px; }
+ .daily-weight .weight-hero { padding-top:0; }
+ .daily-weight .trend-chart { max-height:240px; }
+ .daily-weight .weight-trend { margin-top:4px; margin-bottom:22px; }
+}

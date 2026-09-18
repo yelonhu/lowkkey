@@ -1,167 +1,157 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { addDays, localeSchema, localDateAt, unitSchema, uuidSchema } from '../domain/primitives.ts';
+import { addDays, localeSchema, localDateAt, unitSchema } from '../domain/primitives.ts';
 import { normalizeManualDecimal, normalizeMass } from '../domain/numbers.ts';
-import { formatDate, formatNumber } from '../i18n/locale.ts';
-import { createWeightSchema, patchWeightSchema, weightTrend } from '../domain/weight.ts';
+import { formatDate } from '../i18n/locale.ts';
+import { dailyWeightCreateSchema, dailyWeightEditSchema } from '../domain/daily-records.ts';
+import { weightTrend } from '../domain/weight.ts';
 import type { Weight } from '../domain/weight.ts';
 import type { ProfileSnapshot } from '../domain/profile.ts';
 import type { LocalLedger } from '../domain/local-ledger.ts';
-import { visibleLedgerEntities } from '../domain/local-ledger.ts';
-import { observed } from '../domain/manual-commands.ts';
+import { observed, versionBindingSchema } from '../domain/manual-commands.ts';
 import type { ManualMutation, QueuedCommand } from '../domain/manual-commands.ts';
 import { effectiveTimezone } from '../domain/time.ts';
 import { useDraft } from './use-draft.ts';
 import { commandFor } from './workspace-state.ts';
 import type { WorkspaceRuntime } from './workspace-state.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { NumericText } from './NumericText.tsx';
+import { SaveStatus } from './SaveStatus.tsx';
+import { weightProjection } from './weight-state.ts';
+import { advanceOwnBinding, serializeTraining } from './training/save-coordinator.ts';
+import { versionFor } from './training/training-state.ts';
 
 export function displayMass(kgMicros: number, unit: 'kg' | 'lb', locale: ReturnType<typeof localeSchema.parse>) {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2, useGrouping: false }).format(kgMicros / 1000000 / (unit === 'lb' ? 0.45359237 : 1));
 }
 export const queueStateKey: Record<QueuedCommand['state'], string> = { queued: 'savedLocally', sending: 'syncing', uncertain: 'syncFailed', committed: 'synced', conflict: 'conflict', needs_review: 'needsReview', rejected: 'rejected', discarded: 'discard' };
 
-export function WeightView({ runtime, ledger, profile, commands }: { runtime: WorkspaceRuntime; ledger: LocalLedger; profile: ProfileSnapshot; commands: QueuedCommand[] }) {
+export function WeightView({ runtime, ledger, profile, commands, date, navigate }: { runtime: WorkspaceRuntime; ledger: LocalLedger; profile: ProfileSnapshot; commands: QueuedCommand[]; date: string; navigate: (path: string) => Promise<void> }) {
   const { t, i18n } = useTranslation(), locale = localeSchema.parse(i18n.resolvedLanguage), timezone = effectiveTimezone(profile.timezone, profile.pendingTimezone, profile.timezoneEffectiveDate, new Date()), today = localDateAt(new Date(), timezone);
-  const records = useMemo(() => visibleLedgerEntities(ledger).flatMap(item => item.kind === 'weight_entry' ? [item.value] : []).sort((a, b) => b.localDate.localeCompare(a.localDate) || (b.occurredAt ?? b.createdAt).localeCompare(a.occurredAt ?? a.createdAt)), [ledger]);
-  const defaults = { value: '', unit: profile.bodyWeightUnit, date: today, condition: 'unspecified', targetId: '', targetRevision: '', replacementOperation: '', primaryChoice: 'extra', primaryId: '', primaryRevision: '' };
-  const draft = useDraft(runtime.database, 'weight-form', 'weight', defaults, timezone), fields = draft.fields;
-  const [busy, setBusy] = useState(false), [message, setMessage] = useState<string | null>(null), [outlierAccepted, setOutlierAccepted] = useState<string | null>(null), [deleteTarget, setDeleteTarget] = useState<Weight | null>(null), [limit, setLimit] = useState(20);
-  const [latestActionId, setLatestActionId] = useState<string | null>(null), [quickUndoId, setQuickUndoId] = useState<string | null>(null), [deleteReview, setDeleteReview] = useState<QueuedCommand | null>(null);
-  const submitting = useRef(false), undoing = useRef(new Set<string>());
-  const form = useRef<HTMLFormElement>(null);
-  const action = commands.find(command => command.operationId === latestActionId);
-  // Start the ten-second affordance when this tab receives the successful
-  // create receipt. Old receipts loaded from disk do not restart the window.
+  const records = useMemo(() => weightProjection(ledger, commands).filter(item => item.isPrimary), [ledger, commands]);
+  const current = records.find(item => item.localDate === date);
+  const defaults = (record: Weight | null | undefined = current): Record<string, string> => ({ value: record?.value ?? '', unit: record?.unit ?? profile.bodyWeightUnit, date, condition: record?.condition ?? 'unspecified', targetId: record?.id ?? '', targetBinding: '', newId: crypto.randomUUID(), dirty: 'no' });
+  const draft = useDraft(runtime.database, 'weight-day:' + date, 'weight', defaults(), timezone, fields => {
+    try { const binding = versionBindingSchema.parse(JSON.parse(fields.targetBinding)); return { localDate: date, baseRefs: binding.source.kind === 'observed' ? [{ type: binding.type, id: binding.id, revision: binding.source.revision }] : [] }; }
+    catch { return { localDate: date, baseRefs: [] }; }
+  });
+  const [restored, setRestored] = useState(false);
+  const [editing, setEditing] = useState(false), [details, setDetails] = useState(false), [deleting, setDeleting] = useState<Weight | null>(null), [message, setMessage] = useState<string | null>(null), [outlier, setOutlier] = useState<Weight | null>(null), [reviewing, setReviewing] = useState<QueuedCommand | null>(null), [lastId, setLastId] = useState<string | null>(null), [undoId, setUndoId] = useState<string | null>(null), [busy, setBusy] = useState(false);
+  const handler = useRef<() => Promise<unknown>>(async () => undefined), migrated = useRef(false), input = useRef<HTMLInputElement>(null);
+  const undoAnnounced = useRef<string | null>(null), requestedFocus = useRef(false);
+  const action = commands.find(command => command.operationId === lastId) ?? commands.findLast(command => command.localDate === date && (command.mutation.kind.startsWith('day-weight.') || command.mutation.kind.startsWith('weight.')) && !['committed','discarded'].includes(command.state));
+  const problems = commands.filter(command => command.localDate === date && (command.mutation.kind.startsWith('day-weight.') || command.mutation.kind.startsWith('weight.') || command.operationId === lastId) && ['conflict','needs_review','rejected'].includes(command.state));
+  useEffect(() => { if (draft.ready && draft.read().dirty !== 'yes' && !editing) draft.resetAfterSubmit(defaults()); }, [current?.id, current?.revision, current?.value, current?.unit, draft.ready]);
   useEffect(() => {
-    if (action?.state !== 'committed' || action.mutation.kind !== 'weight.create') return;
-    setQuickUndoId(action.operationId);
-    const timer = setTimeout(() => setQuickUndoId(null), 10000);
-    return () => clearTimeout(timer);
-  }, [action?.operationId, action?.state, action?.mutation.kind]);
-  const editing = records.find(record => record.id === fields.targetId), primary = records.find(record => record.localDate === fields.date && record.isPrimary && record.id !== fields.targetId), reference = records.find(record => record.localDate <= fields.date && record.isPrimary && record.id !== fields.targetId);
-  let normalized: number | null = null;
-  try { normalized = normalizeMass(normalizeManualDecimal(fields.value), unitSchema.parse(fields.unit), 1, 500).kgMicros; } catch { /* Raw partial input remains a draft. */ }
-  const outlier = reference && normalized !== null && Math.abs(normalized - reference.kgMicros) * 100 > reference.kgMicros * 5;
-  const outlierKey = reference ? `${reference.id}:${reference.revision}:${fields.value}:${fields.unit}:${fields.date}` : null;
-  const dateLabel = (date: string) => formatDate(new Date(`${date}T12:00:00Z`), locale, 'UTC');
-  const from = addDays(today, -27), trend = weightTrend(records, from, today), points = trend.trend.flatMap((point, index) => point.meanKgMicros === null ? [] : [{ x: index, y: point.meanKgMicros }]);
-  // Draw primary points last so an equal-valued extra cannot hide their fill.
-  const rawPoints = records.filter(record => record.localDate >= from && record.localDate <= today).sort((a, b) => Number(a.isPrimary) - Number(b.isPrimary));
-  const values = [...points.map(point => point.y), ...rawPoints.map(record => record.kgMicros)];
-  const minimum = values.length ? Math.min(...values) : 0, maximum = values.length ? Math.max(...values) : 0, padding = Math.max((maximum - minimum) * 0.1, 500000), lo = minimum - padding, hi = maximum + padding;
-  const plotY = (value: number) => 132 - (value - lo) / (hi - lo) * 112, plotX = (date: string) => 54 + (Date.parse(date) - Date.parse(from)) / 86400000 * 8.5;
-  const primaryChanged = fields.primaryChoice === 'replace' && (!primary || fields.primaryId !== primary.id || fields.primaryRevision !== String(primary.revision));
-  const weightOperations = new Set(commands.filter(command => command.mutation.kind.startsWith('weight.')).map(command => command.operationId));
-  const pending = commands.filter(command => (command.mutation.kind.startsWith('weight.') || (command.mutation.kind === 'operation.undo' && weightOperations.has(command.mutation.originalId))) && !['committed', 'discarded'].includes(command.state));
-  const undoPending = (id: string) => commands.some(command => command.mutation.kind === 'operation.undo' && command.mutation.originalId === id && command.state !== 'discarded');
-  const feedbackKey = action?.state === 'committed' ? action.mutation.kind === 'weight.create' ? 'weight:created' : action.mutation.kind === 'weight.update' ? 'weight:updated' : action.mutation.kind === 'weight.delete' ? 'weight:deleted' : 'weight:undone' : action ? queueStateKey[action.state] : null;
-  const replacementId = action?.state === 'committed' ? action.receipt?.result.replacementPrimaryId : null;
-  const replacement = records.find(record => record.id === replacementId);
-  async function submit() {
-    if (submitting.current) return; submitting.current = true; setBusy(true); setMessage(null);
-    try {
-      const id = fields.targetId ? uuidSchema.parse(fields.targetId) : crypto.randomUUID();
-      normalizeMass(normalizeManualDecimal(fields.value), unitSchema.parse(fields.unit), 1, 500);
-      if (primaryChanged) { setMessage('weight:primaryChanged'); return; }
-      const confirmation = { primaryChoice: fields.primaryChoice as 'extra' | 'replace', ...(primary && fields.primaryChoice === 'replace' ? { expectedPrimary: { id: fields.primaryId, revision: Number(fields.primaryRevision) } } : {}), confirmedOutlier: outlierAccepted !== null && outlierAccepted === outlierKey, ...(reference ? { outlierReference: { id: reference.id, revision: reference.revision } } : {}) };
-      const raw = { localDate: fields.date, entryTimezone: fields.targetId && editing?.localDate === fields.date ? editing.entryTimezone : timezone, occurredAt: fields.targetId && editing?.localDate === fields.date ? editing.occurredAt : fields.date === today ? new Date().toISOString() : null, timePrecision: fields.targetId && editing?.localDate === fields.date ? editing.timePrecision : fields.date === today ? 'instant' : 'date', value: normalizeManualDecimal(fields.value), unit: unitSchema.parse(fields.unit), condition: fields.condition, ...confirmation };
-      const mutation: ManualMutation = fields.targetId ? { kind: 'weight.update', target: { type: 'weight_entry', id, source: { kind: 'observed', revision: Number(fields.targetRevision) } }, input: patchWeightSchema.parse(raw) } : { kind: 'weight.create', input: createWeightSchema.parse({ id, ...raw }) };
-      if (fields.date > today) { setMessage('errors:invalidInput'); return; }
-      if (outlier && outlierAccepted !== outlierKey) { setMessage('errors:needsConfirmation'); return; }
-      const submitted = await draft.flush(), command = commandFor(ledger, mutation, id, fields.date, raw.entryTimezone);
-      if (fields.replacementOperation) {
-        const previous = await runtime.database.readCommand(fields.replacementOperation);
-        if (!previous) throw new Error('Previous command missing');
-        await runtime.database.resolveCommand(previous.operationId, previous.localRevision, command, submitted);
-      } else await runtime.database.enqueueCommand(command, submitted);
-      draft.resetAfterSubmit(defaults); setOutlierAccepted(null); setLatestActionId(command.operationId); void runtime.queue.flush();
-    } catch (error) { setMessage(error instanceof Error && (error.name === 'ZodError' || error.message.includes('MASS_')) ? 'errors:invalidInput' : 'storageFailed'); }
-    finally { submitting.current = false; setBusy(false); }
+    if (!draft.ready || migrated.current) return; migrated.current = true;
+    if (draft.saved) { if (draft.read().dirty === 'yes') setEditing(true); setRestored(true); return; }
+    void runtime.database.readDraft('weight-form').then(async old => {
+      if (!old || old.rawFields.date !== date || !old.rawFields.value || draft.read().dirty === 'yes') return;
+      const fields = old.rawFields;
+      draft.replace({ ...defaults(), value: fields.value, unit: fields.unit, condition: fields.condition || 'unspecified', targetId: fields.targetId || '', targetBinding: fields.targetId && fields.targetRevision ? JSON.stringify(observed({ type: 'weight_entry', id: fields.targetId, revision: Number(fields.targetRevision) })) : '', dirty: 'yes' });
+      await draft.flush(); await runtime.database.removeDraft('weight-form'); setEditing(true);
+    }).catch(() => setMessage('storageFailed')).finally(() => setRestored(true));
+  }, [draft.ready]);
+  useEffect(() => { if (editing && requestedFocus.current) { requestedFocus.current = false; input.current?.focus({ preventScroll: true }); } }, [editing]);
+  useEffect(() => { const commit = (event: Event) => (event as CustomEvent<Array<() => Promise<unknown>>>).detail.push(() => handler.current()); window.addEventListener('lowkkey:commit-training', commit); return () => window.removeEventListener('lowkkey:commit-training', commit); }, []);
+  useEffect(() => {
+    if (action?.state !== 'committed' || action.mutation.kind !== 'day-weight.create' || (action.receipt?.dataRevision ?? Infinity) > ledger.dataRevision) return;
+    if (undoAnnounced.current === action.operationId) return; undoAnnounced.current = action.operationId;
+    setUndoId(action.operationId); const timer = setTimeout(() => setUndoId(null), 10000); return () => clearTimeout(timer);
+  }, [action?.operationId, action?.state, (action?.receipt?.dataRevision ?? Infinity) <= ledger.dataRevision]);
+  function change(key: string, value: string) {
+    const fields = draft.read();
+    draft.replace({ ...fields, [key]: value, dirty: 'yes', targetId: fields.targetId || current?.id || '', targetBinding: fields.targetBinding || (current ? JSON.stringify(observed({ type: 'weight_entry', id: current.id, revision: current.revision })) : '') });
+    setMessage(null); setOutlier(null);
   }
-  function edit(record: Weight) {
-    draft.replace({ ...defaults, value: record.value, unit: record.unit, date: record.localDate, condition: record.condition, targetId: record.id, targetRevision: String(record.revision) }); setMessage(null); form.current?.scrollIntoView({ block: 'start' }); form.current?.querySelector<HTMLInputElement>('#weight-value')?.focus({ preventScroll: true });
+  async function save(confirmReference?: Weight, reviewed?: QueuedCommand) {
+    return serializeTraining(runtime.database, async () => {
+      if (!draft.ready || (draft.read().dirty !== 'yes' && !reviewed)) return;
+      const fields = { ...draft.read() };
+      let value: string, unit: 'kg' | 'lb', mass: number;
+      try { value = normalizeManualDecimal(fields.value); unit = unitSchema.parse(fields.unit); mass = normalizeMass(value, unit, 1, 500).kgMicros; if (date > today) throw Error(); }
+      catch { await draft.flush(); setMessage('daily:invalidWeight'); return; }
+      setBusy(true);
+      try {
+        const token = await draft.flush(), fresh = await runtime.database.readLedger(); if (!fresh) throw Error('Storage');
+        const queued = await runtime.database.listCommands(), visible = weightProjection(fresh, queued), latest = visible.find(item => item.isPrimary && item.localDate === date);
+        if (problems.length && !reviewed) { setMessage('conflict'); return; }
+        const target = reviewed ? latest : fields.targetId ? visible.find(item => item.id === fields.targetId) : undefined;
+        if (fields.targetId && !target && !reviewed) { setMessage('weight:missingTarget'); return; }
+        // Do not convert a concurrent first write into an update without review.
+        const reference = visible.find(item => item.isPrimary && item.localDate <= date && item.id !== target?.id);
+        if (reference && Math.abs(mass - reference.kgMicros) * 100 > reference.kgMicros * 5 && (confirmReference?.id !== reference.id || confirmReference.revision !== reference.revision)) { setOutlier(reference); return; }
+        if (target && value === target.value && unit === target.unit && fields.condition === target.condition && !reviewed) { if (JSON.stringify(draft.read()) === JSON.stringify(fields) && await draft.clear(defaults(target))) setEditing(false); return; }
+        const confirmation = { confirmedOutlier: !!confirmReference, ...(confirmReference ? { outlierReference: { id: confirmReference.id, revision: confirmReference.revision } } : {}) };
+        const binding = target ? reviewed ? versionFor({ type: 'weight_entry', id: target.id, revision: target.revision }, queued.filter(command => command.operationId !== reviewed.operationId)) : fields.targetBinding ? advanceOwnBinding(versionBindingSchema.parse(JSON.parse(fields.targetBinding)), queued) : versionFor({ type: 'weight_entry', id: target.id, revision: target.revision }, queued) : null;
+        const id = target?.id ?? fields.newId;
+        const mutation: ManualMutation = binding ? { kind: 'day-weight.update', localDate: date, target: { ...binding, type: 'weight_entry' }, input: dailyWeightEditSchema.parse({ value, unit, condition: fields.condition, ...confirmation }) }
+          : { kind: 'day-weight.create', input: dailyWeightCreateSchema.parse({ id, localDate: date, entryTimezone: timezone, timePrecision: 'date', occurredAt: null, value, unit, condition: fields.condition, ...confirmation }) };
+        const command = commandFor(fresh, mutation, id, date, target?.entryTimezone ?? timezone);
+        if (reviewed) { const previous = await runtime.database.readCommand(reviewed.operationId); if (!previous) throw Error(); await runtime.database.resolveCommand(previous.operationId, previous.localRevision, command, token); }
+        else await runtime.database.enqueueCommand(command, token);
+        const next = { ...draft.read(), targetId: id, targetBinding: JSON.stringify({ type: 'weight_entry', id, source: { kind: 'receipt', operationId: command.operationId } }) };
+        if (JSON.stringify(draft.read()) === JSON.stringify(fields)) { draft.resetAfterSubmit({ ...next, dirty: 'no' }); setEditing(false); } else draft.replace(next);
+        setLastId(command.operationId); setMessage(null); setOutlier(null); setReviewing(null); void runtime.queue.flush();
+      } catch { setMessage('storageFailed'); throw Error('Weight save failed'); }
+      finally { setBusy(false); }
+    });
   }
-  async function review(command: QueuedCommand) {
-    if (command.mutation.kind === 'weight.delete') {
-      const targetId = command.mutation.target.id, current = records.find(record => record.id === targetId);
-      if (!current) { setMessage('weight:missingTarget'); return; }
-      setDeleteReview(command); setDeleteTarget(current); return;
-    }
-    if (command.mutation.kind !== 'weight.create' && command.mutation.kind !== 'weight.update') return;
-    const mutation = command.mutation, current = mutation.kind === 'weight.update' ? records.find(record => record.id === mutation.target.id) : null;
-    if (mutation.kind === 'weight.update' && !current) { setMessage('weight:missingTarget'); return; }
-    draft.replace({ ...defaults, value: mutation.input.value ?? current?.value ?? '', unit: mutation.input.unit ?? current?.unit ?? profile.bodyWeightUnit, date: mutation.input.localDate ?? current?.localDate ?? command.localDate, condition: mutation.input.condition ?? current?.condition ?? 'unspecified', targetId: current?.id ?? '', targetRevision: current ? String(current.revision) : '', replacementOperation: command.operationId });
-    setOutlierAccepted(null); setMessage(current ? 'weight:editingBaseline' : null); form.current?.scrollIntoView({ block: 'start' }); form.current?.querySelector<HTMLInputElement>('#weight-value')?.focus({ preventScroll: true });
-  }
+  handler.current = () => save();
   async function remove() {
-    if (!deleteTarget || submitting.current) return; submitting.current = true; setBusy(true); setMessage(null);
-    try {
-      const command = commandFor(ledger, { kind: 'weight.delete', target: observed({ type: 'weight_entry', id: deleteTarget.id, revision: deleteTarget.revision }) }, deleteTarget.id, deleteTarget.localDate, deleteTarget.entryTimezone);
-      if (deleteReview) await runtime.database.resolveCommand(deleteReview.operationId, deleteReview.localRevision, command);
-      else await runtime.database.enqueueCommand(command);
-      setLatestActionId(command.operationId); setDeleteTarget(null); setDeleteReview(null); void runtime.queue.flush();
-    } catch { setMessage('storageFailed'); } finally { submitting.current = false; setBusy(false); }
+    if (!deleting || busy) return; setBusy(true);
+    try { await serializeTraining(runtime.database, async () => {
+      const fresh = await runtime.database.readLedger(); if (!fresh) throw Error();
+      const queued = await runtime.database.listCommands(), binding = advanceOwnBinding(observed({ type: 'weight_entry', id: deleting.id, revision: deleting.revision }), queued);
+      const command = commandFor(fresh, { kind: 'day-weight.delete', localDate: date, target: { ...binding, type: 'weight_entry' } }, deleting.id, date, deleting.entryTimezone);
+      if (reviewing) await runtime.database.resolveCommand(reviewing.operationId, reviewing.localRevision, command); else await runtime.database.enqueueCommand(command);
+      await draft.clear(defaults(null)); setLastId(command.operationId); setDeleting(null); setReviewing(null); setDetails(false); setEditing(false); void runtime.queue.flush();
+    }); } catch { setMessage('storageFailed'); } finally { setBusy(false); }
   }
-  async function undo(operationId: string) {
-    if (undoing.current.has(operationId) || undoPending(operationId)) return;
-    undoing.current.add(operationId); setMessage(null);
-    try {
-      const command = commandFor(ledger, { kind: 'operation.undo', originalId: operationId }, operationId, today, timezone);
-      await runtime.database.enqueueCommand(command); setLatestActionId(command.operationId); setQuickUndoId(null); void runtime.queue.flush();
-    } catch { setMessage('storageFailed'); } finally { undoing.current.delete(operationId); }
+  function review(command: QueuedCommand) {
+    if (command.mutation.kind === 'day-weight.delete' || command.mutation.kind === 'weight.delete') { if (current) { setReviewing(command); setDeleting(current); } return; }
+    if ('input' in command.mutation && 'value' in command.mutation.input) {
+      const proposed = command.mutation.input; draft.replace({ ...draft.read(), value: proposed.value ?? draft.read().value, unit: 'unit' in proposed ? proposed.unit ?? draft.read().unit : draft.read().unit, dirty: 'yes' }); setReviewing(command);
+    }
   }
-  return <div className="weight-view">
-    <div className="page-heading"><h1>{t('weight:title')}</h1><p>{t('weight:subtitle')}</p></div>
-    <div className="detail-grid"><section className="panel"><h2>{t(fields.targetId ? 'weight:editTitle' : 'weight:new')}</h2>
-      <form ref={form} onSubmit={event => { event.preventDefault(); void submit(); }} onBlur={() => { void draft.flush().catch(() => {}); }}>
-        <fieldset disabled={!draft.ready || busy}>
-          <label htmlFor="weight-value">{t('weight:value')}</label><div className="joined-input"><input id="weight-value" inputMode="decimal" autoComplete="off" value={fields.value} onChange={event => { draft.change('value', event.target.value); setMessage(null); }} aria-invalid={message === 'errors:invalidInput' || undefined} aria-describedby="weight-input-status weight-feedback" required/><select aria-label={t('unit')} value={fields.unit} onChange={event => draft.change('unit', event.target.value)}><option value="kg">kg</option><option value="lb">lb</option></select></div>
-          <label htmlFor="weight-date">{t('date')}</label><input id="weight-date" type="date" value={fields.date} max={today} required onChange={event => draft.change('date', event.target.value)}/>
-          <label htmlFor="weight-condition">{t('weight:condition')}</label><select id="weight-condition" value={fields.condition} onChange={event => draft.change('condition', event.target.value)}>{['unspecified', 'fasted', 'other'].map(condition => <option key={condition} value={condition}>{t(`weight:${condition}`)}</option>)}</select>
-          {primary && <div className="notice"><p>{t('weight:sameDay')} <span className="numeric">{primary.value}</span> {primary.unit}</p><label htmlFor="weight-primary">{t('weight:primaryChoice')}</label><select id="weight-primary" value={primaryChanged ? '' : fields.primaryChoice} onChange={event => draft.replace({ ...fields, primaryChoice: event.target.value, primaryId: primary.id, primaryRevision: String(primary.revision) })}>{primaryChanged && <option value="" disabled>{t('weight:primaryChanged')}</option>}<option value="extra">{t('weight:extra')}</option><option value="replace">{t('weight:replace')}</option></select></div>}
-          {primaryChanged && <p role="alert">{t('weight:primaryChanged')}{!primary && <button type="button" className="quiet" onClick={() => draft.replace({ ...fields, primaryChoice: 'extra', primaryId: '', primaryRevision: '' })}>{t('review')}</button>}</p>}
-          {outlier && reference && <div className="notice warning"><p><NumericText>{t('weight:outlier', { date: dateLabel(reference.localDate), value: reference.value, unit: reference.unit })}</NumericText></p><label className="check-label"><input type="checkbox" checked={outlierAccepted === outlierKey} onChange={event => setOutlierAccepted(event.target.checked ? outlierKey : null)}/>{t('weight:confirmOutlier')}</label></div>}
-          {fields.targetId && <p className="muted">{t('weight:editingBaseline')}</p>}
-          <div className="actions"><button type="submit">{t('save')}</button>{(fields.targetId || fields.replacementOperation) && <button className="quiet" type="button" onClick={() => { void draft.clear(defaults).catch(() => setMessage('storageFailed')); }}>{t('cancel')}</button>}</div>
-        </fieldset>
-        <p id="weight-input-status" role="status" className={draft.error ? 'error' : 'muted'}>{draft.error ? t('storageFailed') : draft.saved ? t('savedDraft') : ''}</p>
-        {message && <p role="alert">{t(message)}</p>}
-        <div id="weight-feedback" data-testid="weight-feedback" data-result-state={action?.state}>
-          {feedbackKey && <p role="status">{t(feedbackKey)}</p>}
-          {replacementId && <p role="status" data-testid="replacement-primary"><NumericText>{replacement ? t('weight:primaryPromoted', { date: dateLabel(replacement.localDate), value: replacement.value, unit: replacement.unit }) : t('weight:primaryPromotedPending')}</NumericText></p>}
-          {action?.operationId === quickUndoId && action.state === 'committed' && !undoPending(action.operationId) && <button type="button" className="quiet" data-testid="quick-undo" onClick={() => { void undo(action.operationId); }}>{t('weight:undoNew')}</button>}
-        </div>
-      </form>
-    </section><section className="panel"><h2><NumericText>{t('weight:trend')}</NumericText></h2>
-      {rawPoints.length > 0 && <><svg className="trend-chart" viewBox="0 0 300 162" role="img" aria-label={t('weight:chartDescription')}><path d="M54 16V136H288" className="chart-axis"/><text x="49" y="24" textAnchor="end">{displayMass(hi, profile.bodyWeightUnit, locale)}</text><text x="49" y="134" textAnchor="end">{displayMass(lo, profile.bodyWeightUnit, locale)}</text><text x="54" y="156">{from.slice(5)}</text><text x="284" y="156" textAnchor="end">{today.slice(5)}</text>{trend.trend.map((point, index) => { const previous = trend.trend[index - 1]; return point.meanKgMicros !== null && previous?.meanKgMicros !== null && previous?.meanKgMicros !== undefined ? <line key={point.localDate} x1={plotX(previous.localDate)} x2={plotX(point.localDate)} y1={plotY(previous.meanKgMicros)} y2={plotY(point.meanKgMicros)} className="trend-line"/> : null; })}{rawPoints.map(record => <circle key={record.id} data-measurement={record.id} cx={plotX(record.localDate)} cy={plotY(record.kgMicros)} r="3" className={record.isPrimary ? 'raw-point' : 'extra-point'}><title>{dateLabel(record.localDate)}: {record.value} {record.unit}</title></circle>)}</svg><p className="muted"><NumericText>{t('weight:chartDescription')}</NumericText> · {profile.bodyWeightUnit}</p></>}
-      {trend.trend.at(-1)?.meanKgMicros != null ? <p className="metric">{displayMass(trend.trend.at(-1)!.meanKgMicros!, profile.bodyWeightUnit, locale)} <span className="unit">{profile.bodyWeightUnit}</span></p> : <p><NumericText>{t('weight:insufficient')}</NumericText></p>}
-      <p className="muted"><NumericText>{t('weight:samples', { count: trend.currentSampleDays })}</NumericText></p>
-    </section></div>
-    {pending.length > 0 && <section className="panel pending-list"><h2>{t('weight:pending')}</h2>{pending.map(command => {
-      const mutation = command.mutation, value = 'input' in mutation && 'value' in mutation.input ? mutation.input.value : null, unit = 'input' in mutation && 'unit' in mutation.input ? mutation.input.unit : null, current = 'target' in mutation ? records.find(record => record.id === mutation.target.id) : null;
-      const requiresReview = ['conflict', 'needs_review', 'rejected'].includes(command.state);
-      return <article key={command.operationId} data-command-state={command.state}>
-        <p>{t(queueStateKey[command.state])}</p>
-        {mutation.kind === 'weight.delete' && <p>{t('weight:deleteAction')}</p>}{mutation.kind === 'operation.undo' && <p>{t(requiresReview ? 'weight:undoBlocked' : 'weight:undoAction')}</p>}
-        {value && <p><NumericText>{t('weight:candidate', { value, unit })}</NumericText></p>}{current && <p><NumericText>{t('weight:current', { value: current.value, unit: current.unit })}</NumericText></p>}
-        {requiresReview && <div className="actions">{mutation.kind !== 'operation.undo' && <button className="quiet" onClick={() => { void review(command); }}>{t('review')}</button>}<button className="quiet" onClick={() => { void runtime.database.resolveCommand(command.operationId, command.localRevision).catch(() => setMessage('storageFailed')); }}>{t('discard')}</button></div>}
-        {command.state === 'uncertain' && <button className="quiet" onClick={() => { void runtime.queue.retry(); }}>{t('retry')}</button>}
-      </article>;
-    })}</section>}
-    <section className="panel"><h2>{t('weight:history')}</h2>{records.length === 0 && <p>{t('weight:noHistory')}</p>}
-      <ul className="record-list">{records.slice(0, limit).map(record => <li key={record.id} data-weight-id={record.id}>
-        <div><p className="record-value">{displayMass(record.kgMicros, profile.bodyWeightUnit, locale)} <span className="unit">{profile.bodyWeightUnit}</span></p><p><time dateTime={record.localDate}>{dateLabel(record.localDate)}</time> · {t(record.isPrimary ? 'weight:primary' : 'weight:additional')}</p><p className="muted"><NumericText>{t('weight:original', { value: record.value, unit: record.unit })}</NumericText>{record.timePrecision === 'date' && ` · ${t('weight:dateOnly')}`}</p></div>
-        <div className="actions"><button className="quiet" onClick={() => edit(record)}>{t('edit')}</button><button className="quiet danger" onClick={() => { setDeleteReview(null); setDeleteTarget(record); }}>{t('remove')}</button>
-          {commands.some(command => command.operationId === record.operationId && command.receipt?.undoAvailable && new Date(command.receipt.committedAt).getTime() + 30 * 86400000 >= Date.now()) && !undoPending(record.operationId) && <button className="quiet" onClick={() => { void undo(record.operationId); }}>{t('undo')}</button>}
-        </div>
-      </li>)}</ul>{limit < records.length && <button className="quiet" data-testid="weight-load-more" onClick={() => setLimit(limit + 20)}>{t('weight:loadMore')}</button>}
+  async function undo() {
+    if (!undoId) return; const id = undoId; setUndoId(null);
+    try { const command = commandFor(ledger, { kind: 'operation.undo', originalId: id }, id, date, timezone); await runtime.database.enqueueCommand(command); setLastId(command.operationId); void runtime.queue.flush(); } catch { setMessage('storageFailed'); }
+  }
+  const dateLabel = (value: string) => formatDate(new Date(value + 'T12:00:00Z'), locale, 'UTC');
+  return <div className="weight-view daily-weight" data-weight-date={date} data-draft-ready={restored}>
+    <div className="daily-heading"><h1>{t('weight:title')}</h1><input aria-label={t('date')} type="date" value={date} max={today} onChange={event => { if (event.target.value && event.target.value <= today) void navigate('/weight?date=' + event.target.value); }}/></div>
+    <section className="weight-hero" aria-label={t('weight:value')}>
+      <div className="weight-reading" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !document.hidden && document.hasFocus() && !details && !outlier && !reviewing) void save().catch(() => undefined); }}>
+        {editing ? <><input ref={input} id="weight-value" aria-label={t('weight:value')} inputMode="decimal" autoComplete="off" value={draft.fields.value} disabled={!draft.ready} onChange={event => change('value', event.target.value)} aria-invalid={!!message} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void save().catch(() => undefined); } }}/><select aria-label={t('unit')} value={draft.fields.unit} onChange={event => change('unit', event.target.value)}><option>kg</option><option>lb</option></select></>
+        : <button className="weight-number quiet" data-testid="weight-reading" disabled={!restored} onClick={() => { requestedFocus.current = true; setEditing(true); }} aria-label={t('daily:editWeight')}><span className="numeric">{current ? displayMass(current.kgMicros, profile.bodyWeightUnit, locale) : '—'}</span><span className="unit">{profile.bodyWeightUnit}</span></button>}
+        <button className="quiet weight-more" aria-label={t('details')} onClick={() => setDetails(true)}>···</button>
+      </div>
+      <div className="weight-feedback" data-testid="weight-feedback" data-result-state={action?.state}><SaveStatus command={action} dataRevision={ledger.dataRevision}/>{undoId && <button className="quiet" data-testid="quick-undo" onClick={() => { void undo(); }}>{t('undo')}</button>}</div>
+      {(message || draft.error) && <p role="alert">{t(draft.error ? 'storageFailed' : message!)}</p>}
+      {problems.map(command => <div className="row-status" key={command.operationId} data-command-state={command.state}><span>{t(command.mutation.kind === 'operation.undo' ? 'weight:undoBlocked' : queueStateKey[command.state])}</span>{command.mutation.kind !== 'operation.undo' && <button className="quiet" onClick={() => review(command)}>{t('review')}</button>}<button className="quiet" onClick={() => { void runtime.database.resolveCommand(command.operationId, command.localRevision).catch(() => setMessage('storageFailed')); }}>{t('discard')}</button></div>)}
     </section>
-    {deleteTarget && <ConfirmDialog title={t('weight:confirmDelete')} onCancel={() => { if (!busy) { setDeleteTarget(null); setDeleteReview(null); } }}>
-      <p><NumericText>{t('weight:deleteConfirm', { date: dateLabel(deleteTarget.localDate), value: formatNumber(Number(deleteTarget.value), locale), unit: deleteTarget.unit })}</NumericText></p>
-      {deleteTarget.isPrimary && <p>{t('weight:deletePrimaryEffect')}</p>}
-      <div className="actions"><button className="quiet" autoFocus disabled={busy} onClick={() => { setDeleteTarget(null); setDeleteReview(null); }}>{t('cancel')}</button><button className="danger" disabled={busy} onClick={() => { void remove(); }}>{t('remove')}</button></div>
+    <WeightTrend records={records} date={date} unit={profile.bodyWeightUnit}/>
+    <section className="weight-history"><h2>{t('weight:history')}</h2><ul className="record-list">{records.filter(record => record.localDate <= date).slice(0, 28).map(record => <li key={record.id} data-weight-id={record.id}><button className="quiet weight-history-row" onClick={() => { void navigate('/weight?date=' + record.localDate); }}><time dateTime={record.localDate}>{dateLabel(record.localDate)}</time><span className="numeric">{record.value}<span className="unit"> {record.unit}</span></span></button></li>)}</ul>{!records.length && <p className="muted">{t('noRecords')}</p>}</section>
+    {details && <ConfirmDialog title={t('details')} onCancel={() => { setDetails(false); void save().catch(() => undefined); }}>
+      {current && <p>{t('weight:original', { value: current.value, unit: current.unit })}</p>}
+      <label>{t('weight:condition')}<select aria-label={t('weight:condition')} value={draft.fields.condition} onChange={event => change('condition', event.target.value)}>{['unspecified','fasted','other'].map(value => <option key={value} value={value}>{t('weight:' + value)}</option>)}</select></label>
+      {current && <button className="quiet danger" onClick={() => { setDetails(false); setDeleting({ ...current }); }}>{t('remove')}</button>}
+      <button className="secondary" onClick={() => { setDetails(false); void save().catch(() => undefined); }}>{t('training:done')}</button>
     </ConfirmDialog>}
+    {outlier && <ConfirmDialog title={t('errors:needsConfirmation')} onCancel={() => setOutlier(null)}><p>{t('weight:outlier', { date: dateLabel(outlier.localDate), value: outlier.value, unit: outlier.unit })}</p><button onClick={() => { void save(outlier, reviewing ?? undefined).catch(() => undefined); }}>{t('weight:confirmOutlier')}</button><button className="secondary" onClick={() => setOutlier(null)}>{t('cancel')}</button></ConfirmDialog>}
+    {reviewing && !deleting && !outlier && <ConfirmDialog title={t('review')} onCancel={() => setReviewing(null)}><p>{t('weight:current', { value: current?.value ?? '—', unit: current?.unit ?? '' })}</p><p>{t('weight:candidate', { value: draft.fields.value, unit: draft.fields.unit })}</p><button onClick={() => { void save(undefined, reviewing).catch(() => undefined); }}>{t('training:applyEdit')}</button><button className="secondary" onClick={() => setReviewing(null)}>{t('cancel')}</button></ConfirmDialog>}
+    {deleting && <ConfirmDialog title={t('weight:confirmDelete')} onCancel={() => setDeleting(null)}><p>{t('daily:deleteWeight', { date: dateLabel(date), value: deleting.value, unit: deleting.unit })}</p><button className="danger" disabled={busy} onClick={() => { void remove(); }}>{t('remove')}</button><button className="secondary" onClick={() => setDeleting(null)}>{t('cancel')}</button></ConfirmDialog>}
   </div>;
+}
+function WeightTrend({ records, date, unit }: { records: Weight[]; date: string; unit: 'kg' | 'lb' }) {
+  const { t, i18n } = useTranslation(), locale = localeSchema.parse(i18n.resolvedLanguage), from = addDays(date, -27), trend = weightTrend(records, from, date);
+  const raw = records.filter(record => record.localDate >= from && record.localDate <= date), values = [...raw.map(record => record.kgMicros), ...trend.trend.flatMap(point => point.meanKgMicros === null ? [] : [point.meanKgMicros])];
+  const minimum = values.length ? Math.min(...values) : 60_000_000, maximum = values.length ? Math.max(...values) : 80_000_000, padding = Math.max((maximum - minimum) * .15, 500000), lo = minimum - padding, hi = maximum + padding;
+  const y = (value: number) => 148 - (value - lo) / (hi - lo) * 126, x = (value: string) => 50 + (Date.parse(value) - Date.parse(from)) / 86400000 * 8.7;
+  return <section className="weight-trend" aria-label={t('daily:trend')}><div className="trend-heading"><h2>{t('daily:trend')}</h2><span className="muted">{t('daily:days28')}</span></div>
+    <svg className="trend-chart" viewBox="0 0 300 180" role="img" aria-label={t('daily:chartDescription')}><line x1="50" y1="22" x2="285" y2="22" className="chart-axis"/><line x1="50" y1="148" x2="285" y2="148" className="chart-axis"/><text x="45" y="26" textAnchor="end">{values.length ? displayMass(hi, unit, locale) : '—'}</text><text x="45" y="152" textAnchor="end">{values.length ? displayMass(lo, unit, locale) : '—'}</text><text x="50" y="174">{from.slice(5)}</text><text x="285" y="174" textAnchor="end">{date.slice(5)}</text>
+      {trend.trend.map((point,index) => { const previous = trend.trend[index - 1]; return point.meanKgMicros != null && previous?.meanKgMicros != null ? <line key={point.localDate} x1={x(previous.localDate)} x2={x(point.localDate)} y1={y(previous.meanKgMicros)} y2={y(point.meanKgMicros)} className="trend-line"/> : null; })}
+      {raw.map(record => <circle key={record.id} data-measurement={record.id} cx={x(record.localDate)} cy={y(record.kgMicros)} r="3" className="raw-point"><title>{record.localDate}: {record.value} {record.unit}</title></circle>)}
+    </svg><p className="chart-caption">{t(trend.trend.some(point => point.meanKgMicros !== null) ? 'daily:chartDescription' : 'daily:insufficient')}</p>
+  </section>;
 }

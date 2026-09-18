@@ -92,12 +92,16 @@ describe('typed persistent manual commands', () => {
     expect(f.rows.get(command.operationId)).toMatchObject({ state: 'rejected', issue: { code: 'NEEDS_CONFIRMATION', params: { reason: 'sameDayPrimary', primaryRevision: 2 } } }); rejected.stop();
     const other = fixture(), wrong = new CommandQueue(other.database, other.pull, { ...other.options, fetch: async () => Response.json({ data: { ...other.receipt([...other.rows.values()][0]), operationId: crypto.randomUUID() } }) }); await wrong.flush(); expect([...other.rows.values()][0]).toMatchObject({ state: 'uncertain', issue: { code: 'INVALID_RECEIPT' }, receipt: null }); wrong.stop();
   });
-  it('uses bounded retry, pauses in background, and does not resume after five failures merely on focus', async () => {
+  it('continues retries after five failures with a 30 second cap and pauses in background', async () => {
     vi.useFakeTimers(); const f = fixture(), fetcher = vi.fn<typeof fetch>(async () => { throw new TypeError('Offline transport'); });
     const queue = new CommandQueue(f.database, f.pull, { ...f.options, fetch: fetcher }); queue.start(); await queue.flush();
     for (const delay of [1000, 2000, 4000, 8000]) await vi.advanceTimersByTimeAsync(delay);
-    expect(fetcher).toHaveBeenCalledTimes(5); expect(queue.currentStatus.state).toBe('paused'); f.visibility(false); f.visibility(true); await vi.advanceTimersByTimeAsync(60000); expect(fetcher).toHaveBeenCalledTimes(5);
-    f.network(false); f.network(true); await queue.flush(); expect(fetcher).toHaveBeenCalledTimes(6); queue.stop(); expect(vi.getTimerCount()).toBe(0);
+    expect(fetcher).toHaveBeenCalledTimes(5); expect(queue.currentStatus.state).toBe('idle');
+    await vi.advanceTimersByTimeAsync(16000); expect(fetcher).toHaveBeenCalledTimes(6);
+    await vi.advanceTimersByTimeAsync(29999); expect(fetcher).toHaveBeenCalledTimes(6);
+    await vi.advanceTimersByTimeAsync(1); expect(fetcher).toHaveBeenCalledTimes(7);
+    f.visibility(false); await vi.advanceTimersByTimeAsync(120000); expect(fetcher).toHaveBeenCalledTimes(7);
+    f.visibility(true); await queue.flush(); expect(fetcher).toHaveBeenCalledTimes(8); queue.stop(); expect(vi.getTimerCount()).toBe(0);
   });
   it('keeps an unauthorized queue paused across visibility changes, even before a write', async () => {
     vi.useFakeTimers(); const f = fixture(), fetcher = vi.fn<typeof fetch>(async () => Response.json({ error: { code: 'AUTH_REQUIRED', params: { reason: 'accountChanged' } } }, { status: 401 }));

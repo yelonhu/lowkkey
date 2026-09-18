@@ -48,16 +48,19 @@ describe('foreground pull coordination', () => {
     env.network(true); await sync.refresh(); expect(fetcher).toHaveBeenCalledTimes(4);
     sync.stop(); expect(env.subscribed()).toBe(false); await vi.advanceTimersByTimeAsync(60000); expect(fetcher).toHaveBeenCalledTimes(4); expect(vi.getTimerCount()).toBe(0);
   });
-  it('stops after five consecutive failures and waits for explicit retry or reconnection', async () => {
+  it('retries indefinitely with a 30 second cap and pauses while hidden', async () => {
     vi.useFakeTimers();
     let failing = true;
     const db = persistence(true), env = environment(), fetcher = vi.fn<typeof fetch>(async () => failing ? Response.json({ error: { code: 'TEMPORARY_FAILURE' } }, { status: 503 }) : Response.json({ data: page }));
     const sync = new LedgerSynchronizer(db, { fetch: fetcher, environment: env.env }); sync.start(); await sync.refresh();
     for (const delay of [1000, 2000, 4000, 8000]) await vi.advanceTimersByTimeAsync(delay);
-    expect(fetcher).toHaveBeenCalledTimes(5); expect(sync.currentStatus).toMatchObject({ state: 'paused', errorCode: 'TEMPORARY_FAILURE' });
-    await vi.advanceTimersByTimeAsync(60000); expect(fetcher).toHaveBeenCalledTimes(5);
-    env.visibility(false); env.visibility(true); await vi.advanceTimersByTimeAsync(60000); expect(fetcher).toHaveBeenCalledTimes(5);
-    failing = false; env.network(false); env.network(true); await sync.refresh(); expect(fetcher).toHaveBeenCalledTimes(6); expect(sync.currentStatus.state).toBe('current'); sync.stop();
+    expect(fetcher).toHaveBeenCalledTimes(5); expect(sync.currentStatus).toMatchObject({ state: 'idle', errorCode: 'TEMPORARY_FAILURE' });
+    await vi.advanceTimersByTimeAsync(16000); expect(fetcher).toHaveBeenCalledTimes(6);
+    await vi.advanceTimersByTimeAsync(29999); expect(fetcher).toHaveBeenCalledTimes(6);
+    await vi.advanceTimersByTimeAsync(1); expect(fetcher).toHaveBeenCalledTimes(7);
+    await vi.advanceTimersByTimeAsync(30000); expect(fetcher).toHaveBeenCalledTimes(8);
+    env.visibility(false); await vi.advanceTimersByTimeAsync(120000); expect(fetcher).toHaveBeenCalledTimes(8);
+    failing = false; env.visibility(true); await sync.refresh(); expect(fetcher).toHaveBeenCalledTimes(9); expect(sync.currentStatus.state).toBe('current'); sync.stop();
   });
   it('rebuilds on an expired cursor and retries an invalidated snapshot generation', async () => {
     const db = persistence(true), env = environment();

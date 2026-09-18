@@ -1,3 +1,4 @@
+import { openDay, enterWeight, saveWeight } from './daily-helpers.ts';
 import { test, expect, openWorkspace } from './fixtures.ts';
 test('three artifacts and a quiet accessible conversation entrance use no model requests', async ({ page }, info) => {
   const modelRequests: string[] = [];
@@ -21,26 +22,13 @@ test('three artifacts and a quiet accessible conversation entrance use no model 
   await expect(page.locator('.conversation')).toHaveCSS('animation-name', 'none');
   expect(modelRequests).toEqual([]);
 });
-test('real weight recording preserves raw input across languages and rejects ambiguous decimals', async ({ page }, info) => {
-  await openWorkspace(page, info.project.name, '/weight');
-  const input = page.locator('#weight-value'), date = page.locator('#weight-date');
-  await input.fill('７０．３'); await date.fill('2002-01-02');
-  for (const locale of ['zh-Hant', 'en', 'zh-Hans']) {
-    await page.getByTestId('language').selectOption(locale);
-    await expect(page.locator('html')).toHaveAttribute('lang', locale);
-    await expect(page.locator('[data-sync-state=synced]')).toBeVisible();
-    await expect(input).toHaveValue('７０．３'); await expect(date).toHaveValue('2002-01-02'); await expect(page.locator('.joined-input select')).toHaveValue('kg');
-  }
-  const response = page.waitForResponse(response => response.url().endsWith('/api/v1/weights') && response.request().method() === 'POST');
-  await page.locator('form button[type=submit]').click();
-  const write = await response; expect(write.status()).toBe(201); const id = (await write.json()).data.result.id;
-  await expect(page.locator(`[data-weight-id="${id}"]`)).toContainText('70.3'); await expect(input).toHaveValue('');
-  await input.fill('34,3'); await page.locator('form button[type=submit]').click(); await expect(page.locator('form [role=alert]')).toBeVisible(); await expect(input).toHaveValue('34,3');
-  await page.locator('.chat-button').click(); await page.locator('.conversation .back-link').click(); await expect(input).toBeVisible(); await expect(input).toHaveValue('34,3');
-  await page.reload(); await expect(input).toBeVisible(); await expect(input).toHaveValue('34,3');
-  await page.setViewportSize({ width: 320, height: 800 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: `.artifacts/playwright/${info.project.name}-weight.png`, fullPage: true });
+test('real weight normalizes full-width input and retains ambiguous drafts across languages',async({page},info)=>{
+ const {date}=await openDay(page,info.project.name,2002);await enterWeight(page,'７０．３','kg');await page.locator('.weight-reading select').focus();
+ await page.locator('.daily-heading h1').click();await expect(page.getByTestId('weight-reading')).toContainText('70.3');
+ await saveWeight(page,info.project.name,date,'70.3');
+ await enterWeight(page,'34,3');await page.locator('.daily-heading h1').click();await expect(page.locator('.weight-hero [role=alert]')).toBeVisible();
+ for(const locale of ['zh-Hant','en','zh-Hans']){await page.getByTestId('language').selectOption(locale);await expect(page.locator('html')).toHaveAttribute('lang',locale);await expect(page.locator('#weight-value')).toHaveValue('34,3');}
+ await page.locator('.chat-button').click();await page.locator('.conversation .back-link').click();await expect(page).toHaveURL(/weight\?date=/);await page.reload();await expect(page.locator('#weight-value')).toHaveValue('34,3');
 });
 test('health is real; unfinished APIs and secrets are inaccessible', async ({ request }) => {
   const health = await request.get('/healthz'); expect(await health.json()).toEqual({ status: 'ok' });

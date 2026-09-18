@@ -1,3 +1,4 @@
+import { dailySetInputSchema, dailyWeightCreateSchema, dailyWeightEditSchema } from './daily-records.ts';
 import { z } from 'zod';
 import { entityRefSchema } from './artifacts.ts';
 import type { EntityRef } from './artifacts.ts';
@@ -24,6 +25,13 @@ const exerciseEdit = z.strictObject(sessionExercisePatchSchema.shape).omit({ exp
 /** This allowlist contains manual health commands only. Neither endpoints nor
  * owner/role, provider parameters or arbitrary patch paths come from input. */
 export const manualMutationSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('day-weight.create'), input: dailyWeightCreateSchema }),
+  z.strictObject({ kind: z.literal('day-weight.update'), localDate: localDateSchema, target: target('weight_entry'), input: dailyWeightEditSchema }),
+  z.strictObject({ kind: z.literal('day-weight.delete'), localDate: localDateSchema, target: target('weight_entry') }),
+  z.strictObject({ kind: z.literal('day-exercise.delete'), localDate: localDateSchema, session, target: target('session_exercise') }),
+  z.strictObject({ kind: z.literal('day-set.create'), session, input: dailySetInputSchema }),
+  z.strictObject({ kind: z.literal('day-set.update'), localDate: localDateSchema, session, target: target('workout_set'), input: setEdit }),
+  z.strictObject({ kind: z.literal('day-set.delete'), localDate: localDateSchema, session, target: target('workout_set') }),
   z.strictObject({ kind: z.literal('weight.create'), input: createWeightSchema }),
   z.strictObject({ kind: z.literal('weight.update'), target: target('weight_entry'), input: patchWeightSchema }),
   z.strictObject({ kind: z.literal('weight.delete'), target: target('weight_entry') }),
@@ -80,10 +88,17 @@ function resolve(binding: Binding, receipts: ReadonlyMap<string, CommandReceipt>
 }
 export type PreparedMutation = { path: string; method: 'POST' | 'PATCH' | 'DELETE'; body: unknown; expectedRevision: number | null; checks: EntityRef[] };
 export function prepareMutation(raw: unknown, receipts: ReadonlyMap<string, CommandReceipt> = new Map()): PreparedMutation {
-  const mutation = manualMutationSchema.parse(raw), checks = mutationBindings(mutation).map(binding => resolve(binding, receipts));
+  const mutation = manualMutationSchema.parse(raw), checks = mutationBindings(mutation).filter(binding => !(mutation.kind === 'day-set.create' && mutation.input.createSession && binding.type === 'workout_session')).map(binding => resolve(binding, receipts));
   const revision = (binding: Binding) => resolve(binding, receipts).revision;
   const result = (path: string, method: PreparedMutation['method'], body: unknown = {}, root?: Binding): PreparedMutation => ({ path: `/api/v1${path}`, method, body, expectedRevision: root ? revision(root) : null, checks });
   switch (mutation.kind) {
+    case 'day-weight.create': return result('/weights/days/' + mutation.input.localDate, 'POST', mutation.input);
+    case 'day-weight.update': return result('/weights/days/' + mutation.localDate + '/' + mutation.target.id, 'PATCH', mutation.input, mutation.target);
+    case 'day-weight.delete': return result('/weights/days/' + mutation.localDate + '/' + mutation.target.id, 'DELETE', {}, mutation.target);
+    case 'day-exercise.delete': return result('/training/days/' + mutation.localDate + '/' + mutation.session.id + '/exercises/' + mutation.target.id, 'DELETE', { expectedRevision: revision(mutation.target) }, mutation.session);
+    case 'day-set.create': return result('/training/days/' + mutation.input.localDate + '/sets', 'POST', { ...mutation.input, sessionId: mutation.session.id, expectedSessionRevision: mutation.input.createSession ? null : revision(mutation.session) });
+    case 'day-set.update': return result('/training/days/' + mutation.localDate + '/' + mutation.session.id + '/sets/' + mutation.target.id, 'PATCH', { ...mutation.input, expectedRevision: revision(mutation.target) }, mutation.session);
+    case 'day-set.delete': return result('/training/days/' + mutation.localDate + '/' + mutation.session.id + '/sets/' + mutation.target.id, 'DELETE', { expectedRevision: revision(mutation.target) }, mutation.session);
     case 'weight.create': return result('/weights', 'POST', mutation.input);
     case 'weight.update': return result(`/weights/${mutation.target.id}`, 'PATCH', mutation.input, mutation.target);
     case 'weight.delete': return result(`/weights/${mutation.target.id}`, 'DELETE', {}, mutation.target);

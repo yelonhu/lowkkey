@@ -37,13 +37,14 @@ export class CommandQueue {
   private clearTimer() { if (this.timer !== null) clearTimeout(this.timer); this.timer = null; }
   private schedule(delay: number) {
     this.clearTimer();
-    if (this.active && !this.authPaused && this.failures < 5 && this.environment.online() && this.environment.visible()) this.timer = setTimeout(() => { this.timer = null; void this.flush(); }, delay);
+    if (this.active && !this.authPaused && this.environment.online() && this.environment.visible()) this.timer = setTimeout(() => { this.timer = null; void this.flush(); }, delay);
   }
   start() {
     if (this.active) return;
     this.active = true;
     let wasOnline = this.environment.online();
-    this.unsubscribe = [this.database.subscribe(() => { if (!this.flight) this.schedule(0); }), this.environment.subscribe(() => {
+    const known = new Set<string>();
+    this.unsubscribe = [this.database.subscribe(() => { void this.database.listCommands().then(commands => { const fresh = commands.some(command => command.state === 'queued' && !known.has(command.operationId)); for (const command of commands) known.add(command.operationId); if (fresh && !this.flight) this.schedule(0); }).catch(() => { this.publish('idle', 'STORAGE_FAILED'); this.schedule(5000); }); }), this.environment.subscribe(() => {
       const reconnected = !wasOnline && this.environment.online(); wasOnline = this.environment.online();
       this.clearTimer();
       if (!this.environment.online() || !this.environment.visible()) { this.controller?.abort('inactive'); if (!this.authPaused) this.publish(this.environment.online() ? 'idle' : 'offline'); }
@@ -56,7 +57,7 @@ export class CommandQueue {
   async retry() { this.failures = 0; this.authPaused = false; await this.synchronizer.retry(); return this.flush(); }
   flush(): Promise<void> {
     if (this.flight) return this.flight;
-    if (this.authPaused || this.failures >= 5) return Promise.resolve();
+    if (this.authPaused) return Promise.resolve();
     this.clearTimer();
     if (!this.environment.online() || !this.environment.visible()) { this.publish(this.environment.online() ? 'idle' : 'offline'); return Promise.resolve(); }
     const controller = new AbortController(); this.controller = controller; this.publish('working');
@@ -64,10 +65,10 @@ export class CommandQueue {
       if (controller.signal.aborted) return;
       this.failures++;
       if ((error instanceof RequestFailure || error instanceof SyncRequestError) && [401, 403].includes(error.status)) { this.authPaused = true; this.publish('auth_required', error instanceof RequestFailure ? error.issue.code : error.code); }
-      else this.publish(this.failures >= 5 ? 'paused' : 'idle', error instanceof QueueError ? error.code : error instanceof RequestFailure ? error.issue.code : 'SYNC_FAILED');
+      else this.publish('idle', error instanceof QueueError ? error.code : error instanceof RequestFailure ? error.issue.code : 'SYNC_FAILED');
     }).finally(() => {
       this.controller = null; this.flight = null;
-      this.schedule(this.failures ? 1000 * 2 ** (this.failures - 1) : 5000);
+      this.schedule(this.failures ? Math.min(30000, 1000 * 2 ** Math.min(5, this.failures - 1)) : 5000);
     });
     return this.flight;
   }

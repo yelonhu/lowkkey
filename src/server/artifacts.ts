@@ -7,10 +7,11 @@ import { exerciseDisplaySnapshotSchema } from '../domain/training.ts';
 import { weightTrend } from '../domain/weight.ts';
 import { effectiveTimezone } from '../domain/time.ts';
 import type { AuthContext } from './auth.ts';
-import { latestPrimaryWeight, listWeights } from './weights.ts';
+import { readDailyWeight, listWeights } from './weights.ts';
 import { meals, mealDrafts } from './nutrition-store.ts';
 import { nutritionDaySummary } from './nutrition-days.ts';
 import { claims, schedules, sessions } from './training-store.ts';
+import { readTrainingDay } from './training.ts';
 import { readActivePlan } from './plans.ts';
 import { readGoal } from './goals.ts';
 import { pageResult } from './pagination.ts';
@@ -28,7 +29,7 @@ function checkedRange(range: { from: string; to: string }, maxDays: number) {
   return range;
 }
 export async function trainingVolume(db: D1Database, owner: string, from: string, to: string) {
-  const rows = await db.prepare("SELECT e.display_snapshot_json AS snapshot,SUM(CASE WHEN s.set_type='work' THEN 1 ELSE 0 END) AS work,SUM(CASE WHEN s.set_type='unknown' THEN 1 ELSE 0 END) AS unknown,COUNT(*) AS total FROM workout_sets s JOIN session_exercises e ON e.owner_id=s.owner_id AND e.id=s.session_exercise_id JOIN workout_sessions w ON w.owner_id=e.owner_id AND w.id=e.session_id WHERE w.owner_id=? AND w.local_date BETWEEN ? AND ? AND w.status IN ('in_progress','paused','completed') AND w.deleted_at IS NULL AND e.deleted_at IS NULL AND s.deleted_at IS NULL GROUP BY e.id").bind(owner, from, to).all<{ snapshot: string; work: number; unknown: number; total: number }>();
+  const rows = await db.prepare("SELECT e.display_snapshot_json AS snapshot,SUM(CASE WHEN s.set_type='work' THEN 1 ELSE 0 END) AS work,SUM(CASE WHEN s.set_type='unknown' THEN 1 ELSE 0 END) AS unknown,COUNT(*) AS total FROM workout_sets s JOIN session_exercises e ON e.owner_id=s.owner_id AND e.id=s.session_exercise_id JOIN workout_sessions w ON w.owner_id=e.owner_id AND w.id=e.session_id WHERE w.owner_id=? AND w.local_date BETWEEN ? AND ? AND w.status IN ('draft','in_progress','paused','completed','recorded') AND w.deleted_at IS NULL AND e.deleted_at IS NULL AND s.deleted_at IS NULL GROUP BY e.id").bind(owner, from, to).all<{ snapshot: string; work: number; unknown: number; total: number }>();
   const volume = new Map<string, { muscleId: string; directSets: number; secondarySets: number }>();
   let completedWorkingSets = 0, unknownTypeSets = 0, actualSets = 0, unmappedWorkingSets = 0;
   for (const row of rows.results) {
@@ -58,16 +59,18 @@ export async function readArtifacts(db: D1Database, auth: AuthContext, payload: 
     const commonRefs = [...(goal ? [ref('goal_version', goal)] : []), ...(claim ? [ref('day_claim', claim)] : [])];
     if (!query.kind || query.kind === 'SessionArtifact') {
       const active = (await sessions.list(db, auth.id, "status='in_progress'", [], 'id LIMIT 1'))[0] ?? null;
-      const selected = query.sessionId ? await sessions.read(db, auth.id, query.sessionId) : !query.localDate && active ? active : (await sessions.list(db, auth.id, "local_date=? AND status<>'cancelled'", [localDate], "CASE WHEN status='in_progress' THEN 0 ELSE 1 END,created_at DESC,id LIMIT 1"))[0] ?? null;
+      const selected = query.sessionId ? await sessions.read(db, auth.id, query.sessionId) : (await sessions.list(db, auth.id, "local_date=? AND status<>'cancelled'", [localDate], "CASE WHEN status='in_progress' THEN 0 ELSE 1 END,created_at DESC,id LIMIT 1"))[0] ?? null;
       const planned = await schedules.list(db, auth.id, "local_date=? AND status='planned'", [localDate], 'id LIMIT 21'), plan = await readActivePlan(db, auth.id, localDate);
       const preview = pageResult(planned, 20, auth.id, 'scheduled_session', { from: localDate, to: localDate, status: 'planned' });
+      const day = await readTrainingDay(db, auth.id, localDate);
+      const dayExerciseCount = new Set(day.sets.map(item => item.sessionExerciseId)).size;
       const volume = await trainingVolume(db, auth.id, ranges.training.from, ranges.training.to);
       const rootRefs = [...commonRefs, ...(active ? [ref('workout_session', active)] : []), ...(selected && selected.id !== active?.id ? [ref('workout_session', selected)] : []), ...(plan ? [ref('plan_version', plan)] : []), ...preview.items.map(item => ref('scheduled_session', item))];
-      views.push({ ...common, kind: 'SessionArtifact', entityRefs: rootRefs, quality: volume.actualSets ? volume.unknownTypeSets || volume.unmappedWorkingSets ? 'partial' : 'sufficient' : selected || plan || planned.length ? 'partial' : 'empty', pendingDraftIds: [], props: { activeSessionId: active?.id ?? null, selectedSessionId: selected?.id ?? null, plannedSessionIds: preview.items.map(item => item.id), completedWorkingSets: volume.completedWorkingSets, unknownTypeSets: volume.unknownTypeSets, muscleVolume: volume.muscleVolume } });
+      views.push({ ...common, kind: 'SessionArtifact', entityRefs: rootRefs, quality: volume.actualSets ? volume.unknownTypeSets || volume.unmappedWorkingSets ? 'partial' : 'sufficient' : selected || plan || planned.length ? 'partial' : 'empty', pendingDraftIds: [], props: { daySessionIds: day.sessions.map(item => item.id), dayExerciseCount, daySetCount: day.sets.length, activeSessionId: active?.id ?? null, selectedSessionId: selected?.id ?? null, plannedSessionIds: preview.items.map(item => item.id), completedWorkingSets: volume.completedWorkingSets, unknownTypeSets: volume.unknownTypeSets, muscleVolume: volume.muscleVolume } });
       collections.scheduledSessions = { nextCursor: preview.nextCursor, previewCount: preview.items.length };
     }
     if (!query.kind || query.kind === 'WeightArtifact') {
-      const latest = await latestPrimaryWeight(db, auth.id, localDate), entries = await listWeights(db, auth.id, addDays(ranges.weight.from, -13), ranges.weight.to);
+      const latest = await readDailyWeight(db, auth.id, localDate), entries = await listWeights(db, auth.id, addDays(ranges.weight.from, -13), ranges.weight.to);
       const trend = weightTrend(entries, ranges.weight.from, ranges.weight.to);
       views.push({ ...common, kind: 'WeightArtifact', entityRefs: [...commonRefs, ...(latest ? [ref('weight_entry', latest)] : [])], quality: trend.trend.some(point => point.meanKgMicros !== null) ? 'sufficient' : latest ? 'partial' : 'empty', pendingDraftIds: [], props: { primaryEntryId: latest?.id ?? null, primaryKgMicros: latest?.kgMicros ?? null, trend: trend.trend, algorithmVersion: trend.algorithmVersion, goalVersionId: goal?.id ?? null } });
     }

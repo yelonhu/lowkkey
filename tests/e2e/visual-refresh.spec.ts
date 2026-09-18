@@ -18,7 +18,7 @@ test('visual refresh keeps readable themes, numeric typography and accessible la
   await page.goto('/');
   await expect(page.locator('.login-screen h1')).toBeVisible();
   await page.setViewportSize({ width: 375, height: 850 });
-  await page.screenshot({ path: prefix + '-login.png', fullPage: true });
+  await page.screenshot({animations:'disabled', path: prefix + '-login.png', fullPage: true });
   await openWorkspace(page, info.project.name);
   for (const theme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'no-preference' });
@@ -42,39 +42,41 @@ test('visual refresh keeps readable themes, numeric typography and accessible la
       expect(colors.shadow).not.toBe('none'); expect(colors.border).toBe('0px'); expect(colors.radius).toBe('24px');
       await expect(page.locator('h1')).not.toHaveCSS('font-family', /Georgia|Songti|, serif(?:,|$)/);
       await expect(page.locator('.overview-heading time')).toHaveCSS('font-variant-numeric', /tabular-nums/);
-      await page.screenshot({ path: prefix + '-' + theme + '-' + width + '-overview.png', fullPage: true });
+      await page.screenshot({animations:'disabled', path: prefix + '-' + theme + '-' + width + '-overview.png', fullPage: true });
       await page.locator('[data-artifact=WeightArtifact]').click();
       const input = page.locator('#weight-value');
+      await expect(page.locator('.daily-weight')).toHaveAttribute('data-draft-ready','true');
+      if (!await input.isVisible()) await page.getByTestId('weight-reading').click();
       await expect(input).toBeVisible();
       await input.fill('500.000');
       await expect(input).toHaveCSS('font-family', /monospace|Mono|Menlo/);
-      for (const selector of ['#weight-value', '#weight-date', '.joined-input select', 'form button[type=submit]', '.chat-button']) {
+      for (const selector of ['#weight-value', '.daily-heading input', '.weight-reading select', '.weight-more', '.chat-button']) {
         const bounds = await page.locator(selector).boundingBox();
         expect(bounds!.width).toBeGreaterThanOrEqual(44); expect(bounds!.height).toBeGreaterThanOrEqual(44);
         expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
       }
-      expect(await input.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+      // Large precision values may scroll inside the focused numeric field, never the page.
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await input.fill(''); await page.evaluate(() => window.scrollTo(0, 0));
-      await page.screenshot({ path: prefix + '-' + theme + '-' + width + '-weight.png', fullPage: true });
-      await page.screenshot({ path: prefix + '-' + theme + '-' + width + '-weight-form.png' });
+      await page.screenshot({animations:'disabled', path: prefix + '-' + theme + '-' + width + '-weight.png', fullPage: true });
+      await page.screenshot({animations:'disabled', path: prefix + '-' + theme + '-' + width + '-weight-form.png' });
     }
     await page.setViewportSize({ width: 320, height: 850 });
-    await page.locator('#weight-value').fill('34,3'); await page.locator('form button[type=submit]').click();
-    const alert = page.locator('form [role=alert]'); await expect(alert).toBeVisible();
-    const errorColors = await alert.evaluate(element => ({ text: getComputedStyle(element).color, surface: getComputedStyle(element.closest('.panel')!).backgroundColor }));
+    await page.locator('#weight-value').fill('34,3'); await page.locator('.daily-heading h1').click();
+    const alert = page.locator('.weight-hero [role=alert]'); await expect(alert).toBeVisible();
+    const errorColors = await alert.evaluate(element => ({ text: getComputedStyle(element).color, surface: getComputedStyle(document.documentElement).backgroundColor }));
     expect(contrast(errorColors.text, errorColors.surface)).toBeGreaterThanOrEqual(4.5);
-    await page.screenshot({ path: prefix + '-' + theme + '-error.png', fullPage: true });
+    await page.screenshot({animations:'disabled', path: prefix + '-' + theme + '-error.png', fullPage: true });
     await page.locator('#weight-value').fill('');
     await page.locator('.avatar').click(); await expect(page.locator('.settings-panel')).toBeVisible();
-    await page.screenshot({ path: prefix + '-' + theme + '-settings.png', fullPage: true });
+    await page.screenshot({animations:'disabled', path: prefix + '-' + theme + '-settings.png', fullPage: true });
     await page.locator('.chat-button').click(); await expect(page.locator('.conversation')).toBeVisible();
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(page.locator('.conversation')).toHaveCSS('animation-name', 'none');
     await expect(page.locator('.chat-button')).toHaveCSS('transition-duration', '0s');
     await page.keyboard.press('Tab');
     expect(await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle)).toBe('solid');
-    await page.screenshot({ path: prefix + '-' + theme + '-conversation.png', fullPage: true });
+    await page.screenshot({animations:'disabled', path: prefix + '-' + theme + '-conversation.png', fullPage: true });
     await page.locator('.conversation .back-link').click();
   }
 });

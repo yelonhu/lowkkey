@@ -1,3 +1,4 @@
+import { dailyWeightCreateSchema, dailyWeightEditSchema } from '../domain/daily-records.ts';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { z } from 'zod';
 import { weightInputSchema } from '../domain/contracts.ts';
@@ -146,7 +147,7 @@ export async function undoWeight(db: D1Database, auth: AuthContext, operationId:
       const saved = await listWeights(db, auth.id, date, date);
       const final = [...saved.filter(entry => !pairs.some(pair => pair.after.id === entry.id)), ...pairs.map(pair => pair.after).filter(entry => entry.localDate === date && !entry.deletedAt)];
       if (final.filter(entry => entry.isPrimary).length > 1) throw new DomainError('REVISION_CONFLICT', 409, { reason: 'primaryChanged' });
-      if (final.length && !final.some(entry => entry.isPrimary)) {
+      if (!operation.kind.startsWith('weight.day.') && final.length && !final.some(entry => entry.isPrimary)) {
         final.sort((a, b) => (a.occurredAt ?? a.createdAt).localeCompare(b.occurredAt ?? b.createdAt) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
         const replacement = final[0], existing = pairs.find(pair => pair.after.id === replacement.id);
         if (existing) existing.after.isPrimary = true;
@@ -155,5 +156,32 @@ export async function undoWeight(db: D1Database, auth: AuthContext, operationId:
     }
     const plan = weightPlan(context, pairs, { originalId }, [{ predicate: 'EXISTS(SELECT 1 FROM command_operations WHERE owner_id=? AND operation_id=? AND undone_by IS NULL AND undo_until>=?)', values: [auth.id, originalId, context.now], error: new DomainError('REVISION_CONFLICT', 409) }]);
     return { ...plan, undoable: false, undoOf: originalId };
+  } }, clock);
+}
+
+export async function readDailyWeight(db: D1Database, owner: string, date: string) {
+  localDateSchema.parse(date);
+  return (await listWeights(db, owner, date, date)).find(value => value.isPrimary) ?? null;
+}
+export function createDailyWeight(db: D1Database, auth: AuthContext, operationId: string, date: string, payload: unknown, clock?: () => Date) {
+  const input = dailyWeightCreateSchema.parse(payload);
+  if (input.localDate !== date) throw new DomainError('INVALID_INPUT', 400);
+  return executeCommand(db, auth, { operationId, kind: 'weight.day.create', payload: input, entryPoint: 'manual', plan: async context => {
+    if (await readDailyWeight(db, auth.id, date)) throw new DomainError('REVISION_CONFLICT', 409, { reason: 'dayAlreadyExists' });
+    const facts = weightInputSchema.parse(inputFields(input));
+    const next: Weight = { ...facts, kgMicros: normalizeMass(facts.value, facts.unit, 1, 500).kgMicros, ownerId: auth.id, revision: 1, createdAt: context.now, updatedAt: context.now, deletedAt: null, isPrimary: true, sourceKind: 'manual', sourceRef: null, operationId, createdOperationId: operationId };
+    const plan = await writeWeight(context, next, null, input);
+    plan.guards.push({ predicate: 'NOT EXISTS(SELECT 1 FROM weight_entries WHERE owner_id=? AND local_date=? AND is_primary=1 AND deleted_at IS NULL)', values: [auth.id, date], error: new DomainError('REVISION_CONFLICT', 409, { reason: 'dayAlreadyExists' }) });
+    return plan;
+  } }, clock);
+}
+export function editDailyWeight(db: D1Database, auth: AuthContext, operationId: string, date: string, id: string, revision: number, payload: unknown, deleting = false, clock?: () => Date) {
+  const input: Partial<z.infer<typeof dailyWeightEditSchema>> = deleting ? {} : dailyWeightEditSchema.parse(payload);
+  return executeCommand(db, auth, { operationId, kind: deleting ? 'weight.day.delete' : 'weight.day.update', payload: { date, id, ...input }, expectedRevision: revision, entryPoint: 'manual', plan: async context => {
+    const before = await readWeight(db, auth.id, id);
+    if (before.localDate !== date || !before.isPrimary || before.revision !== revision) throw new DomainError('REVISION_CONFLICT', 409);
+    if (deleting) return weightPlan(context, [{ before, after: revise(before, context, { deletedAt: context.now, isPrimary: false }) }], { id });
+    const next = revise(before, context, { value: input.value ?? before.value, unit: input.unit ?? before.unit, condition: input.condition ?? before.condition, kgMicros: normalizeMass(input.value ?? before.value, input.unit ?? before.unit, 1, 500).kgMicros });
+    return writeWeight(context, next, before, { confirmedOutlier: false, ...input });
   } }, clock);
 }

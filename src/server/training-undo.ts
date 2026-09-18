@@ -31,6 +31,7 @@ export function undoTraining(db: D1Database, auth: AuthContext, operationId: str
     for (const entity of plan.entities) if (entity.type === 'workout_session') {
       const after = sessions.schema.parse(entity.after);
       if (after.status === 'in_progress') plan.guards.push({ predicate: "NOT EXISTS(SELECT 1 FROM workout_sessions WHERE owner_id=? AND id<>? AND deleted_at IS NULL AND status='in_progress')", values: [auth.id, after.id], error: new DomainError('DAY_STATE_CONFLICT', 409, { reason: 'sessionInProgress' }) });
+      if (after.status === 'recorded' && after.deletedAt === null) plan.guards.push({ predicate: "NOT EXISTS(SELECT 1 FROM workout_sessions WHERE owner_id=? AND id<>? AND local_date=? AND deleted_at IS NULL AND status='recorded')", values: [auth.id, after.id, after.localDate], error: new DomainError('REVISION_CONFLICT', 409, { reason: 'dayAlreadyExists' }) });
       if (after.deletedAt === null) {
         const setsBefore = await db.prepare('SELECT s.id FROM workout_sets s JOIN session_exercises e ON e.owner_id=s.owner_id AND e.id=s.session_exercise_id WHERE e.owner_id=? AND e.session_id=? AND s.deleted_at IS NULL AND e.deleted_at IS NULL').bind(auth.id, after.id).all<{ id: string }>();
         const actual = new Set(setsBefore.results.map(row => row.id));

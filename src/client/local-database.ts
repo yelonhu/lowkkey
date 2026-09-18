@@ -159,7 +159,13 @@ export class LocalDatabase {
       return draft;
     });
   }
-  async removeDraft(id: string): Promise<void> { await this.transaction(['drafts'], 'readwrite', async transaction => { await request(transaction.objectStore('drafts').delete(id)); }); }
+  async removeDraft(id: string, expectedUpdatedAt?: string): Promise<void> {
+    await this.transaction(['drafts'], 'readwrite', async transaction => {
+      const drafts = transaction.objectStore('drafts');
+      if (expectedUpdatedAt) { const current = await request(drafts.get(id)); if (!current || localDraftSchema.parse(current).updatedAt !== expectedUpdatedAt) return; }
+      await request(drafts.delete(id));
+    });
+  }
   async listDrafts(): Promise<LocalDraft[]> {
     return this.transaction(['drafts'], 'readonly', async transaction => {
       const values: unknown[] = await request(transaction.objectStore('drafts').getAll());

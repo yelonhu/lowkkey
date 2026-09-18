@@ -53,7 +53,6 @@ export class LedgerSynchronizer {
         if (!this.authorizationPaused) this.publish(this.environment.online() ? 'idle' : 'offline');
       } else if (!this.authorizationPaused) {
         if (reconnected) this.failures = 0;
-        if (this.failures >= 5) return;
         if (this.flight) this.wakeRequested = true;
         else void this.refresh();
       }
@@ -79,12 +78,12 @@ export class LedgerSynchronizer {
       if (controller.signal.aborted && ['visibilityOrNetwork', 'stopped'].includes(String(controller.signal.reason))) return null;
       this.failures++;
       if (error instanceof SyncRequestError && (error.status === 401 || error.status === 403)) { this.failures = 5; this.authorizationPaused = true; this.publish('auth_required', error.code); }
-      else this.publish(this.failures >= 5 ? 'paused' : 'idle', error instanceof SyncRequestError ? error.code : error instanceof LocalLedgerError ? error.code : 'SYNC_FAILED');
+      else this.publish('idle', error instanceof SyncRequestError ? error.code : error instanceof LocalLedgerError ? error.code : 'SYNC_FAILED');
       return null;
     }).finally(() => {
       clearTimeout(timeout); this.controller = null; this.flight = null;
       const wake = this.wakeRequested; this.wakeRequested = false;
-      if (this.active && this.environment.online() && this.environment.visible() && this.failures < 5) this.timer = setTimeout(() => { this.timer = null; void this.refresh(); }, wake ? 0 : this.failures ? Math.min(16000, 1000 * 2 ** (this.failures - 1)) : 5000);
+      if (this.active && this.environment.online() && this.environment.visible() && !this.authorizationPaused) this.timer = setTimeout(() => { this.timer = null; void this.refresh(); }, wake ? 0 : this.failures ? Math.min(30000, 1000 * 2 ** Math.min(5, this.failures - 1)) : 5000);
     });
     return this.flight;
   }

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LocalLedger } from '../../domain/local-ledger.ts';
 import type { ProfileSnapshot } from '../../domain/profile.ts';
-import type { WorkoutSession } from '../../domain/training.ts';
-import { customExerciseInputSchema, equipmentSchema, sessionExerciseInputSchema, setupInputSchema } from '../../domain/training.ts';
+import type { WorkoutSession, SessionExercise } from '../../domain/training.ts';
+import { customExerciseInputSchema, equipmentSchema, setupInputSchema } from '../../domain/training.ts';
 import { defaultSetup } from '../../domain/training-defaults.ts';
 import { localeSchema } from '../../domain/primitives.ts';
 import type { CommandInput } from '../../domain/manual-commands.ts';
@@ -11,12 +11,12 @@ import { commandFor } from '../workspace-state.ts';
 import type { WorkspaceRuntime } from '../workspace-state.ts';
 import { useDraft } from '../use-draft.ts';
 import { ConfirmDialog } from '../ConfirmDialog.tsx';
-import { nextOrdinal, trainingProjection, versionFor } from './training-state.ts';
+import { nextOrdinal, trainingProjection, versionFor, localExercise } from './training-state.ts';
 import type { TrainingProjection } from './training-state.ts';
 import { serializeTraining } from './save-coordinator.ts';
 
-export function ExercisePicker({ runtime, ledger, model, session, profile, onAdded, onClose }: {
-  runtime: WorkspaceRuntime; ledger: LocalLedger; model: TrainingProjection; session: WorkoutSession; profile: ProfileSnapshot; onAdded: (id: string) => void; onClose: () => void;
+export function ExercisePicker({ runtime, ledger, model, session, profile, onAdded, onClose, onDraft }: {
+  runtime: WorkspaceRuntime; ledger: LocalLedger; model: TrainingProjection; session: WorkoutSession; profile: ProfileSnapshot; onAdded: (id: string) => void; onClose: () => void; onDraft: (exercise: SessionExercise) => Promise<void>;
 }) {
   const { t, i18n } = useTranslation(), locale = localeSchema.parse(i18n.resolvedLanguage);
   const draft = useDraft(runtime.database, 'training:' + session.id + ':exercise', 'set', { exerciseId: '', name: '', equipment: 'unspecified', angle: 'unspecified', grip: 'unspecified', laterality: 'unspecified' }, session.entryTimezone);
@@ -28,8 +28,8 @@ export function ExercisePicker({ runtime, ledger, model, session, profile, onAdd
     if (busy) return; setBusy(true); setError(false);
     try { await serializeTraining(runtime.database, async () => {
       const current = await runtime.database.readLedger(); if (!current || current.ownerId !== ledger.ownerId) throw Error('Storage');
-      const previous = await runtime.database.listCommands(), projection = trainingProjection(current, previous), root = projection.sessions.find(item => item.id === session.id);
-      if (!root || !['in_progress', 'paused', 'completed'].includes(root.status)) throw Error('Gone');
+      const previous = await runtime.database.listCommands(), projection = trainingProjection(current, previous), root = projection.sessions.find(item => item.id === session.id) ?? session;
+      if (!root || !['draft', 'in_progress', 'paused', 'completed', 'recorded'].includes(root.status)) throw Error('Gone');
       const batch: CommandInput[] = [], dependencies: string[] = [];
       let exerciseId = selected;
       if (selected === 'custom') {
@@ -49,11 +49,13 @@ export function ExercisePicker({ runtime, ledger, model, session, profile, onAdd
         const binding = versionFor({ type: 'exercise_setup', id: setup.id, revision: setup.revision }, previous);
         if (binding.source.kind === 'receipt') dependencies.push(binding.source.operationId);
       }
-      const id = crypto.randomUUID(), binding = versionFor({ type: 'workout_session', id: root.id, revision: root.revision }, previous);
-      const input = sessionExerciseInputSchema.parse({ id, setupId, ordinal: nextOrdinal(projection.exercises.filter(item => item.sessionId === root.id)) });
-      const command = commandFor(current, { kind: 'session-exercise.create', session: { ...binding, type: 'workout_session' }, input }, id, root.localDate, root.entryTimezone);
-      command.dependencies = [...new Set([...command.dependencies, ...dependencies])]; batch.push(command);
-      await runtime.database.enqueueCommands(batch, await draft.flush()); onAdded(id); void runtime.queue.flush();
+      const id = crypto.randomUUID();
+      if (batch.length) await runtime.database.enqueueCommands(batch, await draft.flush());
+      const fresh = trainingProjection(current, await runtime.database.listCommands());
+      const selectedSetup = fresh.setups.find(item => item.id === setupId), definition = fresh.definitions.find(item => item.id === exerciseId);
+      if (!selectedSetup || !definition) throw Error('Missing setup');
+      await onDraft(localExercise(root, selectedSetup, definition, fresh.labels, id, nextOrdinal(model.exercises.filter(item => item.sessionId === root.id))));
+      onAdded(id); void runtime.queue.flush();
     }); } catch { setError(true); } finally { setBusy(false); }
   }
   return <ConfirmDialog title={t('training:addExercise')} onCancel={onClose}>
