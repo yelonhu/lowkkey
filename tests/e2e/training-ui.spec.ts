@@ -81,7 +81,7 @@ test('slow local persistence never consumes newer row input',async({page,context
  const race={waiting:false,release,saving:Promise.resolve() as Promise<unknown>,preserved:null as string|null};state.race=race;
  LocalDatabase.prototype.readLedger=async function(){if(!new Error().stack?.split('\n')[2]?.includes('/src/app/training/SetRow.tsx'))return original.call(this);LocalDatabase.prototype.readLedger=original;race.waiting=true;await gate;return original.call(this);};
  LocalDatabase.prototype.enqueueCommand=async function(...args:Parameters<LocalDatabase['enqueueCommand']>){LocalDatabase.prototype.enqueueCommand=enqueue;const result=await enqueue.apply(this,args);race.preserved=args[1]?(await this.readDraft(args[1].id))?.rawFields.reps??null:null;return result;};
- const actions:Array<()=>Promise<unknown>>=[];window.dispatchEvent(new CustomEvent('lowkkey:commit-training',{detail:actions}));race.saving=Promise.all(actions.map(action=>action()));
+ const actions:Array<()=>Promise<unknown>>=[];window.dispatchEvent(new CustomEvent('lowkkey:commit-editing',{detail:actions}));race.saving=Promise.all(actions.map(action=>action()));
  });
  await expect.poll(()=>page.evaluate(()=>(window as typeof window&{race?:{waiting:boolean}}).race?.waiting)).toBe(true);
  await reps(row).fill('11');await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));

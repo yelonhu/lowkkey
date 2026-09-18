@@ -29,7 +29,7 @@ test('weight preserves newer input during a slow save and reopening never submit
   const race={waiting:false,release,saving:Promise.resolve() as Promise<unknown>,preserved:null as string|null};state.weightRace=race;
   LocalDatabase.prototype.readLedger=async function(){if(!new Error().stack?.split('\n')[2]?.includes('/src/app/WeightView.tsx'))return original.call(this);LocalDatabase.prototype.readLedger=original;race.waiting=true;await gate;return original.call(this);};
   LocalDatabase.prototype.enqueueCommand=async function(...args:Parameters<LocalDatabase['enqueueCommand']>){LocalDatabase.prototype.enqueueCommand=enqueue;const result=await enqueue.apply(this,args);race.preserved=args[1]?(await this.readDraft(args[1].id))?.rawFields.value??null:null;return result;};
-  const actions:Array<()=>Promise<unknown>>=[];window.dispatchEvent(new CustomEvent('lowkkey:commit-training',{detail:actions}));race.saving=Promise.all(actions.map(action=>action()));
+  const actions:Array<()=>Promise<unknown>>=[];window.dispatchEvent(new CustomEvent('lowkkey:commit-editing',{detail:actions}));race.saving=Promise.all(actions.map(action=>action()));
  });
  await expect.poll(()=>page.evaluate(()=>(window as typeof window & {weightRace?:{waiting:boolean}}).weightRace?.waiting)).toBe(true);
  await page.locator('#weight-value').fill('70.2');await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));

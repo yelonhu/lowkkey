@@ -1,3 +1,4 @@
+import { nutritionLocale } from './nutrition-resources.ts';
 import { dailyLocale } from './daily-resources.ts';
 import { trainingLocale } from './training-resources.ts';
 import { workspaceLocale } from './workspace-resources.ts';
@@ -22,6 +23,6 @@ const baseResources = {
 };
 function withWorkspace<T extends typeof baseResources[keyof typeof baseResources]>(base: T, index: 0 | 1 | 2) {
   const extra = workspaceLocale(index);
-  return { ...base, daily: dailyLocale(index), common: { ...base.common, ...extra.common }, auth: extra.auth, today: extra.today, weight: extra.weight, training: trainingLocale(index), assistant: extra.assistant, settings: extra.settings };
+  return { ...base, daily: dailyLocale(index), common: { ...base.common, ...extra.common }, auth: extra.auth, today: extra.today, weight: extra.weight, training: trainingLocale(index), nutrition: nutritionLocale(index), assistant: extra.assistant, settings: extra.settings };
 }
 export const resources = { en: withWorkspace(baseResources.en, 0), 'zh-Hans': withWorkspace(baseResources['zh-Hans'], 1), 'zh-Hant': withWorkspace(baseResources['zh-Hant'], 2) };

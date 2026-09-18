@@ -107,7 +107,7 @@ it('upgrades populated legacy training without altering child foreign keys, snap
     await addExercise(database, auth, id(), value.sessionId, 1, value.exercise, clock);
     await addSet(database, auth, id(), value.sessionId, 2, { id: value.id, sessionExerciseId: value.sessionExerciseId, ordinal: 1, reps: 8, load: value.load }, clock);
     const before = await readSessionTree(database, owner, value.sessionId);
-    expect(await applyMigrations(database)).toEqual(['0009_daily_records.sql']);
+    expect(await applyMigrations(database)).toEqual(['0009_daily_records.sql', '0010_diet_notes.sql']);
     expect(await readSessionTree(database, owner, value.sessionId)).toEqual(before);
     expect((await database.prepare('PRAGMA foreign_key_check').all()).results).toEqual([]);
     expect(await applyMigrations(database)).toEqual([]);

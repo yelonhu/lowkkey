@@ -63,7 +63,7 @@ export function copyFavorite(db: D1Database, auth: AuthContext, operationId: str
   const input = copyFavoriteSchema.parse(payload);
   return executeCommand(db, auth, { operationId, kind: 'nutrition.meal.copy', payload: { favoriteId: id, ...input }, entryPoint: 'manual', plan: async context => {
     const favorite = await favorites.read(db, auth.id, id); expectRevision(favorite, input.expectedRevision);
-    const meal = mealSchema.parse({ ...newMetadata(context, input.id), localDate: input.localDate, entryTimezone: input.entryTimezone, occurredAt: input.occurredAt, timePrecision: input.timePrecision, mealType: input.mealType ?? favorite.snapshot.mealType, title: favorite.snapshot.title, sourceKind: 'copied', sourceRef: favorite.id, confirmedAt: context.now });
+    const meal = mealSchema.parse({ ...newMetadata(context, input.id), localDate: input.localDate, entryTimezone: input.entryTimezone, occurredAt: input.occurredAt, timePrecision: input.timePrecision, mealType: input.mealType ?? favorite.snapshot.mealType, title: favorite.snapshot.title, note: favorite.snapshot.schemaVersion === 2 ? favorite.snapshot.note : null, sourceKind: 'copied', sourceRef: favorite.id, confirmedAt: context.now });
     const plan = await newMealPlan(context, meal, favorite.snapshot.items.map(snapshot => ({ id: crypto.randomUUID(), snapshot })));
     plan.guards.push({ predicate: 'EXISTS(SELECT 1 FROM favorites WHERE owner_id=? AND id=? AND revision=? AND deleted_at IS NULL)', values: [auth.id, id, favorite.revision], error: new DomainError('CONTEXT_STALE', 422) });
     plan.result = { ...plan.result, sourceFavoriteId: id, sourceFavoriteVersion: favorite.version }; return plan;

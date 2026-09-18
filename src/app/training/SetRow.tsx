@@ -108,8 +108,8 @@ export function SetRow({ runtime, session, exercise, setup, rowId, ordinal, reco
   handler.current = () => save();
   useEffect(() => {
     const commit = (event: Event) => (event as CustomEvent<Array<() => Promise<unknown>>>).detail.push(() => handler.current());
-    window.addEventListener('lowkkey:commit-training', commit);
-    return () => window.removeEventListener('lowkkey:commit-training', commit);
+    window.addEventListener('lowkkey:commit-editing', commit);
+    return () => window.removeEventListener('lowkkey:commit-editing', commit);
   }, []);
   async function remove(acceptedReview = false) {
     try {

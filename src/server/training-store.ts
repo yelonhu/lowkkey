@@ -27,5 +27,5 @@ export const sets = new RecordStore<WorkoutSet>('workout_sets', 'workout_set', w
   ...recordColumns, sessionExerciseId: 'session_exercise_id', ordinal: 'ordinal', reps: 'reps', loadDecimal: 'load_decimal', unit: 'unit', kgMicros: 'kg_micros', loadSemantics: 'load_semantics', setType: 'set_type', rpeHalfUnits: 'rpe_half_units', completedAt: 'completed_at', note: 'note', sourceRowId: 'source_row_id',
 });
 export const claims = new RecordStore<DayClaim>('day_claims', 'day_claim', dayClaimSchema, {
-  ...recordColumns, localDate: 'local_date', entryTimezone: 'entry_timezone', trainingClaim: 'training_claim', nutritionCompleteness: 'nutrition_completeness', nutritionReviewedAt: 'nutrition_reviewed_at', reviewInvalidatedReason: 'review_invalidated_reason', explicitZeroIntake: 'explicit_zero_intake',
+  ...recordColumns, localDate: 'local_date', entryTimezone: 'entry_timezone', trainingClaim: 'training_claim', nutritionCompleteness: 'nutrition_completeness', nutritionContentRevision: 'nutrition_content_revision', nutritionReviewedAt: 'nutrition_reviewed_at', reviewInvalidatedReason: 'review_invalidated_reason', explicitZeroIntake: 'explicit_zero_intake',
 }, [], ['explicitZeroIntake']);

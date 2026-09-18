@@ -44,7 +44,7 @@ async function reference(nutrients = raw, actor = auth, basis = 'per_100g') {
 async function recorded(input = mealInput()) { await createMeal(db, auth, op(), input, clock); return input; }
 async function complete(date = occurrence.localDate, explicitZeroIntake?: boolean) {
   const existing = (await claims.list(db, owner, 'local_date=?', [date]))[0];
-  return patchDayClaim(db, auth, op(), date, existing?.revision, { id: existing?.id ?? op(), entryTimezone: occurrence.entryTimezone, nutritionCompleteness: 'complete', ...(explicitZeroIntake === undefined ? {} : { explicitZeroIntake }) }, clock);
+  return patchDayClaim(db, auth, op(), date, existing?.revision, { id: existing?.id ?? op(), entryTimezone: occurrence.entryTimezone, nutritionCompleteness: 'complete', expectedNutritionContentRevision: existing?.nutritionContentRevision ?? 0, ...(explicitZeroIntake === undefined ? {} : { explicitZeroIntake }) }, clock);
 }
 async function source(actor = owner) {
   const id = op(), now = clock().toISOString();
@@ -347,7 +347,8 @@ describe('authenticated nutrition API', () => {
     const response = await request('/meals', 'POST', input); expect(response.status).toBe(201); expect(response.headers.get('Cache-Control')).toBe('no-store');
     const saved = await response.json(); expect((await request(`/operations/${saved.data.operationId}`)).status).toBe(200);
     expect((await request(`/meals/${input.id}`, 'PATCH', { title: null }, owner, 1)).status).toBe(200);
-    expect((await request('/days/2026-09-16', 'PATCH', { id: op(), entryTimezone: occurrence.entryTimezone, nutritionCompleteness: 'complete' })).status).toBe(200);
+    const dayClaim = (await claims.list(db, owner, 'local_date=?', [occurrence.localDate]))[0];
+    expect((await request('/days/2026-09-16', 'PATCH', { id: dayClaim.id, entryTimezone: occurrence.entryTimezone, nutritionCompleteness: 'complete', expectedNutritionContentRevision: dayClaim.nutritionContentRevision }, owner, dayClaim.revision)).status).toBe(200);
     const summary = await (await request('/nutrition/summary')).json(); expect(summary.data.days[0]).toMatchObject({ completeness: 'complete', knownSum: { energyMkcal: 200000 } });
     const favoriteId = op(); expect((await request('/favorites', 'POST', { id: favoriteId, title: 'Favorite', mealRef: { id: input.id, revision: 2 } })).status).toBe(201);
     const copied = await request(`/favorites/${favoriteId}/copy`, 'POST', { id: op(), ...occurrence, expectedRevision: 1 }); expect(copied.status).toBe(201);

@@ -1,7 +1,7 @@
-# lowkkey Product & Engineering Specification v1.1.6
+# lowkkey Product & Engineering Specification v1.1.7
 
-> **Version:** 1.1.5 · **Status:** Implementation baseline / 开发基线（M0 已完成，M1 进度见 docs/M1.md）<br>
-> **Specification date:** 2026-09-17 UTC<br>
+> **Version:** 1.1.7 · **Status:** Implementation baseline / 开发基线（M0 已完成，M1 进度见 docs/M1.md）<br>
+> **Specification date:** 2026-09-18 UTC<br>
 > **Audience:** 产品负责人、设计者、开发者、测试者、后续接手的 AI coding agents<br>
 > **Language:** 中文正文，英文标识、字段、接口及需求编号<br>
 > **Release:** v1 同步交付 `zh-Hans`、`zh-Hant`、`en`
@@ -90,11 +90,11 @@
 
 **PRD-02** 支持 `lean_bulk`、`fat_loss`、`maintenance`。每人拥有自己的目标、营养目标、计划、单位与明确告知的限制。增长方向的颜色和评价结合个人目标，不能统一把体重下降标成成功。
 
-**PRD-03** 核心动作保持：**记一组 / 拍一下 / 改一下 / 确认保存**。用户可直接操作Artifact，也可用文字、截图、餐照或录音转写表达意图。AI与人通过同一命令服务维护同一账本。所有人可继续用自己的备忘录，不要求学习特定指令语法。
+**PRD-03** 核心动作保持：**记一组 / 写一条 / 拍一下 / 改一下**；普通明确记录离开编辑区自动保存，确认只用于估算、删除和重要变更。用户可直接操作Artifact，也可用文字、截图、餐照或录音转写表达意图。AI与人通过同一命令服务维护同一账本。所有人可继续用自己的备忘录，不要求学习特定指令语法。
 
 **PRD-04** 每日当地中午固定处理昨日复盘；无记录日仍发送轻量简报（用户可关闭日报）。报告整理昨日事实，提供今日计划和下一次动作目标；不因午饭时间变化而调整统计范围。
 
-**DEF 成功指标**：熟悉界面的用户在10秒内完成称重、5秒内确认预填的一组、3秒内完成拍照并本地留存；识别等待另计。保存反馈目标100 ms内；已同步状态以真实回执为准。首次开屏不等待模型、不自动弹键盘；核心手动路径使用零次模型调用。真实手机验证这些目标，不以模拟器或模型mock冒充。
+**DEF 成功指标**：熟悉界面的用户在10秒内完成称重、5秒内填写一组的实际次数并离区记录（重量可沿用上一组，次数/RPE不代填）、3秒内完成拍照并本地留存；识别等待另计。保存反馈目标100 ms内；已同步状态以真实回执为准。首次开屏不等待模型、不自动弹键盘；核心手动路径使用零次模型调用。真实手机验证这些目标，不以模拟器或模型mock冒充。
 
 ### 2.2 Shared State Artifact 与首版范围
 
@@ -180,7 +180,7 @@
 
 ### 3.3 档案与初次使用
 
-**IDN-04** 首次激活仅要求：显示名、一个目标类型、语言、确认后的 IANA 时区。可以立即开始记录。未设置营养目标时显示“设置目标”，不阻止拍照或手动记录，不推算蛋白质缺口。
+**IDN-04** 首次激活仅要求：显示名、一个目标类型、语言、确认后的 IANA 时区。可以立即开始记录。未设置营养目标时不在录入页催促补齐，设置入口留在个人设置，不阻止拍照或手动记录，不推算蛋白质缺口。
 
 | 字段 | 必填性 / 默认 | 校验与影响 |
 |---|---|---|
@@ -219,7 +219,7 @@
 | /training?date=… | SessionArtifact：这一天练了什么，默认今天 | 添加动作、直接填组，无需开始或结束 |
 | /training/sessions/:id | 兼容旧链接，进入对应日期 | 保留原 ID、实际时间、快照、草稿和审计 |
 | /weight?date=… | WeightArtifact：当天大读数、趋势、历史 | 点击读数原位编辑，离区保存；无当天数据不代用上次值 |
-| /nutrition?date=… | DietArtifact：餐食、待确认、已知合计 | 拍照、常用餐、手动保存、确认基本记全 |
+| /nutrition?date=… | DietArtifact：当天饮食便签、可选营养、旧候选与已知合计 | 写一条，离区自动保存；营养、餐别和时间按需展开；记全是可选声明 |
 | /trends | 既有兼容深链接，重定向到相关舱的趋势区 | 默认WeightArtifact；动作条件指向SessionArtifact，不产生第四个舱 |
 | /reports、/reports/:id | 历史快照详情，属于辅助阅读路径 | 补录或打开对话；无报告说明生成时间；不增加顶层看板 |
 | /assistant、/assistant/:threadId | 共用对话面 | 消息、文字/图片/语音、新建与会话列表；空白输入不先创建数据库会话 |
@@ -263,7 +263,7 @@ stateDiagram-v2
 | sync_failed | 暂存仍在，可重试 | 否 |
 | conflict | 其他设备已修改，需要处理 | 以服务器版本为准；保留本机版本 |
 
-训练整行与体重数字＋单位各构成编辑区。本人有效修改在离区时自动入队，区内切焦点不提交；切日期、切页面、打开对话、加组先保存有效内容。无需保存按钮，未改动、空白、半填内容不入账。输入中的半个数字不是完整组。餐照“已保存”仅表示照片留存；识别完成不等于营养入账。服务端回执及其账本批次均应用后才短暂显示“已同步”；后台只读更新保持安静。
+训练整行、体重数字＋单位、饮食整条便签及展开字段各构成编辑区。本人有效修改在离区时自动入队，区内切焦点不提交；切日期、切页面、打开对话、加组或加便签先保存有效内容。无需保存按钮，未改动、空白、半填内容不入账。输入中的半个数字不是完整组。餐照“已保存”仅表示照片留存；识别完成不等于营养入账。服务端回执及其账本批次均应用后才短暂显示“已同步”；后台只读更新保持安静。
 
 **DEF** 输入变化立即排入独立本机草稿持久化队列，单调令牌保护较新的输入；后台切换和意外刷新只保留草稿，不将编辑认作事实。首版不依赖页面卸载时的网络请求保证保存。离线能力范围见 §16。
 
@@ -273,8 +273,8 @@ stateDiagram-v2
 
 - **DEF** 主要触控目标至少 44×44 CSS px；主要操作至少 48 px 高。正文基准 16 px，次要说明一般不小于 14 px；不照抄设计参考里的 10 px 标签。
 - 数字输入支持小数键盘；重量与单位相邻，组数/次数位置稳定。空字符串、0、null 有不同含义。
-- 点击“完成本组”后预填下一组，用户只改变化字段；不得自动把计划组标记为已经完成。
-- 休息计时是便利功能，不推断恢复程度。后台计时以时间戳计算；不依赖浏览器后台定时器准确唤醒。
+- 组内移动焦点不提交，离区自动记录；加组最多沿用上一实际组的重量，次数与RPE留空。历史、计划、空行不当作已完成组。
+- 训练按天记录，不提供开始、结束或计时流程，不从输入时间推断实际训练时间。
 - 状态信息同时用文字或图标表达，不能只靠红绿颜色。遵循 WCAG AA 对比度，支持键盘焦点、读屏标签、动态字号和 reduced-motion。
 - 切换页面/语言/主题不丢草稿；正在发送的确认操作不重复执行。
 - 加载展示骨架或上次快照及时间；失败显示明确的恢复入口。不可用功能不伪装空记录。
@@ -410,12 +410,12 @@ stateDiagram-v2
 
 **TRN-03** 每人可持有多个计划版本，只有一个 active 计划。计划包含训练模板、模板中的动作与目标组、次数下上沿、可选目标 RPE、训练日程；未填目标不妨碍记录。
 
-**DEF v1 日程**：支持每周 weekday 分配模板或计划休息，以及逐日覆盖/移动。非固定周循环可通过模板手动选择并给某日安排，不实现自动滚动周期调度器。一个日程可以有多次训练，全天“休息”与任意非空实际训练冲突时必须处理，不能同时宣称已休息且完成训练。
+**DEF v1 日程**：支持每周 weekday 分配模板或计划休息，以及逐日覆盖/移动。非固定周循环可通过模板手动选择并给某日安排，不实现自动滚动周期调度器。同一天可以安排多个模板，实际事实仍汇总到同一天，全天“休息”与任意非空实际训练冲突时必须处理，不能同时宣称已休息且完成训练。
 
 - 复制上次训练复制动作和目标参考，不复制完成标记、实际次数、RPE 或训练日期。
 - 导入历史记录默认产生已记录的历史训练，不自动生成未来周计划。用户明确“用它建模板”时产生可确认计划草稿。
-- 修改计划创建新版本，默认明日生效；明确选择今日时只更新未开始安排。已经开始的 session 保留自己的计划快照。
-- 移动今日训练需说明是移动还是另加一次，记录日程覆盖；不能通过复制制造两次误提醒。
+- 修改计划创建新版本，默认明日生效；明确选择今日时只影响尚未记录的安排与目标参考。已经发生的实际记录保留原计划引用与快照；旧 session 的生命周期只用于兼容历史。
+- 移动某项安排与给目标日期新增安排必须是不同意图，只有实际存在歧义时才确认，记录日程覆盖；不能通过复制制造两次误提醒。
 - 删除/归档模板不删除历史 session；历史引用计划快照。
 - 未完成计划训练不自动排入明天，也不自动补加训练量。
 
@@ -529,13 +529,13 @@ PR 可以包括相同负重下的次数提升、相同条件下达到新负重�
 
 ### 8.3 餐食字段、来源与数值校验
 
-**NUT-04** Meal 记录发生日期/时间、用餐类型、可选标题和 items。用餐类型 `breakfast/lunch/dinner/snack/unspecified`；时间不决定类型，午餐可以很晚。date-only 历史记录不用伪造 noon 时间。
+**NUT-04** Meal 支持便签型与明细型两种正式记录。便签型保存非空原文和可空的整条营养，不创建虚构食物、标准ID、克重或“一份”；明细型沿用 items。两种表示互斥，不叠加计数。记录发生日期/时间、用餐类型和可选标题。用餐类型 `breakfast/lunch/dinner/snack/unspecified`；时间不决定类型，午餐可以很晚。date-only 历史记录不用伪造 noon 时间。
 
 每项保存：原始名、标准 ID（可空）、数量/份量、营养快照、来源、估算属性、确认时间、引用的参考版本与修改版本。快照最少支持 kcal、protein_g、carbs_g、fat_g，每项都允许 null；null 是未知，不是 0。
 
 **DEF 输入防错范围**：单个 item 的 kcal 0–10,000，单个宏量 0–2,000 g；数量正数。超出提示检查并拒绝当前值，不把它解释为医学风险。单项 kcal >3,000 或明显超大份量先核对；自定义整锅配方允许在确认总产出后使用。
 
-手动保存至少提供一个营养数值，或保存为“仅食物描述/照片，待完善”。后者不计入营养合计。0 kcal 只在用户明确输入或有来源时保存。每日目标 kcal 是大于 0 的数值；>8,000 kcal 要二次核对（DEF）；这些边界属于错误输入检测，不能用于给用户设定目标。
+本人输入非空文字即可成为长期饮食记录，营养可以全部未知，不要求查库、称重或计算。便签不按标点拆分，不自动解释分食人数或“一半”等比例；选填营养表示本人实际吃下的整条内容，系统不重复折算。没有到期时间，也不要求日后补齐数字。照片及模型解析仍是独立待确认候选；未知营养只进入未知项计数，不向已知合计贡献数值。0 kcal 只在用户明确输入或有来源时保存。每日目标 kcal 是大于 0 的数值；>8,000 kcal 要二次核对（DEF）；这些边界属于错误输入检测，不能用于给用户设定目标。
 
 不得强制用 `4P+4C+9F` 覆盖标签热量；纤维、糖醇、标签舍入等可造成差异。只有用户主动选择“按宏量估算热量”时才按该近似计算，并记录 calculated 来源。
 
@@ -550,7 +550,7 @@ PR 可以包括相同负重下的次数提升、相同条件下达到新负重�
 
 ### 8.4 保存、确认与完整度
 
-**NUT-05** 手动明确输入直接保存；照片/模型估算先进入待确认。AI 修改已确认餐食产生差异卡，本人接受后形成新 revision。数量修正能够用快照比例确定计算时直接程序重算草稿，不为简单乘法调用模型。
+**NUT-05** 手动明确文字和数值在离开整条编辑区时自动保存；区内切焦点不提交。输入实时保留独立本机草稿，刷新或后台切换仅保留草稿，恢复不自动入账。空白新便签忽略；清空已有原文不等于删除。照片/模型估算先进入待确认。AI 修改已确认餐食产生差异卡，本人接受后形成新 revision。数量修正能够用快照比例确定计算时直接程序重算草稿，不为简单乘法调用模型。
 
 ```mermaid
 stateDiagram-v2
@@ -561,19 +561,22 @@ stateDiagram-v2
     estimating --> estimate_failed: 超时或模型失败
     estimate_failed --> estimating: 用户重试
     needs_input --> review_ready: 补充或手动填写
-    captured --> review_ready: 手动填写
-    review_ready --> confirmed: 本人确认
-    confirmed --> confirmed: 差异确认后修订
+    captured --> recorded: 本人明确文字或数值，离区保存
+    recorded --> recorded: 本人修改，离区保存
+    review_ready --> recorded: 本人确认估算
+    recorded --> review_ready: AI提出有版本绑定的修改候选
     captured --> deleted: 删除
     review_ready --> deleted: 放弃
-    confirmed --> deleted: 明确删除记录
+    recorded --> deleted: 明确删除记录
 ```
 
 每日有独立 `nutrition_completeness = unreviewed / partial / complete` 声明。默认 unreviewed；“基本记全了”是明确操作，不能因为有早餐午餐晚餐三张照片自动标 complete。没有任何摄入记录的 complete 声明需用户明确“当天未摄入”才能把各项合计视作 0；不能用空列表暗示禁食。
 
-完整度声明绑定当时的饮食内容：新增待确认餐照、新增/修改/删除同日餐食后，之前的 complete 自动变为 partial，保留原确认时间与失效原因；用户可以在本次操作结束时明确再次确认。未处理的同日餐照/草稿必须计入完整度提示，不能在已确认合计之外被隐藏。其他日期或只改变显示语言不会使声明失效。
+完整度声明是可选日级操作，不是保存步骤；文字已经记全与营养仍未知可以同时成立。声明绑定当时的饮食内容版本 nutritionContentRevision：新增待确认餐照、新增/修改/删除同日餐食后，之前的 complete 自动变为 partial，保留原确认时间与失效原因；用户可以在本次操作结束时明确再次确认。未处理的同日餐照/草稿必须计入完整度提示，不能在已确认合计之外被隐藏。其他日期或只改变显示语言不会使声明失效。
 
-**DEF M1 确认入口**：当天有未处理的餐食草稿时，先完善或明确放弃这些候选，再确认基本记全；过期但尚未处理的草稿仍计入提示。完整餐食中某些宏量未知不阻止本人确认基本记全，但该指标仍显示未知项。撤销也是一次内容变化，不自动恢复旧的 complete 声明。
+**DEF M1 确认入口**：nutritionContentRevision 随新增/修改/删除餐食、候选、移日和撤销在同一账本事务推进，即使此前 unreviewed/partial 也推进。确认携带所见内容版本和声明 revision；旧页面拒绝确认未见内容，队列不能静默改绑。待同步或未完成本机编辑时暂不可确认，继续记录不受影响；其他日期和显示变化不推进该日期内容版本。首次营养内容写入可以建立中性的 unreviewed 声明容器，不替用户宣称记全。
+
+当天有未处理的餐食候选时，先完善或明确放弃这些候选，再确认基本记全；过期但尚未处理的草稿仍计入提示。正式记录全部营养未知也不阻止本人确认基本记全，但该指标仍显示未知项。撤销也是一次内容变化，不自动恢复旧的 complete 声明。
 
 即便一天 complete，某些 item 宏量未知，该宏量仍为部分已知。按每个指标分别返回 `known_sum`、`unknown_item_count`、`estimate_present` 和 `day_completeness`。显示“已记录蛋白质 80 g，另有 1 项未提供”，不能显示“全天 80 g”。
 
@@ -1116,9 +1119,9 @@ flowchart TD
 | personal_recipes | P、title、components_json、yield_servings?、yield_grams_milli?、nutrient_snapshot、version | 至少明确一种 yield；每次新版本保留原配料快照 |
 | recipe_versions | owner_id、recipe_id、version、snapshot_json、data_revision | 复合归属外键；每次配方内容版本保存完整不可变快照，与命令同事务。历史配料不能依赖90天操作审计长期保留 |
 | favorites | P、title、meal_snapshot、version | 不指向可变的历史 item；复制产生新记录 |
-| meals | P、local_date、entry_timezone、occurred_at?、time_precision、meal_type、title?、source_kind、source_ref?、confirmed_at | 仅正式确认餐食入此表；待确认卡来自 import_drafts |
+| meals | P、local_date、entry_timezone、occurred_at?、time_precision、meal_type、title?、note_json?、source_kind、source_ref?、confirmed_at | note_json 为有版本的原文及可空原始营养/快照；便签不建 meal_items；确认时间是入账时间，不伪造实际发生时间；AI/照片候选来自 import_drafts |
 | meal_items | P、meal_id、ordinal、food_id?、reference_id?、original_name、quantity_decimal、unit、portion_snapshot?、consumption_fraction、nutrient_snapshot、provenance、estimated、assumption_note? | nutrient_snapshot 内各项允许 null；历史不随 reference 改变 |
-| day_claims | P、local_date、entry_timezone、training_claim=unspecified/rest_confirmed、nutrition_completeness=unreviewed/partial/complete、nutrition_reviewed_at?、review_invalidated_reason?、explicit_zero_intake=false | UNIQUE(owner_id,local_date)；训练完成状态由实际记录推导 |
+| day_claims | P、local_date、entry_timezone、training_claim=unspecified/rest_confirmed、nutrition_completeness=unreviewed/partial/complete、nutrition_content_revision=0、nutrition_reviewed_at?、review_invalidated_reason?、explicit_zero_intake=false | UNIQUE(owner_id,local_date)；训练完成状态由实际记录推导 |
 | source_assets | P、kind=image/audio、object_key、mime、byte_size、width?、height?、duration_ms?、sha256、status、last_used_at、purge_at? | audio需服务端验证duration且设置purge_at；图片不伪填时长；object_key不向模型开放 |
 | source_texts | P、text、sha256、input_locale_hint?、origin=typed/ocr/transcript/submitted_transcript、asset_id?、transcription_job_id?、supersedes_text_id?、capture_context_json? | 原始转写与用户修正后发送文本分别保存；音频清理后保留必要元数据关联，文本不作为系统指令 |
 | transcription_jobs | P、source_asset_id、locale_hint?、status、attempt_id?、transcript_text_id?、error_code?、expires_at | 同owner+operation去重；任务状态见§9.5；音频清理后不得自动重新上传重试 |
@@ -1179,9 +1182,9 @@ type RecoveryNote = {
 
 JSON中计量缩放后的数值必须是安全整数。Plan weekday=1 Monday；同项 plannedRest=true 时 templateIds 必须空。weekday不可重复，未列出的日期表示未安排，不能推定休息。templateId在版本内唯一；所有schedule引用必须能在该版本解析。plannedSets为null或1–30整数，repMin/repMax为null或1–200整数；两者均有值时min≤max；目标RPE遵循组级范围。Recovery 是可选的轻量记录，不能变成每日必填问卷。
 
-/me的聚合revision以user_profiles.revision为唯一权威；修改users中的locale/timezone也必须在同一事务保护并递增该revision，避免两份profile版本号漂移。只提供描述的手动餐食通过import_drafts留存，不通过/meals创建空营养的confirmed记录。provenance/estimated由来源链和显式输入路径决定，客户端不能把ai_estimate改成非估算来绕过提示。
+/me的聚合revision以user_profiles.revision为唯一权威；修改users中的locale/timezone也必须在同一事务保护并递增该revision，避免两份profile版本号漂移。只提供描述的本人饮食通过/meals便签型正式入账；note.schemaVersion=1，description保留原文（1–2000字符且非全空白），nutrients四项原始十进制均可null，nutrientSnapshot由服务端构造。旧明细请求不带note仍兼容；便签不与items同时提交，普通PATCH不切换表示。MealSnapshot继续读取schemaVersion=1的明细，便签采用schemaVersion=2且items为空。旧候选不批量转为事实；本人可显式转成便签并原子消费其draftRef，来源与版本保留。过期的纯手动文字候选仍可明确转为记录，照片/模型候选继续遵守确认规则。provenance/estimated由来源链和显式输入路径决定，客户端不能把ai_estimate改成非估算来绕过提示。
 
-M1 的 PlanSnapshot 以 `plan_versions.snapshot_json` 保存。计划内容不可原地修订；draft/published/archived 是版本的管理状态，某日唯一有效计划按该日前最后一条 plan_selections 选择，同日按 data_revision 排序。这样明日激活或归档不会改变今日选择，也不会重写已开始 session。plan_selections 是计划命令的内部元数据，不是第四种 Artifact；同步批次与完整快照、导出必须包含相应时间线，并使用同一 data_revision 截止，不能仅同步 plan_versions 而遗漏选择变化。
+M1 的 PlanSnapshot 以 `plan_versions.snapshot_json` 保存。计划内容不可原地修订；draft/published/archived 是版本的管理状态，某日唯一有效计划按该日前最后一条 plan_selections 选择，同日按 data_revision 排序。这样明日激活或归档不会改变今日选择，也不会重写已经落账的训练引用与快照。plan_selections 是计划命令的内部元数据，不是第四种 Artifact；同步批次与完整快照、导出必须包含相应时间线，并使用同一 data_revision 截止，不能仅同步 plan_versions 而遗漏选择变化。
 
 M1 的 meal_items 将上表中的食物、原名、份量、来源、假设和营养字段封装在严格的 `snapshot_json` 中，API字段为 `snapshot`；根归属、ordinal、revision 和操作关联仍是独立列。快照另含 `nutrientBasis`，保存原始十进制营养值、对应数量和单位、参考/配方版本及计算来源。手动值描述所填数量在 consumptionFraction 之前的整份数值；修改数量用原始 basis 一次缩放，不从上次舍入结果累乘。显式4/4/9计算保留 calculationInput 的原数值和来源；确认不会消除估算标记。份量的 grams_decimal/ml_decimal 与缩放整数并存。
 
@@ -1335,7 +1338,7 @@ erDiagram
 
 **ARC-03** private 子表使用复合归属约束：父表有 UNIQUE(owner_id,id)，子表 (owner_id,parent_id) 引用它，避免误关联其他人。指向系统或个人目录时按 scope+owner 做应用校验。JSON中的ID不能逃过同样检查。
 
-索引至少包括：owner_id+local_date（体重/餐食/训练/声明）、owner_id+setup_id及时间（历史查询通过session_exercises连接）、owner_id+alias_normalized、report去重、job status+next_attempt_at、owner_id+operation_id、owner_id+data_revision。目录查询限制结果数，禁止在每次输入时扫描私人全库。标准目录撤销用 archived，不删除历史所需的语义。所有新增JSON字段都采用版本化判别schema，禁止任意字段透传；复杂上下文和洞察单字段8KB上限，超过则缩为引用/分页而非截断后执行。新增索引：threads(owner_id,status,last_active_at)、messages(owner_id,thread_id,created_at)、requests(owner_id,client_request_id)、insights(owner_id,kind,status,expires_at)、evidence(owner_id,source_type,source_id)、assets(purge_at,status)。同一用户最多一个in_progress训练用唯一部分索引保障；原有历史completed/paused不受此限制。thread指针删除时置null或以不含内容的墓碑保留，不能级联删除事实、审计或独立声明。
+索引至少包括：owner_id+local_date（体重/餐食/训练/声明）、owner_id+setup_id及时间（历史查询通过session_exercises连接）、owner_id+alias_normalized、report去重、job status+next_attempt_at、owner_id+operation_id、owner_id+data_revision。目录查询限制结果数，禁止在每次输入时扫描私人全库。标准目录撤销用 archived，不删除历史所需的语义。所有新增JSON字段都采用版本化判别schema，禁止任意字段透传；复杂上下文和洞察单字段8KB上限，超过则缩为引用/分页而非截断后执行。新增索引：threads(owner_id,status,last_active_at)、messages(owner_id,thread_id,created_at)、requests(owner_id,client_request_id)、insights(owner_id,kind,status,expires_at)、evidence(owner_id,source_type,source_id)、assets(purge_at,status)。旧接口兼容约束仍用唯一部分索引限制一个in_progress；它不是新版交互要求。新版recorded日容器按owner+date唯一，completed/paused等旧历史保留。thread指针删除时置null或以不含内容的墓碑保留，不能级联删除事实、审计或独立声明。
 
 <a id="api"></a>
 ## 15. API 与并发契约
@@ -1393,7 +1396,7 @@ erDiagram
 | PATCH/DELETE /training/sessions/:id/exercises/:exerciseId | 顺序/目标或明确删除 | 连同子组的影响先确认 |
 | POST /training/sessions/:id/finish、/pause、/resume、/cancel | If-Match | 合法状态转换；finish验证至少一组；cancel只接受无实际组的训练，有组时需选择finish保留或DELETE明确删除 |
 | GET /training/history | setupId、from/to、limit | 可比较历史、条件和最近日期 |
-| GET/POST /meals | 日期范围或明确手动MealInput | 读取/保存confirmed餐食 |
+| GET/POST /meals | 日期范围或明确手动MealInput（便签note与明细items互斥） | 读取/自动保存正式饮食；文字即可入账 |
 | GET/PATCH/DELETE /meals/:id | item差异、root revision | 确认修正后更新快照和统计 |
 | GET/POST /favorites、/recipes、/portions | 具名快照或份量定义 | 本人管理；复制不修改原记录 |
 | GET /recipes/:id/versions/:version | 本人配方ID及内容版本 | 回查该版配料、总产出及来源；他人统一404 |
@@ -1476,6 +1479,8 @@ GET /sync/snapshot 的每页最多100个类型化条目，覆盖本人当前实�
   "condition": "fasted"
 }
 ```
+
+以下主副选择字段属于旧称重接口兼容示例；新版按日入口采用§6的单值及版本更新，不展示主副选择。
 
 新增称重请求头：`Idempotency-Key: 29a3d61a-d672-4359-834c-792af3bbce87`。不能由客户端指定 isPrimary 以替换另一主要记录而跳过同日确认；存在primary冲突时返回待确认选择。手动确认字段采用 `primaryChoice=extra/replace`；replace 必须附 `expectedPrimary={id,revision}`，绑定用户正在确认的原主要记录。异常称重核对采用 `confirmedOutlier` 与 `outlierReference={id,revision}`，引用变化后重新核对。上述字段仅用于明确的手动保存，不能供模型伪造确认。
 
@@ -1635,7 +1640,7 @@ IndexedDB按user_id隔离存放：草稿、最近快照、待同步command、尚
 
 server dataRevision、thread last_context_data_revision、本机sync cursor是三个不同位置：数据版本、某会话已使用的上下文、某设备已取得的同步进度；禁止共用一个变量。重复或乱序batch只应用一次，发现缺口先补齐或取全量快照。一次后台同步不会自动选择另一个会话、切舱、抢焦点或改变用户正在编辑的字段；编辑基线冲突明确提示。
 
-离线时对话可读本机历史、可保存未发草稿，发送按钮解释需要联网；不自动把离线草稿在重连后发送给模型。手动队列恢复依然自动按依赖同步。源线程归档/删除、登录过期或存在相关待解决写冲突时，待发送请求保持草稿，用户处理后明确发送。返回现场仅保存导航/scroll/当前组ID/本机草稿/计时起点，不能把一份旧session快照覆盖全局实体缓存。
+离线时对话可读本机历史、可保存未发草稿，发送按钮解释需要联网；不自动把离线草稿在重连后发送给模型。手动队列恢复依然自动按依赖同步。源线程归档/删除、登录过期或存在相关待解决写冲突时，待发送请求保持草稿，用户处理后明确发送。返回现场仅保存导航/scroll/当前组ID/本机草稿；旧计时起点字段只为兼容旧现场读取，新版不使用计时，不能把一份旧session快照覆盖全局实体缓存。
 
 **验收关联**：AT-120–AT-125、172、188–191、209、213。
 
@@ -1649,7 +1654,7 @@ server dataRevision、thread last_context_data_revision、本机sync cursor是�
 **DEF 工作目录布局（按 M0 建立，具体能力按里程碑验收）**：
 
 ```text
-veyra/
+lowkkey/
   SPEC.md
   README.md                 # 后续最短操作入口，指向本规范
   package.json / lockfile    # 后续锁定依赖
@@ -2016,6 +2021,17 @@ staging的邮件收件人必须同时满足测试allowlist；用户数据中的�
 
 原有AT编号全部保留，AT-060与AT-067按v1.1范围/记忆语义修订；新增AT-170–214与其需求字段构成逐项追踪表。静态文档检查不等于这些业务AT已通过，执行结果应记录在相应阶段验收文件。
 
+### 18.10 饮食便签修订验收
+
+| ID | 关联要求 | 场景 | 通过条件 |
+|---|---|---|---|
+| AT-215 | NUT-04, NUT-05 | 纯文字便签 | 正式长期保留，原文不拆解；营养全null不等于0，不建虚构份量 |
+| AT-216 | UX-02, SYN-01 | 区内切焦点、离区、慢存储与刷新 | 区内不入账；离区一次；新输入和原日期不丢失，刷新只恢复草稿 |
+| AT-217 | NUT-05 | 旧页面确认当天记全 | 内容版本变化必须拒绝；其他日期不失效；未知营养不阻止明确记全 |
+| AT-218 | NUT-04, EVT-01 | 便签补营养、删除与撤销 | 同一ID版本更新；原值一次缩放，不再次按原话比例折算；旧撤销不盖新值 |
+| AT-219 | NUT-05, SYN-03 | 旧候选及明细记录 | 不自动升级候选；明确转为记录与消费引用原子完成；原快照仍可读 |
+| AT-220 | LOC-01, UX-02 | 三语、断网重连与宽度变化 | 无保存/刷新前置；冲突明确核对；长原文不裁切，数字/焦点/触控可用 |
+
 <a id="delivery"></a>
 ## 19. 开发阶段、验证项和发布门槛
 
@@ -2026,7 +2042,7 @@ staging的邮件收件人必须同时满足测试allowlist；用户数据中的�
 | 阶段 | 实施内容 | 完成门槛 |
 |---|---|---|
 | M0 — 工程与契约（已完成） | 沿用React/Vite、Hono、Zod、Drizzle/D1、身份骨架、三语框架、mock和项目隔离 | [docs/M0.md](docs/M0.md)已有80项测试、9项浏览器验证及VAL-ENV证据；只证明工程范围，本轮未重测线上部署 |
-| M1 — 三舱与统一账本（实施中） | 三舱概览/专注操作、页头入口与空对话壳、本人档案/目标/标准目录、手动体重/饮食/逐组/计划/历史、快照、事件基础、离线同步与导出 | 原AT-001–039、120–125及170–173、178、184、186、188–189、207、209、211的手动/视图部分通过；三语实机可快录，未接模型时不假装能回复 |
+| M1 — 三舱与统一账本（实施中） | 三舱概览/专注操作、页头入口与空对话壳、本人档案/目标/标准目录、手动体重/饮食/逐组/计划/历史、快照、事件基础、离线同步与导出 | 原AT-001–039、120–125及170–173、178、184、186、188–189、207、209、211及215–220的手动/视图部分通过；三语实机可快录，未接模型时不假装能回复 |
 | M2 — 共享对话与多模态（待实现） | 单一对话面、多会话、文本/截图/餐照/短录音、草稿确认、OpenAI适配器、受控命令、预算审计、人工事件回传 | AT-040–080及174–191、202–208、212–213对应项通过；VAL-AI/VOICE/PHOTO及并发/注入评估有证据；本阶段记忆接口可保留但不能显示未实现的个体化结论 |
 | M3 — 长期洞察与复盘（待实现） | 四类结构化洞察、可见纠正/撤销、保守个体分析/递进、昨日状态、报告快照、中午邮件、补录与恢复 | AT-090–109、192–201、210、214及VAL-MEM/MAIL/OPS通过；数值TDEE是独立VAL-TDEE门槛，未通过必须关闭并明确未验证，不能宣称真实代谢拟合已交付 |
 | M4 — 首版整体验收（待实现） | 三语、移动交互、可访问性、权限、费用实测、所有降级/备份恢复/回滚的端到端验收 | 所有适用必须AT通过；M0组件证据不能代替业务证据；VAL-LOC/PERF/COST通过，首版发布清单逐项有证据 |
@@ -2036,21 +2052,21 @@ M1即可开展受控手动自用；M4前不称完整首发。朋友真实数据�
 
 **M1 分批交付（2026-09-17，经产品负责人确认）**：先交付 M1.1 称重快录审阅版，覆盖首页进入称重、录入/修改/删除、七日趋势、原始单位保留、三语草稿恢复、真实回执反馈和新增后10秒撤销。按实际收到成功回执开始计算该入口的10秒；历史允许撤销的服务端窗口仍遵循 UX-03，旧操作不得覆盖后续修改。详见 [docs/M1.1.md](docs/M1.1.md)。单批通过不代表整个 M1 或完整体重舱验收。
 
-**M1 后续顺序调整（2026-09-17，经产品负责人确认）**：M1.1 称重快录及视觉修订已有本地交付。先工程收整，再打通训练与饮食快录。保留原 M1 编号作为需求归属，执行顺序如下。
+**M1 后续顺序调整（2026-09-18，经产品负责人确认）**：M1.1 称重快录及视觉修订已有本地交付。先工程收整，再打通训练与饮食快录。保留原 M1 编号作为需求归属，执行顺序如下。
 
 | 执行批次 | 原需求归属 | 本批交付 |
 |---|---|---|
-| 0（本批） | 工程收整 | 现状对照、本地 Git 基线、模块职责与命令接入清单 |
+| 0（已交付） | 工程收整 | 现状对照、本地 Git 基线、模块职责与命令接入清单 |
 | 1 | M1.4 训练快录 | 按日动作与配置、逐组增改删、自动保存、当天结果；首批覆盖§7六个示例动作 |
-| 2 | M1.6 手动饮食第一批 | 手动营养／标签／小批受审参考食物、餐食增改删、当天合计与完整度、描述草稿 |
-| 3 | M1.5 训练计划与回看 | 模板、按日生效、周安排与移动、复制上次、同条件比较；40条受审动作目录 |
-| 4 | M1.6 饮食复用 | 常用餐、配方、具名份量、个人别名、历史；约100条受审食物目录 |
-| 5 | M1.2 离线与同步 | 已访问页面离线重开、三舱重连入账、冲突、退出前保留或导出待同步内容 |
+| 2（本批） | M1.6 饮食便签 | 自由文字、选填营养、自动保存、当天回看、版本绑定的完整度 |
+| 3 | M1.2 离线与同步 | 已访问页面离线重开、三舱重连入账、冲突、退出前保留或导出待同步内容 |
+| 4 | M1.5 训练计划与回看 | 可选模板、按日生效、周安排与移动、复制上次、同条件比较；40条受审动作目录 |
+| 5 | M1.6 饮食复用与参考 | 常用记录、可选标签／份量／配方、个人别名、历史；约100条受审参考食物，不作为自由记录前置 |
 | 6 | M1.3 体重与个人设置 | 可选历史时间、周变化、按日生效目标、档案与单位、30天允许操作的历史撤销 |
 | 7 | M1.7 私有照片 | 拍摄／上传、本机留存、同步、查看／删除与存储失败提示；识别仍属 M2 |
 | 8 | M1.8 阶段收尾 | 成员管理、本人 JSON／CSV／照片导出、最小恢复、三语实机及完整 M1 验收 |
 
-第0批已建立基线，当前交付第1批训练快录审阅版，详见 [docs/M1-baseline.md](docs/M1-baseline.md) 与 [docs/M1.4.md](docs/M1.4.md)。首批六条动作目录已由产品负责人明确批准；来源与人工审核记录随追加迁移发布，40条完整目录仍属后续批次。每批交付可运行预览、五分钟试用清单、独立证据和可回退提交，产品负责人审阅后才进入下一批。健康写入继续经过统一账本与类型化命令队列；目录来源与人工审核分批记录，不把测试 fixture 当作受审条目。精细动效、图标与真实 AI 不在这些快录批次展开。本次只调整顺序，不降低完整 M1 门槛。
+第0批已建立基线，每日训练与体重已交付；当前交付第2批饮食便签审阅版，详见 [docs/M1-daily-records.md](docs/M1-daily-records.md) 与 [docs/M1-diet-notes.md](docs/M1-diet-notes.md)。首批六条动作目录已由产品负责人明确批准；来源与人工审核记录随追加迁移发布，40条完整目录仍属后续批次。每批交付可运行预览、五分钟试用清单、独立证据和可回退提交，产品负责人审阅后才进入下一批。健康写入继续经过统一账本与类型化命令队列；目录来源与人工审核分批记录，不把测试 fixture 当作受审条目。精细动效、图标与真实 AI 不在这些快录批次展开。本次完成饮食便签及规范收整，不降低完整 M1 门槛。
 
 ### 19.2 验证项及保守默认
 
@@ -2249,3 +2265,4 @@ PR描述至少说明问题、最终行为、影响范围、对应需求与验收
 - `PATCH/DELETE /training/days/:date/:sessionId/sets/:id` 同时保护根/组版本；按日删除允许旧已结束训练的最后一组。动作删除使用同日期路径的 exercises/:id；旧端点兼容已持久化命令。
 - `GET/POST /weights/days/:date` 读取/首建当天值；`PATCH/DELETE /weights/days/:date/:id` 要求 If-Match。旧副记录不由新路径晋升；显示单位变化不回写事实。
 - 新命令使用 day-set、day-exercise、day-weight 白名单，沿用统一账本、幂等回执、本人版本依赖串联和精确草稿消费。默认发生时间未知，写入时间单独保留。
+| 1.1.7 | 2026-09-18 | 饮食便签成为正式长期记录，营养可全未知；统一离区保存，补同日内容版本与完整度并发保护；清理旧完成/计时要求，调整后续顺序；验收见 docs/M1-diet-notes.md，整个M1未验收 |

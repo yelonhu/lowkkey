@@ -6,7 +6,8 @@ import { effectiveTimezone } from '../domain/time.ts';
 import { visibleLedgerEntities } from '../domain/local-ledger.ts';
 import type { LocalLedger } from '../domain/local-ledger.ts';
 import type { ProfileSnapshot } from '../domain/profile.ts';
-import { summarizeNutrients } from '../domain/nutrition.ts';
+import { dietProjection, isDietCommand, pendingCommand } from './nutrition/diet-state.ts';
+import { DietView } from './nutrition/DietView.tsx';
 import type { ManualMutation, QueuedCommand } from '../domain/manual-commands.ts';
 import type { ReturnScene } from '../client/local-database.ts';
 import { formatDate, formatNumber } from '../i18n/locale.ts';
@@ -41,7 +42,7 @@ export function Workspace({ ownerId, onSignedOut }: { ownerId: string; onSignedO
   const legacySessionId = /^\/training\/sessions\/([^/?]+)/.exec(frontPath)?.[1];
   const legacySession = entities.find(item => item.kind === 'workout_session' && item.value.id === legacySessionId);
   const selectedDate = localDateSchema.safeParse(routeDate).success ? routeDate! : legacySession?.kind === 'workout_session' ? legacySession.value.localDate : today;
-  useEffect(() => { if (!chat && runtime && ledger && (frontPath === '/training' || frontPath === '/weight' || legacySession)) { const destination = (frontPath.startsWith('/weight') ? '/weight' : '/training') + '?date=' + selectedDate; history.replaceState(null, '', destination); setPath(destination); setFrontPath(destination); } }, [chat, runtime, ledger, frontPath, legacySession, selectedDate]);
+  useEffect(() => { if (!chat && runtime && ledger && (frontPath === '/training' || frontPath === '/weight' || frontPath === '/nutrition' || legacySession)) { const destination = (frontPath.startsWith('/weight') ? '/weight' : frontPath.startsWith('/nutrition') ? '/nutrition' : '/training') + '?date=' + selectedDate; history.replaceState(null, '', destination); setPath(destination); setFrontPath(destination); } }, [chat, runtime, ledger, frontPath, legacySession, selectedDate]);
   useEffect(() => { const changed = () => { const value = currentPath(); void commitTrainingRows().then(flushDrafts).then(() => { setPath(value); if (!value.startsWith('/assistant')) setFrontPath(value); }).catch(() => setNotice('storageFailed')); }; window.addEventListener('popstate', changed); return () => window.removeEventListener('popstate', changed); }, []);
   useEffect(() => {
     if (!profile) return;
@@ -105,28 +106,29 @@ export function Workspace({ ownerId, onSignedOut }: { ownerId: string; onSignedO
     {denied ? <section className="panel"><p>{t(state.syncStatus.errorCode === 'MEMBER_SUSPENDED' || state.queueStatus.errorCode === 'MEMBER_SUSPENDED' ? 'auth:inactive' : 'auth:signedOut')}</p><button onClick={onSignedOut}>{t('auth:signIn')}</button></section> : !runtime || !ledger || !profile ? <section className="loading-state" data-testid="initial-load"><p role={state.syncStatus.errorCode || disconnected ? 'alert' : 'status'}>{t(disconnected ? 'offlineUnavailable' : state.syncStatus.errorCode ? 'loadFailed' : 'loading')}</p>{runtime && <button className="quiet" onClick={() => { void state.retry(); }}>{t('retry')}</button>}</section> : <>
       <main id="main-content" aria-label={t('a11y:main')}><div hidden={chat} className="workspace-face" key="front">
         {frontPath !== '/today' && frontPath !== '/' && <button className="quiet back-link" onClick={() => { void navigate('/today'); }}>← {t('today')}</button>}
-        {frontPath.startsWith('/weight') ? <WeightView key={selectedDate} runtime={runtime} ledger={ledger} profile={profile} commands={commands} date={selectedDate} navigate={navigate}/> : frontPath.startsWith('/settings') ? <SettingsView runtime={runtime} ledger={ledger} profile={profile} commands={commands} preference={preference} onSignedOut={onSignedOut}/> : frontPath.startsWith('/training') ? <TrainingView key={selectedDate} runtime={runtime} ledger={ledger} profile={profile} commands={commands} date={selectedDate} navigate={navigate}/> : frontPath.startsWith('/nutrition') ? <section className="panel"><h1>{t(frontPath.startsWith('/training') ? 'today:training' : 'today:nutrition')}</h1><p>{t('unavailableFeature')}</p></section> : <Overview ledger={ledger} profile={profile} commands={commands} navigate={destination => { void navigate(destination); }}/>}
+        {frontPath.startsWith('/weight') ? <WeightView key={selectedDate} runtime={runtime} ledger={ledger} profile={profile} commands={commands} date={selectedDate} navigate={navigate}/> : frontPath.startsWith('/settings') ? <SettingsView runtime={runtime} ledger={ledger} profile={profile} commands={commands} preference={preference} onSignedOut={onSignedOut}/> : frontPath.startsWith('/training') ? <TrainingView key={selectedDate} runtime={runtime} ledger={ledger} profile={profile} commands={commands} date={selectedDate} navigate={navigate}/> : frontPath.startsWith('/nutrition') ? <DietView key={selectedDate} runtime={runtime} ledger={ledger} profile={profile} commands={commands} date={selectedDate} navigate={navigate}/> : <Overview ledger={ledger} profile={profile} commands={commands} navigate={destination => { void navigate(destination); }}/>}
       </div>{chat && <ConversationDraft runtime={runtime} timezone={timezone} back={() => { void returnToFront(); }}/>}</main>
       <footer className="app-footer"><LanguagePicker value={locale} onChange={value => { void preference({ locale: value }); }}/></footer>
     </>}
   </div>;
 }
 function Overview({ ledger, profile, commands, navigate }: { ledger: LocalLedger; profile: ProfileSnapshot; commands: QueuedCommand[]; navigate: (destination: string) => void }) {
-  const { t, i18n } = useTranslation(), locale = localeSchema.parse(i18n.resolvedLanguage), timezone = effectiveTimezone(profile.timezone, profile.pendingTimezone, profile.timezoneEffectiveDate, new Date()), today = localDateAt(new Date(), timezone), entries = visibleLedgerEntities(ledger);
+  const { t, i18n } = useTranslation(), locale = localeSchema.parse(i18n.resolvedLanguage), timezone = effectiveTimezone(profile.timezone, profile.pendingTimezone, profile.timezoneEffectiveDate, new Date()), today = localDateAt(new Date(), timezone);
   const latest = weightProjection(ledger, commands).find(item => item.isPrimary && item.localDate === today);
   const model = trainingProjection(ledger, commands), roots = new Set(model.sessions.filter(item => item.localDate === today && !['cancelled','deleted'].includes(item.status)).map(item => item.id)), groups = model.exercises.filter(item => roots.has(item.sessionId)), recorded = model.sets.filter(item => groups.some(group => group.id === item.sessionExerciseId)), actions = new Set(recorded.map(item => item.sessionExerciseId)).size;
-  const mealIds = new Set(entries.flatMap(item => item.kind === 'meal' && item.value.localDate === today ? [item.value.id] : []));
-  const claim = entries.filter(item => item.kind === 'day_claim').find(item => item.value.localDate === today), pending = entries.filter(item => item.kind === 'import_draft' && item.value.localDate === today && item.value.status !== 'confirmed');
-  const nutrients = summarizeNutrients(entries.flatMap(item => item.kind === 'meal_item' && mealIds.has(item.value.mealId) ? [item.value.snapshot.nutrientSnapshot] : []), claim?.value.explicitZeroIntake ?? false);
+  const diet = dietProjection(ledger, commands, today), nutrients = diet.summary;
+  const dietPending = commands.some(command => command.localDate === today && isDietCommand(command, commands) && pendingCommand(command, ledger));
   const link = (destination: string) => ({ href: destination, onClick: (event: React.MouseEvent<HTMLAnchorElement>) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); navigate(destination); } } });
   return <><div className="page-heading overview-heading"><p className="eyebrow"><time dateTime={today}>{formatDate(new Date(), locale, timezone)}</time></p><h1>{t('today:title')}</h1></div><div className="artifact-grid">
     <a {...link('/training?date=' + today)} className="artifact-card training-artifact" data-artifact="SessionArtifact">
       <h2>{t('today:training')}</h2><p className="card-main">{recorded.length ? t('daily:trainingSummary', { actions, sets: recorded.length }) : t('daily:recordTraining')}</p><span className="card-action" aria-hidden="true">↗</span>
     </a>
     <a {...link('/weight')} className="artifact-card" data-artifact="WeightArtifact"><h2>{t('today:weight')}</h2><p className="metric">{latest ? displayMass(latest.kgMicros, profile.bodyWeightUnit, locale) : '—'} <span className="unit">{latest ? profile.bodyWeightUnit : ''}</span></p><p className="muted">{latest ? <time dateTime={latest.localDate}>{formatDate(new Date(latest.localDate + 'T12:00:00Z'), locale, 'UTC')}</time> : t('noRecords')}</p><span className="card-action">{t('today:weigh')}</span></a>
-    <a {...link('/nutrition?date=' + today)} className="artifact-card" data-artifact="DietArtifact"><h2>{t('today:nutrition')}</h2><p className="metric">{nutrients.knownSum.energyMkcal === null ? '—' : formatNumber(nutrients.knownSum.energyMkcal / 1000, locale)} <span className="unit">kcal</span></p><p className="muted">{t('today:' + (claim?.value.nutritionCompleteness ?? 'unreviewed'))}</p>
-      {nutrients.knownSum.estimated && <p>{t('today:estimated')}</p>}{nutrients.unknownCounts.energy > 0 && <p><NumericText>{t('today:unknownEnergy', { count: nutrients.unknownCounts.energy })}</NumericText></p>}{pending.length > 0 && <p><NumericText>{t('today:pendingMeals', { count: pending.length })}</NumericText></p>}
-      <span className="card-action">{t('today:recordMeal')}</span></a>
+    <a {...link('/nutrition?date=' + today)} className="artifact-card" data-artifact="DietArtifact"><h2>{t('today:nutrition')}</h2><p className="card-main"><NumericText>{diet.records.length ? t('nutrition:count', { count: diet.records.length }) : t('today:recordMeal')}</NumericText></p>
+      {nutrients.knownSum.energyMkcal !== null && <p className="muted">{t('nutrition:known')} <span className="numeric">{formatNumber(nutrients.knownSum.energyMkcal / 1000, locale)}</span> kcal</p>}
+      {dietPending && <span className="muted">{t('daily:local')}</span>}
+      {diet.drafts.length > 0 && <span className="muted"><NumericText>{t('today:pendingMeals', { count: diet.drafts.length })}</NumericText></span>}
+      <span className="card-action" aria-hidden="true">↗</span></a>
   </div></>;
 }
 

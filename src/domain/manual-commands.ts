@@ -1,5 +1,6 @@
 import { dailySetInputSchema, dailyWeightCreateSchema, dailyWeightEditSchema } from './daily-records.ts';
 import { z } from 'zod';
+import { dayClaimInputSchema } from './day-claims.ts';
 import { entityRefSchema } from './artifacts.ts';
 import type { EntityRef } from './artifacts.ts';
 import { revisionSchema, scaledSchema, utcSchema, uuidSchema, localDateSchema, timezoneSchema } from './primitives.ts';
@@ -53,6 +54,8 @@ export const manualMutationSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('set.create'), session, input: trainingSetInputSchema }),
   z.strictObject({ kind: z.literal('set.update'), session, target: target('workout_set'), input: setEdit }),
   z.strictObject({ kind: z.literal('set.delete'), session, target: target('workout_set') }),
+  z.strictObject({ kind: z.literal('day-claim.create'), localDate: localDateSchema, input: dayClaimInputSchema }),
+  z.strictObject({ kind: z.literal('day-claim.update'), localDate: localDateSchema, target: target('day_claim'), input: dayClaimInputSchema }),
   z.strictObject({ kind: z.literal('meal.create'), input: mealInputSchema }),
   z.strictObject({ kind: z.literal('meal.update'), target: target('meal'), input: mealPatchSchema }),
   z.strictObject({ kind: z.literal('meal.delete'), target: target('meal') }),
@@ -72,7 +75,7 @@ export const manualMutationSchema = z.discriminatedUnion('kind', [
 ]);
 export type ManualMutation = z.infer<typeof manualMutationSchema>;
 export function mutationBindings(mutation: ManualMutation): Binding[] {
-  return [...('session' in mutation ? [mutation.session] : []), ...('target' in mutation ? [mutation.target] : [])];
+  return [...('session' in mutation ? [mutation.session] : []), ...('target' in mutation && mutation.target ? [mutation.target] : [])];
 }
 export function observed<T extends EntityRef['type']>(ref: EntityRef & { type: T }): Binding & { type: T } { return { type: ref.type, id: ref.id, source: { kind: 'observed', revision: ref.revision } }; }
 export class QueueError extends Error {
@@ -120,6 +123,8 @@ export function prepareMutation(raw: unknown, receipts: ReadonlyMap<string, Comm
     case 'session-exercise.update': return result(`/training/sessions/${mutation.session.id}/exercises/${mutation.target.id}`, 'PATCH', sessionExercisePatchSchema.parse({ ...mutation.input, expectedRevision: revision(mutation.target) }), mutation.session);
     case 'set.delete': return result(`/training/sessions/${mutation.session.id}/sets/${mutation.target.id}`, 'DELETE', { expectedRevision: revision(mutation.target) }, mutation.session);
     case 'session-exercise.delete': return result(`/training/sessions/${mutation.session.id}/exercises/${mutation.target.id}`, 'DELETE', { expectedRevision: revision(mutation.target) }, mutation.session);
+    case 'day-claim.create': return result('/days/' + mutation.localDate, 'PATCH', mutation.input);
+    case 'day-claim.update': return result('/days/' + mutation.localDate, 'PATCH', mutation.input, mutation.target);
     case 'meal.create': return result('/meals', 'POST', mutation.input);
     case 'meal.update': return result(`/meals/${mutation.target.id}`, 'PATCH', mutation.input, mutation.target);
     case 'meal.delete': return result(`/meals/${mutation.target.id}`, 'DELETE', {}, mutation.target);
@@ -148,7 +153,7 @@ export const commandInputSchema = z.strictObject({
   if (command.dependencies.includes(command.operationId) || new Set(command.dependencies).size !== command.dependencies.length) ctx.addIssue({ code: 'custom', message: 'Invalid dependencies' });
   for (const binding of mutationBindings(command.mutation)) if (binding.source.kind === 'receipt' && !command.dependencies.includes(binding.source.operationId)) ctx.addIssue({ code: 'custom', message: 'A receipt version must name its dependency' });
   const mutation = command.mutation;
-  const identity = 'input' in mutation && 'id' in mutation.input ? mutation.input.id : 'target' in mutation ? mutation.target.id : mutation.kind === 'operation.undo' ? mutation.originalId : null;
+  const identity = 'input' in mutation && 'id' in mutation.input ? mutation.input.id : 'target' in mutation && mutation.target ? mutation.target.id : mutation.kind === 'operation.undo' ? mutation.originalId : null;
   if (identity !== null && identity !== command.clientEntityId) ctx.addIssue({ code: 'custom', message: 'Client entity identity differs from mutation' });
   if ('input' in mutation && 'localDate' in mutation.input && mutation.input.localDate && mutation.input.localDate !== command.localDate) ctx.addIssue({ code: 'custom', message: 'Capture date differs from mutation' });
   if ('input' in mutation && 'entryTimezone' in mutation.input && mutation.input.entryTimezone && mutation.input.entryTimezone !== command.entryTimezone) ctx.addIssue({ code: 'custom', message: 'Capture timezone differs from mutation' });

@@ -52,7 +52,7 @@ export function WeightView({ runtime, ledger, profile, commands, date, navigate 
     }).catch(() => setMessage('storageFailed')).finally(() => setRestored(true));
   }, [draft.ready]);
   useEffect(() => { if (editing && requestedFocus.current) { requestedFocus.current = false; input.current?.focus({ preventScroll: true }); } }, [editing]);
-  useEffect(() => { const commit = (event: Event) => (event as CustomEvent<Array<() => Promise<unknown>>>).detail.push(() => handler.current()); window.addEventListener('lowkkey:commit-training', commit); return () => window.removeEventListener('lowkkey:commit-training', commit); }, []);
+  useEffect(() => { const commit = (event: Event) => (event as CustomEvent<Array<() => Promise<unknown>>>).detail.push(() => handler.current()); window.addEventListener('lowkkey:commit-editing', commit); return () => window.removeEventListener('lowkkey:commit-editing', commit); }, []);
   useEffect(() => {
     if (action?.state !== 'committed' || action.mutation.kind !== 'day-weight.create' || (action.receipt?.dataRevision ?? Infinity) > ledger.dataRevision) return;
     if (undoAnnounced.current === action.operationId) return; undoAnnounced.current = action.operationId;

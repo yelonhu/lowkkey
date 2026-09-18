@@ -21,7 +21,7 @@ let runtime: ReturnType<typeof localRuntime>, db: D1Database;
 beforeAll(async () => { runtime = localRuntime(); db = await runtime.getD1Database('DB') as unknown as D1Database; await applyMigrations(db); });
 afterAll(async () => { await runtime.dispose(); });
 beforeEach(async () => {
-  const tables = ['change_batches', 'operation_revisions', 'command_operations', 'mutation_guards', 'meal_items', 'meals', 'workout_sets', 'session_exercises', 'workout_sessions', 'exercise_setups', 'exercise_labels', 'exercise_definitions', 'weight_entries', 'users'];
+  const tables = ['change_batches', 'operation_revisions', 'command_operations', 'mutation_guards', 'meal_items', 'meals', 'workout_sets', 'session_exercises', 'workout_sessions', 'exercise_setups', 'exercise_labels', 'exercise_definitions', 'weight_entries', 'day_claims', 'users'];
   await db.batch(tables.map(table => db.prepare(`DELETE FROM ${table}`)));
   for (const id of [owner, other]) await db.prepare("INSERT INTO users(id,email_normalized,role,status,locale,timezone,created_at) VALUES (?,?,'member','active','en','America/Chicago',?)").bind(id, `${id}@example.invalid`, clock().toISOString()).run();
 });

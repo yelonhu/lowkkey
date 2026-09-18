@@ -26,7 +26,7 @@ export function effects(mutation: ManualMutation): Array<Pick<EntityRef, 'id' | 
   if ('session' in mutation) result.push({ type: 'workout_session', id: mutation.session.id });
   if ('target' in mutation) result.push({ type: mutation.target.type, id: mutation.target.id });
   if (mutation.kind === 'day-set.create') result.push({ type: 'session_exercise', id: mutation.input.exercise.id });
-  const createTypes = { 'day-set.create': 'workout_set', 'day-weight.create': 'weight_entry', 'weight.create': 'weight_entry', 'session.create': 'workout_session', 'session-exercise.create': 'session_exercise', 'set.create': 'workout_set', 'setup.create': 'exercise_setup', 'exercise.create': 'exercise_definition' } as const;
+  const createTypes = { 'meal.create': 'meal', 'meal-draft.create': 'import_draft', 'day-claim.create': 'day_claim', 'day-set.create': 'workout_set', 'day-weight.create': 'weight_entry', 'weight.create': 'weight_entry', 'session.create': 'workout_session', 'session-exercise.create': 'session_exercise', 'set.create': 'workout_set', 'setup.create': 'exercise_setup', 'exercise.create': 'exercise_definition' } as const;
   if (mutation.kind in createTypes && 'input' in mutation && 'id' in mutation.input)
     result.push({ type: createTypes[mutation.kind as keyof typeof createTypes], id: mutation.input.id });
   return result;

@@ -18,8 +18,8 @@ export const foodAliases = new RecordStore<FoodAlias>('food_aliases', 'food_alia
   ...recordColumns, aliasOriginal: 'alias_original', aliasNormalized: 'alias_normalized', localeHint: 'locale_hint', foodId: 'food_id', favoriteId: 'favorite_id', confirmedAt: 'confirmed_at',
 });
 export const meals = new RecordStore<Meal>('meals', 'meal', mealSchema, {
-  ...recordColumns, localDate: 'local_date', entryTimezone: 'entry_timezone', occurredAt: 'occurred_at', timePrecision: 'time_precision', mealType: 'meal_type', title: 'title', sourceKind: 'source_kind', sourceRef: 'source_ref', confirmedAt: 'confirmed_at',
-});
+  ...recordColumns, localDate: 'local_date', entryTimezone: 'entry_timezone', occurredAt: 'occurred_at', timePrecision: 'time_precision', mealType: 'meal_type', title: 'title', sourceKind: 'source_kind', sourceRef: 'source_ref', confirmedAt: 'confirmed_at', note: 'note_json',
+}, ['note'], [], { note: 'note_revision' });
 export const mealItems = new RecordStore<MealItem>('meal_items', 'meal_item', mealItemSchema, {
   ...recordColumns, mealId: 'meal_id', ordinal: 'ordinal', snapshot: 'snapshot_json',
 }, ['snapshot'], [], { snapshot: 'snapshot_revision' });
