@@ -1,0 +1,13 @@
+{
+  "name": "@lowkkey/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "lowkkey 核心规则：解析器、写入闸门、验证器与参考引擎。纯函数，无 I/O，前后端共用。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lowkkey/protocol": "*"
+  }
+}

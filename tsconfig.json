@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "ES2023", "lib": ["ES2023", "DOM", "DOM.Iterable"], "module": "ESNext", "moduleResolution": "Bundler",
     "jsx": "react-jsx", "strict": true, "noEmit": true, "skipLibCheck": true, "verbatimModuleSyntax": true,
-    "allowImportingTsExtensions": true, "resolveJsonModule": true, "allowJs": true, "types": ["vite/client", "node"],
+    "allowImportingTsExtensions": true, "resolveJsonModule": true, "types": ["vite/client", "node"],
     "noUnusedLocals": true, "noUnusedParameters": true, "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "db", "tests", "*.config.ts"]
+  "include": ["src", "packages", "tests", "*.config.ts"]
 }

@@ -1,8 +1,12 @@
 {
-  "name": "veyra-m0-local", "main": "src/server/worker.ts", "compatibility_date": "2026-07-30",
-  "compatibility_flags": ["nodejs_compat"], "workers_dev": false, "preview_urls": false,
-  "assets": { "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/healthz", "/cdn-cgi/access/logout"] },
-  "d1_databases": [{ "binding": "DB", "database_name": "veyra-local", "database_id": "00000000-0000-0000-0000-000000000000", "remote": false, "migrations_dir": "db/migrations" }],
-  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "veyra-local-media", "remote": false }, { "binding": "BACKUPS", "bucket_name": "veyra-local-backups", "remote": false }],
+  "name": "lowkkey-v02-local",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": { "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/v1/*", "/mcp", "/.well-known/*", "/authorize", "/oauth/*", "/healthz"] },
+  "d1_databases": [{ "binding": "DB", "database_name": "lowkkey-v02-local", "database_id": "11111111-1111-4111-8111-111111111111", "remote": false, "migrations_dir": "db/migrations" }],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "22222222-2222-4222-8222-222222222222" }],
   "observability": { "enabled": false }
 }

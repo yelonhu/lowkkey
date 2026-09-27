@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lowkkey · 设计原型</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Noto+Serif+SC:wght@600;700&display=swap">
+<style>
+:root{--bg:#E9E9E7;--ink:#141415;--ink3:#6C6C71;--line:#D5D5D3}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+.bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:12px 20px;background:rgba(233,233,231,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.bar b{font-family:"Noto Serif SC","Songti SC",serif;font-size:18px;margin-right:12px}
+.bar a{font-size:13px;color:var(--ink3);text-decoration:none;padding:6px 10px;border-radius:14px}
+.bar a:hover,.bar a.on{color:var(--ink);background:#fff}
+.bar .mode{margin-left:auto;font-weight:600;color:var(--ink)}
+.stage{display:flex;flex-wrap:wrap;gap:56px 48px;justify-content:center;padding:40px 20px 80px}
+figure{margin:0;display:flex;flex-direction:column;gap:12px}
+figcaption{font-size:13px;color:var(--ink3)}
+.screen{position:relative;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.04),0 20px 60px rgba(20,20,21,.12)}
+.phone .screen{width:390px;height:844px;border-radius:44px}
+.screen a{text-decoration:none}
+body.single figure{display:none}
+body.single figure.cur{display:flex}
+@media (max-width:440px){.stage{padding:16px 0 40px}.phone .screen{border-radius:0}figcaption{padding:0 16px}}
+[data-screen="Main"] a{color:#141415;text-decoration:none}
+[data-screen="Main"] a:hover{color:#2C4A66}
+[data-screen="Main"] input::placeholder{color:#6C6C71}
+[data-screen="Capture"] a{color:#2C4A66;text-decoration:none}
+[data-screen="Capture"] a:hover{color:#1F364C}
+[data-screen="Session"] a{color:#9FBAD4;text-decoration:none}
+[data-screen="Session"] a:hover{color:#C3D5E6}
+[data-screen="Body"] a{color:#141415;text-decoration:none}
+[data-screen="Body"] a:hover{color:#2C4A66}
+[data-screen="Progress"] a{color:#141415;text-decoration:none}
+[data-screen="Progress"] a:hover{color:#2C4A66}
+[data-screen="Ledger"] a{color:#141415;text-decoration:none}
+[data-screen="Ledger"] a:hover{color:#2C4A66}
+[data-screen="Connect"] a{color:#2C4A66;text-decoration:none}
+[data-screen="Connect"] a:hover{color:#1F364C}
+[data-screen="Debrief"] a{color:#9FBAD4;text-decoration:none}
+[data-screen="Debrief"] a:hover{color:#C3D5E6}
+</style>
+</head>
+<body>
+<div class="bar"><b>lowkkey</b><a href="#Main">01 今日</a><a href="#Capture">02 需要确认</a><a href="#Session">03 训练中</a><a href="#Body">04 体征</a><a href="#Progress">05 进步</a><a href="#Ledger">06 日志</a><a href="#Connect">07 接入</a><a href="#Transition">08 进入训练 · 过渡</a><a href="#Debrief">09 训练完成</a><a href="#Icon">10 图标</a><a class="mode" href="#all">总览</a></div>
+<main class="stage">
+<figure class="shot phone" data-key="Main"><figcaption>01 今日</figcaption><section class="screen" data-screen="Main" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #F1F1EF; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="display: flex; flex-direction: column; gap: 6px; padding: 14px 20px 0">
+<div style="display: flex; justify-content: space-between; align-items: center; height: 32px">
+<a href="#Main" style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; color: #141415">lowkkey</a>
+<div style="display: flex; align-items: center; gap: 2px">
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; color: #6C6C71" data-bind="header-date">9.26 周六</span>
+<a href="#Connect" aria-label="接入" style="width: 40px; height: 40px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: #545458">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"></path></svg></a>
+</div>
+</div>
+<nav style="display: flex; gap: 24px; border-bottom: 1px solid #E3E3E0">
+<a href="#Main" aria-current="page" style="padding: 10px 0 10px; font-size: 15px; font-weight: 600; color: #141415; border-bottom: 2px solid #141415; margin-bottom: -1px">今日</a>
+<a href="#Body" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">体征</a>
+<a href="#Progress" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">进步</a>
+<a href="#Ledger" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">日志</a>
+</nav>
+</header>
+
+<main style="flex-grow: 1; display: flex; flex-direction: column; padding: 0 20px; overflow: hidden">
+
+<h1 data-bind="main-title" style="margin: 20px 0 0; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 27px; line-height: 40px; font-weight: 700; letter-spacing: 0.5px">今天，<br>肩与手臂。</h1>
+
+<div style="display: flex; align-items: baseline; gap: 0; margin-top: 14px; font-size: 12px; color: #6C6C71">
+<a href="#Body" style="display: flex; align-items: baseline; gap: 4px; padding-right: 14px; color: #6C6C71"><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; color: #141415">60.15</span>kg · 今晨</a>
+<a href="#Body" style="display: flex; align-items: baseline; gap: 4px; padding: 0 14px; border-left: 1px solid #E3E3E0; color: #6C6C71"><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; color: #2C4A66">+1.9</span>kg/周 <span style="font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; color: #2C4A66">ƒ</span></a>
+<span style="display: flex; align-items: baseline; gap: 4px; padding-left: 14px; border-left: 1px solid #E3E3E0"><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; color: #141415">2</span>/ 8 周期</span>
+</div>
+
+<section data-bind="main-advice" style="display: flex; flex-direction: column; gap: 6px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #E3E3E0">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #93661E">建议</div>
+<div style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 20px; line-height: 30px; font-weight: 700; letter-spacing: 0.3px">从周一起，每天减少约 300 kcal。</div>
+<div style="font-size: 13px; line-height: 19px; color: #545458">约等于一碗半米饭。增速回到目标后自动恢复。</div>
+<div style="display: flex; gap: 8px; margin-top: 8px">
+<button type="button" style="height: 44px; padding: 0 30px; border: 0; border-radius: 22px; background: #141415; color: #F7F7F5; font: inherit; font-size: 15px; font-weight: 600">采用</button>
+<button type="button" style="height: 44px; padding: 0 24px; border: 1px solid #D5D5D3; border-radius: 22px; background: transparent; color: #141415; font: inherit; font-size: 15px">以后</button>
+</div>
+</section>
+
+<section data-bind="main-plan" style="display: flex; flex-direction: column; margin-top: 20px; padding-top: 16px; border-top: 1px solid #E3E3E0">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #6C6C71">训练计划</div>
+<div style="font-size: 12px; color: #6C6C71">5 个动作 · 16 组 · RIR 3</div>
+</div>
+<div style="display: flex; align-items: baseline; height: 32px; font-size: 15px"><span>坐姿哑铃推肩</span><span style="flex-grow: 1; margin: 0 10px; border-bottom: 1px dotted #C7C7C6"></span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #545458">40 lb</span></div>
+<div style="display: flex; align-items: baseline; height: 32px; font-size: 15px"><span>侧平举</span><span style="flex-grow: 1; margin: 0 10px; border-bottom: 1px dotted #C7C7C6"></span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #545458">20 lb</span></div>
+<div style="display: flex; align-items: baseline; height: 32px; font-size: 15px"><span>面拉</span><span style="flex-grow: 1; margin: 0 10px; border-bottom: 1px dotted #C7C7C6"></span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #545458">15.8 kg</span></div>
+<div style="display: flex; align-items: baseline; height: 32px; font-size: 15px"><span>EZ 杠弯举</span><span style="flex-grow: 1; margin: 0 10px; border-bottom: 1px dotted #C7C7C6"></span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #545458">55 lb</span></div>
+<div style="display: flex; align-items: baseline; height: 32px; font-size: 15px"><span>仰卧臂屈伸</span><span style="flex-grow: 1; margin: 0 10px; border-bottom: 1px dotted #C7C7C6"></span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #545458">45 lb</span></div>
+<a href="#Session" style="display: flex; align-items: center; justify-content: center; height: 52px; margin-top: 14px; border-radius: 26px; background: #141415; color: #F7F7F5; font-size: 16px; font-weight: 600; letter-spacing: 1px">开始训练</a>
+</section>
+
+</main>
+
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 26px">
+<div role="status" data-bind="capture-status" style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 6px 0 14px; margin: 0 4px; border-radius: 20px; background: #1C1C1E; color: #F2F2F0; font-size: 14px">
+<span style="display: flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#86B394" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>已记录体重 <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums">60.15</span> kg</span>
+<button type="button" style="height: 40px; padding: 0 12px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #9FBAD4">撤销</button>
+</div>
+<div style="display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 4px; background: #FFFFFF; border: 1px solid #E3E3E0; border-radius: 26px; box-shadow: 0 8px 28px rgba(20,20,21,0.07)">
+<button type="button" aria-label="拍照或截图" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: #545458; display: flex; align-items: center; justify-content: center">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+</button>
+<label for="cap" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">记录</label>
+<input id="cap" data-action="capture-input" type="text" placeholder="记录体重、训练，或拍一张照片" style="flex-grow: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font: inherit; font-size: 15px; color: #141415">
+<a href="#Capture" aria-label="语音" style="width: 44px; height: 44px; border-radius: 22px; background: #141415; color: #F7F7F5; display: flex; align-items: center; justify-content: center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3.5" width="6" height="11" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg>
+</a>
+</div>
+</div>
+
+</div></section></figure>
+<figure class="shot phone" data-key="Capture"><figcaption>02 需要确认</figcaption><section class="screen" data-screen="Capture" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #F1F1EF; position: relative; overflow: hidden">
+
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 390px; height: 844px; display: flex; flex-direction: column; padding: 20px 20px; box-sizing: border-box">
+<div style="display: flex; justify-content: space-between"><div style="width: 78px; height: 18px; border-radius: 4px; background: #D5D5D3"></div><div style="width: 60px; height: 12px; border-radius: 4px; background: #E3E3E0"></div></div>
+<div style="display: flex; gap: 24px; margin-top: 22px; padding-bottom: 12px; border-bottom: 1px solid #E3E3E0"><div style="width: 30px; height: 14px; border-radius: 4px; background: #D5D5D3"></div><div style="width: 30px; height: 14px; border-radius: 4px; background: #E3E3E0"></div><div style="width: 30px; height: 14px; border-radius: 4px; background: #E3E3E0"></div><div style="width: 30px; height: 14px; border-radius: 4px; background: #E3E3E0"></div></div>
+<div style="width: 150px; height: 26px; margin-top: 28px; border-radius: 6px; background: #D5D5D3"></div>
+<div style="width: 230px; height: 26px; margin-top: 14px; border-radius: 6px; background: #D5D5D3"></div>
+<div style="width: 260px; height: 16px; margin-top: 22px; border-radius: 4px; background: #E3E3E0"></div>
+<div style="height: 1px; margin-top: 30px; background: #E3E3E0"></div>
+<div style="width: 280px; height: 20px; margin-top: 24px; border-radius: 5px; background: #D5D5D3"></div>
+</div>
+<div aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 390px; height: 844px; background: rgba(20,20,21,0.38)"></div>
+
+<div role="dialog" aria-label="确认" data-bind="question" style="position: absolute; left: 0; bottom: 0; width: 390px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 8px 20px 34px; background: #FFFFFF; border-radius: 26px 26px 0 0">
+<div style="display: flex; justify-content: center"><div style="width: 36px; height: 5px; border-radius: 3px; background: #D5D5D3"></div></div>
+
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: 1.5px; color: #6E4F78">需要确认</span>
+<span style="display: flex; align-items: center; gap: 5px; font-size: 12px; color: #36684A"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>已记录 5 项</span>
+</div>
+
+<h2 style="margin: -4px 0 0; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 23px; line-height: 34px; font-weight: 700; letter-spacing: 0.3px; text-wrap: balance">RIR 0 指的是哪一组？</h2>
+
+<div style="font-size: 14px; line-height: 23px; color: #6C6C71">有两组 125 lb。你写的是：卧推 105lb*5+115lb*8+125lb*7+125lb*5，<mark style="background: #F0E9F2; color: #141415; padding: 2px 4px; border-radius: 4px; font-weight: 600">125那组rir0</mark>。今日体重130.1lb</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 18px; border: 1px solid #E3E3E0; border-radius: 14px; background: #FFFFFF; font: inherit; color: #141415"><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 500">125 × 7</span><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6C6C71">第 3 组<span style="font-size: 11px; padding: 2px 8px; border-radius: 9px; border: 1px dashed #A08AA8; color: #6E4F78">推测</span></span></button>
+<button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 18px; border: 1px solid #E3E3E0; border-radius: 14px; background: #FFFFFF; font: inherit; color: #141415"><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 500">125 × 5</span><span style="font-size: 13px; color: #6C6C71">第 4 组</span></button>
+<button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 18px; border: 1px solid #E3E3E0; border-radius: 14px; background: #FFFFFF; font: inherit; color: #141415"><span style="font-size: 16px">两组都是</span><span style="font-size: 13px; color: #6C6C71">第 3、4 组</span></button>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center">
+<a href="#Ledger" style="display: flex; align-items: center; height: 44px; font-size: 14px">查看记录</a>
+<button type="button" style="height: 44px; padding: 0 4px; border: 0; background: transparent; font: inherit; font-size: 14px; color: #6C6C71">跳过</button>
+</div>
+</div>
+
+</div></section></figure>
+<figure class="shot phone" data-key="Session"><figcaption>03 训练中</figcaption><section class="screen" data-screen="Session" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #000000; color: #F2F2F0; display: flex; flex-direction: column; overflow: hidden">
+
+<div data-bind="session-header" style="display: flex; align-items: center; justify-content: space-between; height: 52px; padding: 0 8px">
+<a href="#Main" style="display: flex; align-items: center; height: 44px; padding: 0 8px 0 2px; font-size: 14px; color: #7F7F84">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"></path></svg>今日</a>
+<div style="text-align: center; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 15px; font-weight: 600">杠铃平板卧推</span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 12px; color: #7F7F84">第 3 组，共 4 组</span></div>
+<a href="#Debrief" style="display: flex; align-items: center; height: 44px; padding: 0 10px; font-size: 14px; color: #7F7F84">结束</a>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 6px 24px 0">
+<span style="font-size: 12px; color: #7F7F84">休息</span>
+<div style="flex-grow: 1; height: 2px; border-radius: 1px; background: #29292B; display: flex"><div style="width: 68%; height: 2px; border-radius: 1px; background: #9FBAD4"></div></div>
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; color: #A8A8AC">1:42</span>
+</div>
+
+<div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px">
+<div style="display: flex; align-items: center; gap: 2px; font-size: 14px; letter-spacing: 1px; color: #7F7F84">下一组
+<button type="button" aria-label="计算方式" style="width: 36px; height: 36px; border: 0; background: transparent; font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; font-size: 17px; color: #9FBAD4">ƒ</button>
+</div>
+<div style="display: flex; align-items: baseline; gap: 8px">
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 116px; line-height: 116px; font-weight: 500; letter-spacing: -5px">125</span>
+<span style="font-size: 20px; color: #7F7F84">lb</span>
+</div>
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 19px; color: #A8A8AC">× 5–8</div>
+
+<svg width="326" height="104" viewBox="0 0 326 104" role="img" aria-label="每侧 35 磅加 5 磅，空杆 45 磅" style="margin-top: 26px">
+<rect x="26" y="53" width="58" height="10" rx="2" fill="none" stroke="#565659" stroke-width="1.25"></rect>
+<rect x="242" y="53" width="58" height="10" rx="2" fill="none" stroke="#565659" stroke-width="1.25"></rect>
+<line x1="92" y1="58" x2="234" y2="58" stroke="#565659" stroke-width="2.5" stroke-linecap="round"></line>
+<path d="M124 55v6M130 55v6M136 55v6M142 55v6M148 55v6M178 55v6M184 55v6M190 55v6M196 55v6M202 55v6" stroke="#29292B" stroke-width="1"></path>
+<rect x="84" y="47" width="8" height="22" rx="1.5" fill="#3A3A3D"></rect>
+<rect x="234" y="47" width="8" height="22" rx="1.5" fill="#3A3A3D"></rect>
+<rect x="69" y="21.5" width="14" height="73" rx="3" fill="#E8E8E7"></rect>
+<rect x="59" y="38" width="8" height="40" rx="2" fill="#7F7F84"></rect>
+<rect x="243" y="21.5" width="14" height="73" rx="3" fill="#E8E8E7"></rect>
+<rect x="259" y="38" width="8" height="40" rx="2" fill="#7F7F84"></rect>
+</svg>
+
+<div style="margin-top: 10px; font-size: 12px; letter-spacing: 0.5px; color: #7F7F84">每侧 <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #D6D6D8">35 + 5</span> · 空杆 <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums">45</span></div>
+<div style="margin-top: 22px; font-size: 13px; color: #7F7F84">上一组 <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #A8A8AC">115 × 8</span> · RIR 2</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 0 16px 30px">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px">
+<span style="font-size: 14px; color: #7F7F84">次数</span>
+<div style="display: flex; align-items: center; gap: 22px">
+<button type="button" aria-label="减一次" style="width: 52px; height: 52px; border: 0; border-radius: 26px; background: #141415; color: #F2F2F0; font-size: 24px">−</button>
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 36px; font-weight: 500; min-width: 44px; text-align: center">8</span>
+<button type="button" aria-label="加一次" style="width: 52px; height: 52px; border: 0; border-radius: 26px; background: #141415; color: #F2F2F0; font-size: 24px">+</button>
+</div>
+<span style="font-size: 14px; color: #7F7F84">次</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="padding: 0 4px; font-size: 13px; color: #7F7F84">RIR · 还能再做几次</div>
+<div role="radiogroup" aria-label="RIR" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<button type="button" role="radio" aria-checked="false" style="height: 52px; border: 0; border-radius: 14px; background: #141415; color: #D6D6D8; font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-size: 18px">0</button>
+<button type="button" role="radio" aria-checked="false" style="height: 52px; border: 0; border-radius: 14px; background: #141415; color: #D6D6D8; font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-size: 18px">1</button>
+<button type="button" role="radio" aria-checked="false" style="height: 52px; border: 0; border-radius: 14px; background: #141415; color: #D6D6D8; font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-size: 18px">2</button>
+<button type="button" role="radio" aria-checked="false" style="height: 52px; border: 0; border-radius: 14px; background: #141415; color: #D6D6D8; font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-size: 18px">3+</button>
+</div>
+</div>
+<button type="button" style="height: 58px; border: 0; border-radius: 16px; background: #F2F2F0; color: #121213; font: inherit; font-size: 17px; font-weight: 600; letter-spacing: 0.5px">完成本组</button>
+</div>
+
+</div></section></figure>
+<figure class="shot phone" data-key="Body"><figcaption>04 体征</figcaption><section class="screen" data-screen="Body" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #F1F1EF; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="display: flex; flex-direction: column; gap: 6px; padding: 14px 20px 0">
+<div style="display: flex; justify-content: space-between; align-items: center; height: 32px">
+<a href="#Main" style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; color: #141415">lowkkey</a>
+<div style="display: flex; align-items: center; gap: 2px">
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; color: #6C6C71" data-bind="header-date">9.26 周六</span>
+<a href="#Connect" aria-label="接入" style="width: 40px; height: 40px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: #545458">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"></path></svg></a>
+</div>
+</div>
+<nav style="display: flex; gap: 24px; border-bottom: 1px solid #E3E3E0">
+<a href="#Main" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">今日</a>
+<a href="#Body" aria-current="page" style="padding: 10px 0 10px; font-size: 15px; font-weight: 600; color: #141415; border-bottom: 2px solid #141415; margin-bottom: -1px">体征</a>
+<a href="#Progress" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">进步</a>
+<a href="#Ledger" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">日志</a>
+</nav>
+</header>
+
+<main style="flex-grow: 1; display: flex; flex-direction: column; padding: 0 20px; overflow: hidden">
+
+<h1 data-bind="body-title" style="margin: 20px 0 0; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 26px; line-height: 40px; font-weight: 700; letter-spacing: 0.5px">按当前趋势，<br>10 月 19 日达到 65 kg。</h1>
+<p style="margin: 8px 0 0; font-size: 14px; line-height: 21px; color: #545458">若按目标速度，这一天在明年 1 月中旬。增重越快，其中脂肪的比例通常越高。</p>
+
+<svg data-bind="body-chart" width="350" height="214" viewBox="0 0 350 214" role="img" aria-label="体重 9/15 至 9/26 由 58.0 升至 60.2 公斤；按当前趋势 10 月 19 日达到 65 公斤，按目标速度明年 1 月中旬达到" style="display: block; margin-top: 18px">
+<line data-bind="body-goal-grid" x1="0" y1="30.6" x2="350" y2="30.6" stroke="#C7C7C6" stroke-width="1"></line>
+<text data-bind="body-goal-label" x="0" y="24" font-size="11" fill="#545458" font-family="-apple-system,PingFang SC,sans-serif">目标 65 kg</text>
+<line data-bind="body-reference-grid" x1="0" y1="136.9" x2="350" y2="136.9" stroke="#E3E3E0" stroke-width="1"></line>
+<text data-bind="body-reference-label" x="0" y="131" font-size="11" fill="#6C6C71" font-family="Geist,-apple-system,sans-serif">60</text>
+<line data-bind="body-today-grid" x1="102.4" y1="40" x2="102.4" y2="192" stroke="#D5D5D3" stroke-width="1" stroke-dasharray="2 3"></line>
+<line data-bind="body-goal-trend" x1="102.4" y1="133.7" x2="346" y2="107.3" stroke="#36684A" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round"></line>
+<line data-bind="body-observed-trend" x1="10" y1="178.8" x2="102.4" y2="131" stroke="#2C4A66" stroke-width="2" stroke-linecap="round"></line>
+<line data-bind="body-forecast-trend" x1="102.4" y1="131" x2="296.3" y2="30.6" stroke="#2C4A66" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round"></line>
+<circle cx="10" cy="179.2" r="3.5" fill="#141415"></circle>
+<circle cx="18.4" cy="172.4" r="3.5" fill="#141415"></circle>
+<circle cx="35.2" cy="163.6" r="3.5" fill="#141415"></circle>
+<circle cx="43.6" cy="157.9" r="3.5" fill="#141415"></circle>
+<circle cx="52" cy="166.6" r="3" fill="#F1F1EF" stroke="#141415" stroke-width="1.5"></circle>
+<circle cx="60.4" cy="152.2" r="3.5" fill="#141415"></circle>
+<circle cx="68.8" cy="152.2" r="3.5" fill="#141415"></circle>
+<circle cx="77.2" cy="136.7" r="3.5" fill="#141415"></circle>
+<circle cx="85.6" cy="151.1" r="3" fill="#F1F1EF" stroke="#141415" stroke-width="1.5"></circle>
+<circle cx="94" cy="123.1" r="3.5" fill="#141415"></circle>
+<circle cx="102.4" cy="133.7" r="4.5" fill="#141415" stroke="#F1F1EF" stroke-width="2"></circle>
+<circle data-bind="body-forecast-point" cx="296.3" cy="30.6" r="5" fill="#F1F1EF" stroke="#2C4A66" stroke-width="2"></circle>
+<text data-bind="body-forecast-date" x="296.3" y="52" text-anchor="middle" font-size="12" font-weight="600" fill="#2C4A66" font-family="Geist,-apple-system,sans-serif">10/19</text>
+<text data-bind="body-goal-speed" x="346" y="100" text-anchor="end" font-size="11" fill="#36684A" font-family="-apple-system,PingFang SC,sans-serif">目标速度 → 1 月中</text>
+<text data-bind="body-start-date" x="10" y="208" font-size="11" fill="#6C6C71" font-family="Geist,-apple-system,sans-serif">9/15</text>
+<text data-bind="body-current-date" x="102.4" y="208" text-anchor="middle" font-size="11" fill="#141415" font-family="-apple-system,PingFang SC,sans-serif">今天</text>
+<text data-bind="body-middle-date" x="220" y="208" text-anchor="middle" font-size="11" fill="#6C6C71" font-family="Geist,-apple-system,sans-serif">10/10</text>
+<text data-bind="body-end-date" x="346" y="208" text-anchor="end" font-size="11" fill="#6C6C71" font-family="Geist,-apple-system,sans-serif">10/25</text>
+</svg>
+
+<div style="display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 11px; color: #545458">
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 7px; height: 7px; border-radius: 4px; background: #141415"></span>晨起空腹</span>
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 5px; height: 5px; border-radius: 4px; border: 1.5px solid #141415"></span>排便后称</span>
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 14px; height: 0; border-top: 2px solid #2C4A66"></span>趋势 +1.4 kg/周</span>
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 14px; height: 0; border-top: 1.5px dashed #36684A"></span>目标 +0.3 kg/周</span>
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 6px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #E3E3E0">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #93661E">建议 · 9/28 周一生效</div>
+<div style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 20px; line-height: 30px; font-weight: 700; letter-spacing: 0.3px">每天减少约 300 kcal</div>
+<div style="display: flex; gap: 8px; margin-top: 8px">
+<button type="button" style="height: 44px; padding: 0 30px; border: 0; border-radius: 22px; background: #141415; color: #F7F7F5; font: inherit; font-size: 15px; font-weight: 600">采用</button>
+<button type="button" style="height: 44px; padding: 0 24px; border: 1px solid #D5D5D3; border-radius: 22px; background: transparent; color: #141415; font: inherit; font-size: 15px">以后</button>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; margin-top: 20px; border-top: 1px solid #E3E3E0">
+<button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 46px; padding: 0; border: 0; border-bottom: 1px solid #E3E3E0; background: transparent; font: inherit; font-size: 15px; color: #141415; text-align: left">
+<span>趋势的计算方式 <span style="font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; color: #2C4A66">ƒ</span></span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+<button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 46px; padding: 0; border: 0; border-bottom: 1px solid #E3E3E0; background: transparent; font: inherit; font-size: 15px; color: #141415; text-align: left">
+<span>称重条件 <span style="font-size: 13px; color: #93661E">· 2 次不一致</span></span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+<button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 46px; padding: 0; border: 0; border-bottom: 1px solid #E3E3E0; background: transparent; font: inherit; font-size: 15px; color: #141415; text-align: left">
+<span>腰围 <span style="font-size: 13px; color: #6C6C71">· 尚未记录</span></span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+</section>
+
+</main>
+
+</div></section></figure>
+<figure class="shot phone" data-key="Progress"><figcaption>05 进步</figcaption><section class="screen" data-screen="Progress" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #F1F1EF; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="display: flex; flex-direction: column; gap: 6px; padding: 14px 20px 0">
+<div style="display: flex; justify-content: space-between; align-items: center; height: 32px">
+<a href="#Main" style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; color: #141415">lowkkey</a>
+<div style="display: flex; align-items: center; gap: 2px">
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; color: #6C6C71" data-bind="header-date">9.26 周六</span>
+<a href="#Connect" aria-label="接入" style="width: 40px; height: 40px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: #545458">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"></path></svg></a>
+</div>
+</div>
+<nav style="display: flex; gap: 24px; border-bottom: 1px solid #E3E3E0">
+<a href="#Main" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">今日</a>
+<a href="#Body" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">体征</a>
+<a href="#Progress" aria-current="page" style="padding: 10px 0 10px; font-size: 15px; font-weight: 600; color: #141415; border-bottom: 2px solid #141415; margin-bottom: -1px">进步</a>
+<a href="#Ledger" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">日志</a>
+</nav>
+</header>
+
+<main style="flex-grow: 1; display: flex; flex-direction: column; padding: 0 20px; overflow: hidden">
+
+<h1 data-bind="progress-title" style="margin: 20px 0 0; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 27px; line-height: 40px; font-weight: 700; letter-spacing: 0.5px">引体向上，<br>已超过自身体重。</h1>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px">
+<span style="font-size: 14px; color: #545458">下次练背，第一组可尝试无辅助。</span>
+<button type="button" style="flex-shrink: 0; height: 44px; padding: 0 18px; border: 1px solid #141415; border-radius: 22px; background: transparent; color: #141415; font: inherit; font-size: 14px; font-weight: 600">加入计划</button>
+</div>
+
+<section style="display: flex; flex-direction: column; margin-top: 22px; padding-top: 16px; border-top: 1px solid #E3E3E0">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #6C6C71">相对力量</div>
+<div style="font-size: 12px; color: #6C6C71">e1RM ÷ 体重 <span style="font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; color: #2C4A66">ƒ</span></div>
+</div>
+<svg data-bind="progress-chart" width="350" height="206" viewBox="0 0 350 206" role="img" aria-label="卧推 1.19 倍体重，引体向上净负荷 1.08 倍，高位下拉 1.00 倍">
+<text x="0" y="18" font-size="15" fill="#141415" font-family="-apple-system,PingFang SC,sans-serif">卧推</text>
+<text x="0" y="36" font-size="11" fill="#6C6C71" font-family="-apple-system,PingFang SC,sans-serif">e1RM 158 lb · 两周 +8%</text>
+<text x="350" y="24" text-anchor="end" font-size="20" font-weight="500" fill="#141415" font-family="Geist,-apple-system,sans-serif">1.19×</text>
+<rect x="0" y="46" width="350" height="4" rx="2" fill="#E3E3E0"></rect>
+<rect x="0" y="46" width="278.6" height="4" rx="2" fill="#2C4A66"></rect>
+<text x="0" y="80" font-size="15" fill="#141415" font-family="-apple-system,PingFang SC,sans-serif">引体向上</text>
+<text x="0" y="98" font-size="11" fill="#6C6C71" font-family="-apple-system,PingFang SC,sans-serif">净负荷 e1RM 65 kg · 两周 +23%</text>
+<text x="350" y="86" text-anchor="end" font-size="20" font-weight="500" fill="#141415" font-family="Geist,-apple-system,sans-serif">1.08×</text>
+<rect x="0" y="108" width="350" height="4" rx="2" fill="#E3E3E0"></rect>
+<rect x="0" y="108" width="251.1" height="4" rx="2" fill="#2C4A66"></rect>
+<text x="0" y="142" font-size="15" fill="#141415" font-family="-apple-system,PingFang SC,sans-serif">高位下拉</text>
+<text x="0" y="160" font-size="11" fill="#6C6C71" font-family="-apple-system,PingFang SC,sans-serif">e1RM 60 kg · 使用拉力带后 +8%</text>
+<text x="350" y="148" text-anchor="end" font-size="20" font-weight="500" fill="#141415" font-family="Geist,-apple-system,sans-serif">1.00×</text>
+<rect x="0" y="170" width="350" height="4" rx="2" fill="#E3E3E0"></rect>
+<rect x="0" y="170" width="232.9" height="4" rx="2" fill="#2C4A66"></rect>
+<line x1="233.3" y1="40" x2="233.3" y2="182" stroke="#141415" stroke-width="1" stroke-dasharray="2 2"></line>
+<text x="233.3" y="200" text-anchor="middle" font-size="11" fill="#141415" font-family="-apple-system,PingFang SC,sans-serif">= 自身体重</text>
+</svg>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #E3E3E0">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #6C6C71">本周训练部位</div>
+<div style="font-size: 12px; color: #6C6C71">对照 10–20 组/周</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 15px">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: #2C4A66"></span>胸</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: #2C4A66"></span>背</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 4px; background: #2C4A66"></span>手臂</span>
+<span style="display: flex; align-items: center; gap: 6px; color: #93661E"><span style="width: 7px; height: 7px; border-radius: 4px; border: 1.5px solid #93661E; box-sizing: border-box"></span>肩 · 偏少</span>
+<span style="display: flex; align-items: center; gap: 6px; color: #6C6C71"><span style="width: 7px; height: 7px; border-radius: 4px; border: 1.5px solid #A1A1A5; box-sizing: border-box"></span>腿 · 每周一次（你的设置）</span>
+</div>
+<button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 46px; margin-top: 4px; padding: 0; border: 0; border-top: 1px solid #E3E3E0; border-bottom: 1px solid #E3E3E0; background: transparent; font: inherit; font-size: 15px; color: #141415; text-align: left">
+<span>各肌群每周组数 <span style="font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; color: #2C4A66">ƒ</span></span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+</section>
+
+</main>
+
+</div></section></figure>
+<figure class="shot phone" data-key="Ledger"><figcaption>06 日志</figcaption><section class="screen" data-screen="Ledger" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #F1F1EF; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="display: flex; flex-direction: column; gap: 6px; padding: 14px 20px 0">
+<div style="display: flex; justify-content: space-between; align-items: center; height: 32px">
+<a href="#Main" style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; color: #141415">lowkkey</a>
+<div style="display: flex; align-items: center; gap: 2px">
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; color: #6C6C71" data-bind="header-date">9.26 周六</span>
+<a href="#Connect" aria-label="接入" style="width: 40px; height: 40px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: #545458">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"></path></svg></a>
+</div>
+</div>
+<nav style="display: flex; gap: 24px; border-bottom: 1px solid #E3E3E0">
+<a href="#Main" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">今日</a>
+<a href="#Body" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">体征</a>
+<a href="#Progress" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">进步</a>
+<a href="#Ledger" aria-current="page" style="padding: 10px 0 10px; font-size: 15px; font-weight: 600; color: #141415; border-bottom: 2px solid #141415; margin-bottom: -1px">日志</a>
+</nav>
+</header>
+
+<main style="flex-grow: 1; display: flex; flex-direction: column; padding: 0 20px; overflow: hidden">
+
+<h1 style="margin: 20px 0 0; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 27px; line-height: 40px; font-weight: 700; letter-spacing: 0.5px">每一条记录，<br>都有来源，都可撤销。</h1>
+
+<div role="group" aria-label="按来源筛选" data-bind="ledger-filters" style="display: flex; gap: 4px; margin: 12px 0 6px -10px">
+<button type="button" aria-pressed="true" style="height: 44px; padding: 0 10px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #141415; text-decoration: underline; text-underline-offset: 6px">全部</button>
+<button type="button" aria-pressed="false" style="display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 10px; border: 0; background: transparent; font: inherit; font-size: 14px; color: #545458"><span style="width: 8px; height: 8px; border-radius: 4px; background: #141415"></span>你</button>
+<button type="button" aria-pressed="false" style="display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 10px; border: 0; background: transparent; font: inherit; font-size: 14px; color: #545458"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4.2" fill="none" stroke="#6E4F78" stroke-width="1.4"></circle><path d="M5 0.8a4.2 4.2 0 0 0 0 8.4z" fill="#6E4F78"></path></svg>模型</button>
+<button type="button" aria-pressed="false" style="display: flex; align-items: center; gap: 5px; height: 44px; padding: 0 10px; border: 0; background: transparent; font: inherit; font-size: 14px; color: #545458"><span style="font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; color: #2C4A66">ƒ</span>规则</button>
+</div>
+
+<div data-bind="ledger-timeline" style="position: relative; display: flex; flex-direction: column">
+<div style="position: absolute; left: 5px; top: 8px; bottom: 0; width: 1px; background: #DCDCDA"></div>
+
+<div data-row="date" style="display: flex; align-items: center; gap: 14px; height: 34px"><span style="position: relative; flex-shrink: 0; width: 11px; height: 11px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><span style="width: 5px; height: 5px; background: #A1A1A5"></span></span><span style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px">9月26日 周六</span></div>
+<div data-row="user" style="display: flex; gap: 14px; padding: 6px 0 10px">
+<span style="position: relative; flex-shrink: 0; width: 11px; height: 20px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><span style="width: 9px; height: 9px; border-radius: 5px; background: #141415"></span></span>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px">体重 <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-weight: 500">60.15 kg</span></div><div style="font-size: 12px; color: #6C6C71">你输入「今日132.6lb」</div></div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 14px; height: 34px"><span style="position: relative; flex-shrink: 0; width: 11px; height: 11px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><span style="width: 5px; height: 5px; background: #A1A1A5"></span></span><span style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px">9月24日 周四</span></div>
+<div data-row="model" style="display: flex; gap: 14px; padding: 6px 0 10px">
+<span style="position: relative; flex-shrink: 0; width: 11px; height: 20px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><svg width="10" height="10" viewBox="0 0 10 10" aria-label="模型"><circle cx="5" cy="5" r="4.2" fill="#F1F1EF" stroke="#6E4F78" stroke-width="1.4"></circle><path d="M5 0.8a4.2 4.2 0 0 0 0 8.4z" fill="#6E4F78"></path></svg></span>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px">胸 · 5 个动作</div><div style="font-size: 12px; color: #6C6C71">来自备忘录截图 · Claude 读取</div></div>
+</div>
+<div data-row="rule" style="display: flex; gap: 14px; padding: 6px 0 10px">
+<span style="position: relative; flex-shrink: 0; width: 11px; height: 20px; display: flex; align-items: center; justify-content: center; background: #F1F1EF; font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; font-size: 14px; color: #2C4A66" aria-label="规则">ƒ</span>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px; color: #2C4A66">卧推 e1RM 新纪录 <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-weight: 500">158 lb</span></div><div style="font-size: 12px; color: #6C6C71">由规则根据上一条计算</div></div>
+</div>
+<div style="display: flex; gap: 14px; padding: 6px 0 10px">
+<span style="position: relative; flex-shrink: 0; width: 11px; height: 20px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><span style="width: 9px; height: 9px; border-radius: 5px; background: #141415"></span></span>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px">体重 <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-weight: 500">59.33 kg</span></div><div style="font-size: 12px; color: #93661E">排便后称重 · 已标注</div></div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 14px; height: 34px"><span style="position: relative; flex-shrink: 0; width: 11px; height: 11px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><span style="width: 5px; height: 5px; background: #A1A1A5"></span></span><span style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px">9月22日 周二</span></div>
+<div style="display: flex; gap: 14px; padding: 6px 0 10px">
+<span style="position: relative; flex-shrink: 0; width: 11px; height: 20px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><svg width="10" height="10" viewBox="0 0 10 10" aria-label="模型"><circle cx="5" cy="5" r="4.2" fill="#F1F1EF" stroke="#6E4F78" stroke-width="1.4"></circle><path d="M5 0.8a4.2 4.2 0 0 0 0 8.4z" fill="#6E4F78"></path></svg></span>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px">背 · 全程拉力带</div><div style="font-size: 12px; color: #6C6C71">来自备忘录截图 · Claude 读取</div></div>
+</div>
+<div style="display: flex; gap: 14px; padding: 6px 0 10px">
+<span style="position: relative; flex-shrink: 0; width: 11px; height: 20px; display: flex; align-items: center; justify-content: center; background: #F1F1EF; font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; font-size: 14px; color: #2C4A66" aria-label="规则">ƒ</span>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px; color: #2C4A66">下拉 e1RM <span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-weight: 500">52 → 60 kg</span></div><div style="font-size: 12px; color: #6C6C71">使用拉力带后，握力不再是限制</div></div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 14px; height: 34px"><span style="position: relative; flex-shrink: 0; width: 11px; height: 11px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><span style="width: 5px; height: 5px; background: #A1A1A5"></span></span><span style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px">9月19日 周六</span></div>
+<div data-row="reverted" style="display: flex; gap: 14px; padding: 6px 0 10px">
+<span style="position: relative; flex-shrink: 0; width: 11px; height: 20px; display: flex; align-items: center; justify-content: center; background: #F1F1EF"><svg width="10" height="10" viewBox="0 0 10 10" aria-label="模型，已撤回"><circle cx="5" cy="5" r="4.2" fill="#F1F1EF" stroke="#9E4536" stroke-width="1.4"></circle><path d="M2 8 8 2" stroke="#9E4536" stroke-width="1.4"></path></svg></span>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px; color: #6C6C71; text-decoration: line-through; text-decoration-color: #A1A1A5">2 条体重写到了 9/21、9/22</div><div style="font-size: 12px; line-height: 17px; color: #9E4536">已撤销 · 日期由模型推断，实际为 9/18、9/19</div></div>
+</div>
+</div>
+
+</main>
+
+</div></section></figure>
+<figure class="shot phone" data-key="Connect"><figcaption>07 接入</figcaption><section class="screen" data-screen="Connect" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #F1F1EF; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="display: flex; flex-direction: column; gap: 6px; padding: 14px 20px 0">
+<div style="display: flex; justify-content: space-between; align-items: center; height: 32px">
+<a href="#Main" style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; color: #141415">lowkkey</a>
+<div style="display: flex; align-items: center; gap: 2px">
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; color: #6C6C71" data-bind="header-date">9.26 周六</span>
+<a href="#Connect" aria-label="接入" aria-current="page" style="width: 40px; height: 40px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: #141415">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"></path></svg></a>
+</div>
+</div>
+<nav style="display: flex; gap: 24px; border-bottom: 1px solid #E3E3E0">
+<a href="#Main" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">今日</a>
+<a href="#Body" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">体征</a>
+<a href="#Progress" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">进步</a>
+<a href="#Ledger" style="padding: 10px 0 10px; font-size: 15px; color: #6C6C71">日志</a>
+</nav>
+</header>
+
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; padding: 0 20px; overflow: hidden">
+
+<h1 style="margin: 20px 0 4px; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 27px; line-height: 40px; font-weight: 700; letter-spacing: 0.5px">你的数据，<br>任何模型都能读取。</h1>
+
+<div style="display: flex; flex-direction: column; gap: 0; padding: 16px; background: #FFFFFF; border-radius: 16px">
+<div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 14px; border: 1px dashed #A08AA8; border-radius: 12px">
+<div style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 600">模型</span><span style="font-size: 11px; color: #6C6C71">理解输入，提出建议</span></div>
+<span style="font-size: 12px; font-weight: 600; color: #6E4F78">建议</span>
+</div>
+<div style="display: flex; justify-content: center; height: 16px"><div style="width: 1px; height: 16px; background: #D5D5D3"></div></div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 14px; background: #E7EDF3; border-radius: 12px">
+<div style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 600">规则 <span style="font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; font-weight: 400; color: #2C4A66">ƒ</span></span><span style="font-size: 11px; color: #545458">计算与校验，由代码执行</span></div>
+<span style="font-size: 12px; font-weight: 600; color: #2C4A66">校验</span>
+</div>
+<div style="display: flex; justify-content: center; height: 16px"><div style="width: 1px; height: 16px; background: #D5D5D3"></div></div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 14px; background: #141415; border-radius: 12px; color: #FFFFFF">
+<div style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 600">数据</span><span style="font-size: 11px; color: #A1A1A5">只追加，归你所有</span></div>
+<span style="font-size: 12px; font-weight: 600">可撤销</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="padding: 0 4px; font-size: 12px; font-weight: 600; color: #6C6C71">已接入</div>
+<div style="display: flex; flex-direction: column; background: #FFFFFF; border-radius: 14px">
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 6px 14px 6px 16px">
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px">Claude</div><div style="font-size: 11px; color: #6C6C71">MCP · 读取与记录</div></div>
+<span style="display: flex; align-items: center; gap: 5px; font-size: 12px; color: #36684A"><span style="width: 6px; height: 6px; border-radius: 3px; background: #36684A"></span>已连接</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 6px 14px 6px 16px; border-top: 1px solid #EDEDEB">
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 15px">ChatGPT</div><div style="font-size: 11px; color: #6C6C71">MCP · 只读（开发者模式）</div></div>
+<span style="display: flex; align-items: center; gap: 5px; font-size: 12px; color: #36684A"><span style="width: 6px; height: 6px; border-radius: 3px; background: #36684A"></span>已连接</span>
+</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="padding: 0 4px; font-size: 12px; font-weight: 600; color: #6C6C71">MCP 工具 · 权限</div>
+<div style="display: flex; flex-direction: column; background: #FFFFFF; border-radius: 14px">
+<div style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 14px 0 16px"><span style="font-family: ui-monospace,'SF Mono',Menlo,monospace; font-size: 13px">get_state</span><span style="font-size: 11px; color: #545458">读</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 14px 0 16px; border-top: 1px solid #EDEDEB"><span style="font-family: ui-monospace,'SF Mono',Menlo,monospace; font-size: 13px">run_verifiers</span><span style="font-size: 11px; color: #2C4A66">读 · 计算</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 14px 0 16px; border-top: 1px solid #EDEDEB"><span style="font-family: ui-monospace,'SF Mono',Menlo,monospace; font-size: 13px">log_entries</span><span style="font-size: 11px; color: #6E4F78">校验通过即记录，否则询问你</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 14px 0 16px; border-top: 1px solid #EDEDEB"><span style="font-family: ui-monospace,'SF Mono',Menlo,monospace; font-size: 13px">propose_change</span><span style="font-size: 11px; color: #6E4F78">提议 · 进审阅队列</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 14px 0 16px; border-top: 1px solid #EDEDEB"><span style="font-family: ui-monospace,'SF Mono',Menlo,monospace; font-size: 13px; color: #6C6C71">revert · 改写 · 删除</span><span style="font-size: 11px; color: #141415; font-weight: 600">仅你 · 不对模型开放</span></div>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; padding: 4px 6px 4px 16px; background: #FFFFFF; border-radius: 14px">
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><div style="font-size: 11px; color: #6C6C71">MCP 端点</div><div style="font-family: ui-monospace,'SF Mono',Menlo,monospace; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">[YOUR-ENDPOINT]/mcp</div></div>
+<button type="button" style="flex-shrink: 0; height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; color: #2C4A66">复制</button>
+</div>
+
+</div>
+
+
+
+</div></section></figure>
+<figure class="shot" data-key="Transition"><figcaption>08 进入训练 · 过渡</figcaption><section class="screen" data-screen="Transition" data-template="app"><div style="width: 1160px; height: 840px; box-sizing: border-box; padding: 40px; background: #F7F7F5; display: flex; flex-direction: column; gap: 22px">
+
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<div style="display: flex; align-items: baseline; gap: 14px"><span style="font-family: 'Noto Serif SC','Songti SC',serif; font-size: 24px; font-weight: 700; letter-spacing: 1px">进入训练</span><span style="font-size: 14px; color: #6C6C71">今日 → 训练中</span></div>
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; color: #545458">620 ms · cubic-bezier(0.32, 0.72, 0, 1)</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 40px">
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="position: relative; width: 240px; height: 520px; border-radius: 30px; overflow: hidden; background: #F1F1EF; box-shadow: 0 0 0 1px #E3E3E0">
+<div style="position: absolute; left: 12px; top: 13px; width: 48px; height: 12px; border-radius: 3px; background: #D5D5D3"></div>
+<div style="position: absolute; left: 190px; top: 15px; width: 38px; height: 8px; border-radius: 3px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 12px; top: 40px; width: 18px; height: 8px; border-radius: 3px; background: #A1A1A5"></div>
+<div style="position: absolute; left: 45px; top: 40px; width: 18px; height: 8px; border-radius: 3px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 78px; top: 40px; width: 18px; height: 8px; border-radius: 3px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 111px; top: 40px; width: 18px; height: 8px; border-radius: 3px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 12px; top: 58px; width: 216px; height: 1px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 12px; top: 74px; width: 70px; height: 14px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 96px; width: 120px; height: 14px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 130px; width: 150px; height: 9px; border-radius: 3px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 12px; top: 157px; width: 216px; height: 1px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 12px; top: 180px; width: 150px; height: 12px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 201px; width: 120px; height: 7px; border-radius: 3px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 12px; top: 219px; width: 50px; height: 27px; border-radius: 14px; background: #141415"></div>
+<div style="position: absolute; left: 68px; top: 219px; width: 44px; height: 25px; border-radius: 14px; border: 1px solid #D5D5D3"></div>
+<div style="position: absolute; left: 12px; top: 258px; width: 216px; height: 1px; background: #E3E3E0"></div>
+<div style="position: absolute; left: 12px; top: 284px; width: 216px; height: 7px; display: flex; justify-content: space-between"><span style="width: 62px; height: 7px; border-radius: 3px; background: #D5D5D3"></span><span style="width: 30px; height: 7px; border-radius: 3px; background: #E3E3E0"></span></div>
+<div style="position: absolute; left: 12px; top: 304px; width: 216px; height: 7px; display: flex; justify-content: space-between"><span style="width: 40px; height: 7px; border-radius: 3px; background: #D5D5D3"></span><span style="width: 30px; height: 7px; border-radius: 3px; background: #E3E3E0"></span></div>
+<div style="position: absolute; left: 12px; top: 324px; width: 216px; height: 7px; display: flex; justify-content: space-between"><span style="width: 28px; height: 7px; border-radius: 3px; background: #D5D5D3"></span><span style="width: 34px; height: 7px; border-radius: 3px; background: #E3E3E0"></span></div>
+<div style="position: absolute; left: 12px; top: 344px; width: 216px; height: 7px; display: flex; justify-content: space-between"><span style="width: 50px; height: 7px; border-radius: 3px; background: #D5D5D3"></span><span style="width: 30px; height: 7px; border-radius: 3px; background: #E3E3E0"></span></div>
+<div style="position: absolute; left: 12px; top: 364px; width: 216px; height: 7px; display: flex; justify-content: space-between"><span style="width: 52px; height: 7px; border-radius: 3px; background: #D5D5D3"></span><span style="width: 30px; height: 7px; border-radius: 3px; background: #E3E3E0"></span></div>
+<div style="position: absolute; left: 12px; top: 391px; width: 216px; height: 32px; border-radius: 16px; background: #141415; transform: scale(0.97); box-shadow: 0 0 0 5px rgba(20,20,21,0.08)"></div>
+<div style="position: absolute; left: 14px; top: 433px; width: 212px; height: 24px; border-radius: 12px; background: #1C1C1E"></div>
+<div style="position: absolute; left: 7px; top: 463px; width: 224px; height: 30px; border-radius: 16px; background: #FFFFFF; border: 1px solid #E3E3E0"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600">0 ms · 按下</div>
+<div style="font-size: 13px; line-height: 19px; color: #545458">「开始训练」下沉 3%。轻触感反馈。</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="position: relative; width: 240px; height: 520px; border-radius: 30px; overflow: hidden; background: #E8E8E6; box-shadow: 0 0 0 1px #E3E3E0">
+<div style="position: absolute; left: 0; top: 0; width: 240px; height: 520px; transform: scale(0.96); opacity: 0.7; filter: blur(1px)">
+<div style="position: absolute; left: 12px; top: 13px; width: 48px; height: 12px; border-radius: 3px; background: #D5D5D3"></div>
+<div style="position: absolute; left: 12px; top: 58px; width: 216px; height: 1px; background: #D5D5D3"></div>
+<div style="position: absolute; left: 12px; top: 74px; width: 70px; height: 14px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 96px; width: 120px; height: 14px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 157px; width: 216px; height: 1px; background: #D5D5D3"></div>
+<div style="position: absolute; left: 12px; top: 180px; width: 150px; height: 12px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 219px; width: 50px; height: 27px; border-radius: 14px; background: #141415"></div>
+<div style="position: absolute; left: 12px; top: 258px; width: 216px; height: 1px; background: #D5D5D3"></div>
+<div style="position: absolute; left: 12px; top: 284px; width: 62px; height: 7px; border-radius: 3px; background: #D5D5D3"></div>
+<div style="position: absolute; left: 12px; top: 304px; width: 40px; height: 7px; border-radius: 3px; background: #D5D5D3"></div>
+<div style="position: absolute; left: 7px; top: 463px; width: 224px; height: 30px; border-radius: 16px; background: #FFFFFF"></div>
+</div>
+<div style="position: absolute; left: 30px; top: 317px; width: 180px; height: 180px; border-radius: 90px; background: #000000"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600">120 ms · 墨滴</div>
+<div style="font-size: 13px; line-height: 19px; color: #545458">黑色按钮本身就是墨滴，从按下点向外晕开。纸面后退 4%，失焦。</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="position: relative; width: 240px; height: 520px; border-radius: 30px; overflow: hidden; background: #D9D9D7; box-shadow: 0 0 0 1px #E3E3E0">
+<div style="position: absolute; left: 0; top: 0; width: 240px; height: 520px; transform: scale(0.92); opacity: 0.35; filter: blur(3px)">
+<div style="position: absolute; left: 12px; top: 13px; width: 48px; height: 12px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 74px; width: 70px; height: 14px; border-radius: 3px; background: #C7C7C6"></div>
+<div style="position: absolute; left: 12px; top: 96px; width: 120px; height: 14px; border-radius: 3px; background: #C7C7C6"></div>
+</div>
+<div style="position: absolute; left: -230px; top: 57px; width: 700px; height: 700px; border-radius: 350px; background: #000000"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600">380 ms · 浸染</div>
+<div style="font-size: 13px; line-height: 19px; color: #545458">墨覆盖九成屏幕，纸面只剩顶部一角，状态栏转为浅色字。</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="position: relative; width: 240px; height: 520px; border-radius: 30px; overflow: hidden; background: #000000; color: #F2F2F0">
+<div style="position: absolute; left: 10px; top: 16px; font-size: 10px; color: #7F7F84">‹ 今日</div>
+<div style="position: absolute; left: 0; top: 140px; width: 240px; display: flex; flex-direction: column; align-items: center; gap: 3px">
+<div style="font-size: 9px; letter-spacing: 1px; color: #7F7F84">下一组</div>
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 70px; line-height: 72px; font-weight: 500; letter-spacing: -3px">125</div>
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-size: 12px; color: #A8A8AC">× 5–8</div>
+<svg width="196" height="63" viewBox="0 0 326 104" aria-hidden="true" style="margin-top: 14px">
+<rect x="26" y="53" width="58" height="10" rx="2" fill="none" stroke="#565659" stroke-width="1.5"></rect>
+<rect x="242" y="53" width="58" height="10" rx="2" fill="none" stroke="#565659" stroke-width="1.5"></rect>
+<line x1="92" y1="58" x2="234" y2="58" stroke="#565659" stroke-width="3" stroke-linecap="round"></line>
+<rect x="84" y="47" width="8" height="22" rx="1.5" fill="#3A3A3D"></rect>
+<rect x="234" y="47" width="8" height="22" rx="1.5" fill="#3A3A3D"></rect>
+<rect x="69" y="21.5" width="14" height="73" rx="3" fill="#E8E8E7"></rect>
+<rect x="59" y="38" width="8" height="40" rx="2" fill="#7F7F84"></rect>
+<rect x="243" y="21.5" width="14" height="73" rx="3" fill="#E8E8E7"></rect>
+<rect x="259" y="38" width="8" height="40" rx="2" fill="#7F7F84"></rect>
+</svg>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600">620 ms · 落定</div>
+<div style="font-size: 13px; line-height: 19px; color: #545458">重量数字自下方 12 px 升起并淡入，杠铃随后淡入。重触感反馈。</div>
+</div>
+</div>
+
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px; margin-top: 6px">
+<div style="position: relative; height: 26px">
+<div style="position: absolute; left: 0; top: 12px; width: 1080px; height: 2px; background: #141415; opacity: 0.85"></div>
+<div style="position: absolute; left: -5px; top: 8px; width: 10px; height: 10px; border-radius: 5px; background: #141415"></div>
+<div style="position: absolute; left: 204px; top: 8px; width: 10px; height: 10px; border-radius: 5px; background: #141415"></div>
+<div style="position: absolute; left: 657px; top: 8px; width: 10px; height: 10px; border-radius: 5px; background: #141415"></div>
+<div style="position: absolute; left: 1075px; top: 8px; width: 10px; height: 10px; border-radius: 5px; background: #141415"></div>
+<div style="position: absolute; left: -4px; top: -2px; width: 8px; height: 8px; transform: rotate(45deg); background: #2C4A66"></div>
+<div style="position: absolute; left: 1076px; top: -2px; width: 8px; height: 8px; transform: rotate(45deg); background: #2C4A66"></div>
+</div>
+<div style="position: relative; height: 16px; font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 12px; color: #545458">
+<span style="position: absolute; left: 0; top: 0">0</span>
+<span style="position: absolute; left: 198px; top: 0">120</span>
+<span style="position: absolute; left: 651px; top: 0">380</span>
+<span style="position: absolute; right: 0; top: 0">620 ms</span>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 12px; color: #545458">
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; transform: rotate(45deg); background: #2C4A66"></span>触感反馈</span>
+<span>结束训练：逆放 480 ms，墨收回「今日」的开始按钮，按钮变为「已完成」。</span>
+</div>
+</div>
+
+</div></section></figure>
+<figure class="shot phone" data-key="Debrief"><figcaption>09 训练完成</figcaption><section class="screen" data-screen="Debrief" data-template="app"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #000000; color: #F2F2F0; display: flex; flex-direction: column; padding: 60px 20px 34px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 13px; letter-spacing: 1px; color: #7F7F84">9月19日 周六 · 胸</div>
+<h1 data-bind="debrief-title" style="margin: 0; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 30px; line-height: 40px; font-weight: 700; letter-spacing: 1px">训练完成</h1>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; margin-top: 52px">
+<div style="display: flex; align-items: center; gap: 4px; font-size: 14px; color: #A8A8AC">卧推 e1RM <button type="button" aria-label="计算方式" style="width: 32px; height: 32px; border: 0; background: transparent; font-family: 'Noto Serif SC',Georgia,serif; font-style: italic; font-size: 16px; color: #9FBAD4">ƒ</button></div>
+<div style="display: flex; align-items: baseline; gap: 8px">
+<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 100px; line-height: 104px; font-weight: 500; letter-spacing: -4px">154</span>
+<span style="font-size: 20px; color: #7F7F84">lb</span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; margin-top: 6px">
+<span style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 14px; background: #14231A; color: #86B394; font-size: 13px; font-weight: 600"><span style="width: 6px; height: 6px; border-radius: 3px; background: #86B394"></span>新纪录</span>
+<span style="font-size: 13px; color: #7F7F84">较之前 +<span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #A8A8AC">5%</span></span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; margin-top: 44px">
+<div style="font-size: 12px; letter-spacing: 1px; color: #7F7F84; padding-bottom: 10px">各动作最佳组</div>
+<div style="display: flex; justify-content: space-between; align-items: center; height: 50px; border-top: 1px solid #1C1C1E; font-size: 15px"><span>杠铃平板卧推</span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #D6D6D8">125 × 7</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; height: 50px; border-top: 1px solid #1C1C1E; font-size: 15px"><span>上斜哑铃卧推</span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #D6D6D8">40 × 9</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; height: 50px; border-top: 1px solid #1C1C1E; border-bottom: 1px solid #1C1C1E; font-size: 15px"><span>蝴蝶机夹胸</span><span style="font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; color: #D6D6D8">18 kg × 12</span></div>
+</div>
+
+<a href="#Capture" style="display: flex; justify-content: space-between; align-items: center; min-height: 58px; margin-top: 20px; padding: 0 14px 0 16px; border: 1px dashed #7C6684; border-radius: 14px; color: #F2F2F0">
+<div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12px; letter-spacing: 1px; color: #C7ADCC">需要确认 · 1</span><span style="font-size: 14px">RIR 0 指的是哪一组</span></div>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7F7F84" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg>
+</a>
+
+<div style="flex-grow: 1"></div>
+
+<a href="#Main" style="display: flex; align-items: center; justify-content: center; height: 56px; border-radius: 16px; background: #F2F2F0; color: #121213; font-size: 16px; font-weight: 600; letter-spacing: 0.5px">完成</a>
+
+</div></section></figure>
+<figure class="shot" data-key="Icon"><figcaption>10 图标</figcaption><section class="screen" data-screen="Icon" data-template="app"><div style="width: 512px; height: 512px; box-sizing: border-box; background: #F7F7F5; display: flex; align-items: center; justify-content: center">
+<div role="img" aria-label="lowkkey 图标：一大一小两枚杠铃片" style="width: 440px; height: 440px; border-radius: 100px; background: #000000; display: flex; align-items: center; justify-content: center; gap: 18px">
+<div style="width: 70px; height: 236px; border-radius: 22px; background: #E8E8E7"></div>
+<div style="width: 50px; height: 150px; border-radius: 17px; background: #9FBAD4"></div>
+</div>
+</div></section></figure>
+</main>
+<script>
+(function(){
+  function show(){
+    var h=location.hash.replace('#','')||'Main';
+    var figs=document.querySelectorAll('figure'),links=document.querySelectorAll('.bar a');
+    var all=(h==='all');
+    document.body.classList.toggle('single',!all);
+    figs.forEach(function(f){f.classList.toggle('cur',f.getAttribute('data-key')===h)});
+    links.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+h)});
+    window.scrollTo(0,0);
+  }
+  window.addEventListener('hashchange',show);show();
+})();
+</script>
+</body>
+</html>

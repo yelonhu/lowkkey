@@ -1,0 +1,13 @@
+{
+  "name": "@lowkkey/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "lowkkey 标准协议：实体、API、MCP 工具定义。所有端（前端、后端、MCP）共享的唯一事实来源。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.0"
+  }
+}

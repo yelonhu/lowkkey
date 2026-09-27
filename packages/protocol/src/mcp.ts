@@ -1,0 +1,105 @@
+import { z } from 'zod';
+import { EntryDraft } from './entities.ts';
+import { Id, LocalDate } from './primitives.ts';
+import { VerifierId } from './rules.ts';
+import type { Scope } from './api.ts';
+
+/**
+ * MCP 工具定义。MCP 服务器只做三件事：鉴权（scope）、参数校验（下面的 zod）、调用与 REST 相同的服务层。
+ *
+ * 刻意不存在的工具：revert / update / delete / decide。
+ * 模型只能提交待审批次和提议；撤销、入账、改计划、做决定只属于用户（不变量 I1）。
+ */
+export type McpTool = {
+  name: string;
+  scope: Scope;
+  title: string;
+  description: string;
+  input: z.ZodObject;
+};
+
+export const MCP_TOOLS = [
+  {
+    name: 'get_state',
+    scope: 'read',
+    title: '读取状态',
+    description:
+      '读取用户的训练与体征状态：条目、训练计划、需要确认的事项、提议、触发器，以及所有派生值（带公式与输入）。' +
+      '引用任何数字（斜率、e1RM、下一组重量、周组数）前必须先读取这里的派生值，不得自行计算。',
+    input: z.object({
+      from: LocalDate.optional().describe('可选起始日期'),
+      to: LocalDate.optional().describe('可选结束日期'),
+    }),
+  },
+  {
+    name: 'get_history',
+    scope: 'read',
+    title: '读取动作历史',
+    description: '读取某个动作最近 n 次训练的全部组（按时间倒序）。',
+    input: z.object({
+      exerciseId: Id,
+      limit: z.number().int().min(1).max(50).default(10),
+    }),
+  },
+  {
+    name: 'run_verifiers',
+    scope: 'read',
+    title: '运行验证器',
+    description: '按需运行验证器（V1–V10）并返回派生值。用于回答「为什么是这个数」。',
+    input: z.object({
+      ids: z.array(VerifierId).optional().describe('默认全部'),
+      asOf: LocalDate.optional(),
+    }),
+  },
+  {
+    name: 'propose_entries',
+    scope: 'submit',
+    title: '提交待审批次',
+    description:
+      '把用户原话或截图内容提交成结构化草稿。用户回答批次内歧义后，一次确认才会原子入账。' +
+      '捕获时刻、本地日期与 IANA 时区必须固定，离线重试沿用同一幂等键和内容。',
+    input: z.object({
+      idempotencyKey: z.uuid(),
+      rawText: z.string().min(1).max(4000),
+      capturedAt: z.iso.datetime({offset:true}),
+      capturedLocalDate: LocalDate,
+      timeZone: z.string().min(1).max(80),
+      entries: z.array(EntryDraft).min(1).max(100),
+    }),
+  },
+  {
+    name: 'propose_change',
+    scope: 'propose',
+    title: '提出计划修改',
+    description:
+      '提出对训练计划的修改（JSON Merge Patch）。只用于规则覆盖不到的事，例如换动作、调整训练日。' +
+      '规则已经能算出的处方（如双进阶加重）不要提议。提议进入收件箱，由用户决定。',
+    input: z.object({
+      idempotencyKey: z.uuid(),
+      title: z.string().max(80),
+      rationale: z.string().max(1000),
+      ruleRefs: z.array(VerifierId).default([]),
+      patch: z.record(z.string(), z.unknown()),
+    }),
+  },
+  {
+    name: 'list_inbox',
+    scope: 'read',
+    title: '读取收件箱',
+    description: '读取待用户处理的事项：需要确认、未决提议、待决触发器。',
+    input: z.object({}),
+  },
+] as const satisfies readonly McpTool[];
+
+export type McpToolName = (typeof MCP_TOOLS)[number]['name'];
+
+/** 生成 MCP `tools/list` 所需的 JSON Schema 描述。 */
+export function mcpToolList() {
+  return MCP_TOOLS.map((t) => ({
+    name: t.name,
+    title: t.title,
+    description: t.description,
+    inputSchema: z.toJSONSchema(t.input, { io: 'input' }),
+    annotations: { readOnlyHint: t.scope === 'read', destructiveHint: false, idempotentHint: t.scope === 'read' },
+  }));
+}

@@ -1,215 +1,108 @@
 import { Hono } from 'hono';
-import { drizzle } from 'drizzle-orm/d1';
-import { z } from 'zod';
 import type { D1Database } from '@cloudflare/workers-types';
-import { accessVerifier, authentication } from './auth.ts';
-import type { AuthContext, IdentityVerifier, VerifiedIdentity } from './auth.ts';
-import { memberLookup } from './members.ts';
-import { parseWriteHeaders } from '../domain/contracts.ts';
-import { addDays, localDateAt, localDateSchema, uuidSchema } from '../domain/primitives.ts';
-import { effectiveTimezone } from '../domain/time.ts';
-import { DomainError } from './errors.ts';
-import { createDailyWeight, editDailyWeight, readDailyWeight, createWeight, deleteWeight, patchWeight, readWeight, undoWeight } from './weights.ts';
-import { readOperation } from './commands.ts';
-import { patchProfile, readProfile } from './profiles.ts';
-import { createGoal, readGoal } from './goals.ts';
-import { activateMember, changeMember, inviteMember, listMembers, sessionState } from './membership.ts';
-import { checkSession, logoutSession } from './sessions.ts';
-import { readConsistent } from './read-model.ts';
-import { registerTrainingRoutes } from './training-api.ts';
-import { undoTraining } from './training-undo.ts';
-import { registerNutritionRoutes } from './nutrition-api.ts';
-import { undoNutrition } from './nutrition-undo.ts';
-import { registerArtifactRoutes } from './artifact-api.ts';
-import { registerSyncRoutes } from './sync-api.ts';
+import { z, ZodError } from 'zod';
+import { accessVerifier } from './auth.ts';
+import type { Identity, IdentityVerifier } from './auth.ts';
+import { accountFor, StoreError } from './account.ts';
+import { CaptureRequest, EntryDraft, Program, ProposeChangeRequest, ProposalDecisionRequest, ResolveHeldRequest, Snapshot, TriggerDecisionRequest } from '@lowkkey/protocol';
+import * as v1 from './v1-store.ts';
+import { ForbiddenError, NotFoundError } from '@lowkkey/core';
 
-export type AppBindings = { DB: D1Database; APP_ORIGIN: string; RESTORE_EPOCH: string; APP_ENV?: 'development' | 'test' | 'staging' | 'production'; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string };
-export type ApiEnvironment = { Bindings: AppBindings; Variables: { auth: AuthContext } };
-type Options = { verifyIdentity?: (request: Request, bindings: AppBindings) => Promise<VerifiedIdentity>; clock?: () => Date };
-const verifiers = new Map<string, IdentityVerifier>();
-async function verifyAccess(request: Request, bindings: AppBindings) {
-  if (!bindings.ACCESS_TEAM_DOMAIN || !bindings.ACCESS_AUD) throw new DomainError('AUTH_REQUIRED', 401);
-  const key = JSON.stringify([bindings.ACCESS_TEAM_DOMAIN, bindings.ACCESS_AUD]);
+export type Bindings = { DB: D1Database; APP_ENV?: 'development' | 'test' | 'production'; APP_ORIGIN?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string };
+type Environment = { Bindings: Bindings; Variables: { ownerId: string; principal:{kind:'user'|'model';clientId:string;scopes:string[]} } };
+const verifiers = new Map<string,IdentityVerifier>();
+function productionVerifier(bindings: Bindings): IdentityVerifier {
+  if (!bindings.ACCESS_TEAM_DOMAIN || !bindings.ACCESS_AUD) throw new StoreError('AUTH_NOT_CONFIGURED',503);
+  const key = `${bindings.ACCESS_TEAM_DOMAIN}:${bindings.ACCESS_AUD}`;
   let verifier = verifiers.get(key);
-  if (!verifier) {
-    verifier = accessVerifier({ teamDomain: bindings.ACCESS_TEAM_DOMAIN, audience: bindings.ACCESS_AUD });
-    verifiers.set(key, verifier);
-  }
-  return verifier(request);
+  if (!verifier) { verifier = accessVerifier({ teamDomain:bindings.ACCESS_TEAM_DOMAIN, audience:bindings.ACCESS_AUD }); verifiers.set(key,verifier); }
+  return verifier;
 }
-export function writeHeaders(headers: Headers, editing = false) {
-  try { return parseWriteHeaders(headers, editing); }
-  catch { throw new DomainError('INVALID_INPUT', 400, { reason: 'writeHeaders' }); }
+function localIdentity(request: Request): Identity {
+  if (!/(?:^|;\s*)lowkkey_dev=1(?:;|$)/.test(request.headers.get('Cookie') ?? '')) throw new StoreError('AUTH_REQUIRED',401);
+  return { issuer:'lowkkey-local',subject:'owner',email:'owner@local.invalid' };
 }
-export function createApi(options: Options = {}) {
-  const app = new Hono<ApiEnvironment>();
-  const bodies = new WeakMap<Request, unknown>();
-  const identities = new WeakMap<Request, VerifiedIdentity>();
-  const identityFor = (request: Request) => { const identity = identities.get(request); if (!identity) throw new DomainError('AUTH_REQUIRED', 401); return identity; };
-  const clock = options.clock ?? (() => new Date());
-  const meta = (bindings: AppBindings, extra: Record<string, unknown> = {}) => ({ requestId: crypto.randomUUID(), serverTime: clock().toISOString(), restoreEpoch: uuidSchema.parse(bindings.RESTORE_EPOCH), ...extra });
-  app.use('/api/*', async (context, next) => { context.header('Cache-Control', 'no-store'); context.header('X-Content-Type-Options', 'nosniff'); await next(); });
-  app.get('/healthz', context => context.json({ status: 'ok' }, 200, { 'Cache-Control': 'no-store' }));
-  app.use('/api/v1/*', async (context, next) => {
-    let identity: VerifiedIdentity;
-    try { identity = await (options.verifyIdentity ?? verifyAccess)(context.req.raw, context.env); }
-    catch { throw new DomainError('AUTH_REQUIRED', 401); }
-    if (context.req.path !== '/api/v1/session/logout') await checkSession(context.env.DB, identity, clock());
-    identities.set(context.req.raw, identity);
-    await next();
+function assertOrigin(request: Request, bindings: Bindings) {
+  if (bindings.APP_ENV === 'production' && !bindings.APP_ORIGIN) throw new StoreError('ORIGIN_NOT_CONFIGURED',503);
+  const expected = new URL(bindings.APP_ORIGIN ?? 'http://127.0.0.1:5173').origin;
+  if (request.headers.get('Origin') !== expected || request.headers.get('Sec-Fetch-Site') === 'cross-site') throw new StoreError('ORIGIN_REQUIRED',403);
+}
+async function jsonBody(request: Request, limit=16_384): Promise<unknown> {
+  const contentType = request.headers.get('Content-Type')?.split(';',1)[0].trim().toLowerCase();
+  if (contentType !== 'application/json') throw new StoreError('JSON_REQUIRED',400);
+  const text = await request.text();
+  if (text.length > limit) throw new StoreError('BODY_TOO_LARGE',413);
+  try { return JSON.parse(text) as unknown; } catch { throw new StoreError('INVALID_JSON',400); }
+}
+const key=(request:Request)=>request.headers.get('Idempotency-Key')??'';
+function userOnly(kind:'user'|'model') {if(kind!=='user')throw new StoreError('forbidden',403);}
+function allowed(principal:{kind:'user'|'model';scopes:string[]},scope:string) {if(principal.kind!=='user'&&!principal.scopes.includes(scope))throw new StoreError('forbidden',403);}
+export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
+  const app = new Hono<Environment>();
+  app.get('/healthz', context => context.json({ status:'ok' }));
+  app.post('/api/local/session', context => {
+    if (!['development','test'].includes(context.env.APP_ENV ?? '')) throw new StoreError('NOT_FOUND',404);
+    assertOrigin(context.req.raw,context.env);
+    return context.json({ ok:true },200,{ 'Set-Cookie':'lowkkey_dev=1; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400', 'Cache-Control':'no-store' });
   });
-  app.use('/api/v1/*', async (context, next) => {
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(context.req.method)) {
-      const origin = context.req.header('Origin');
-      if (origin !== new URL(context.env.APP_ORIGIN).origin || context.req.header('Sec-Fetch-Site') === 'cross-site') throw new DomainError('AUTH_REQUIRED', 401);
-      if (context.req.header('Content-Type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') throw new DomainError('INVALID_INPUT', 400);
-      const reader = context.req.raw.body?.getReader();
-      if (!reader) throw new DomainError('INVALID_INPUT', 400);
-      const decoder = new TextDecoder('utf-8', { fatal: true });
-      let bytes = 0, body = '';
-      try {
-        while (true) {
-          const chunk = await reader.read();
-          if (chunk.done) break;
-          bytes += chunk.value.byteLength;
-          if (bytes > 65536) { await reader.cancel(); throw new DomainError('INVALID_INPUT', 400, { reason: 'bodyTooLarge' }); }
-          body += decoder.decode(chunk.value, { stream: true });
-        }
-        body += decoder.decode();
-      } catch (error) { if (error instanceof TypeError) throw new DomainError('INVALID_INPUT', 400); throw error; }
-      finally { reader.releaseLock(); }
-      bodies.set(context.req.raw, JSON.parse(body));
+  app.use('/v1/*',async(context,next)=>{
+    {
+      let identity:Identity;
+      try { identity=options.verifyIdentity?await options.verifyIdentity(context.req.raw):['development','test'].includes(context.env.APP_ENV??'')?localIdentity(context.req.raw):await productionVerifier(context.env)(context.req.raw); }
+      catch { throw new StoreError('unauthorized',401); }
+      context.set('ownerId',await accountFor(context.env.DB,identity));
+      context.set('principal',{kind:'user',clientId:'web',scopes:['user']});
+      if(!['GET','HEAD','OPTIONS'].includes(context.req.method))assertOrigin(context.req.raw,context.env);
     }
+    context.header('Cache-Control','no-store');context.header('X-Content-Type-Options','nosniff');
     await next();
   });
-  app.get('/api/v1/session', async context => {
-    z.strictObject({}).parse(context.req.query());
-    const state = await sessionState(context.env.DB, identityFor(context.req.raw), clock());
-    return context.json({ data: { status: state.state, userId: state.member.id, email: state.member.email, invitationExpiresAt: state.state === 'invited' ? state.invitation.expiresAt : null }, meta: meta(context.env) });
+  app.get('/v1/state',async c=>{
+    allowed(c.get('principal'),'read');
+    const data=await v1.state(c.env.DB,c.get('ownerId'));
+    const from=c.req.query('from'),to=c.req.query('to');
+    if(from&&to&&from>to)throw new StoreError('bad_request',400);
+    return c.json({...data,entries:data.entries.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to))});
   });
-  app.post('/api/v1/session/activate', async context => {
-    const headers = writeHeaders(context.req.raw.headers);
-    const receipt = await activateMember(context.env.DB, identityFor(context.req.raw), headers.operationId, bodies.get(context.req.raw), clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) }, 201);
+  app.get('/v1/program',async c=>{allowed(c.get('principal'),'read');return c.json((await v1.state(c.env.DB,c.get('ownerId'))).program);});
+  app.put('/v1/program',async c=>{userOnly(c.get('principal').kind);return c.json(await v1.writeProgram(c.env.DB,c.get('ownerId'),key(c.req.raw),Program.parse(await jsonBody(c.req.raw,1_000_000))));});
+  app.get('/v1/preferences/timezone',async c=>{userOnly(c.get('principal').kind);return c.json({timeZone:(await v1.state(c.env.DB,c.get('ownerId'))).timezone});});
+  app.put('/v1/preferences/timezone',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({timeZone:z.string().min(1).max(80)}).parse(await jsonBody(c.req.raw));return c.json(await v1.setTimeZone(c.env.DB,c.get('ownerId'),key(c.req.raw),body.timeZone));});
+  app.post('/v1/capture',async c=>{
+    userOnly(c.get('principal').kind);
+    const body=CaptureRequest.parse(await jsonBody(c.req.raw));
+    if(!body.text?.trim())throw new StoreError('bad_request',400);
+    return c.json(await v1.captureText(c.env.DB,c.get('ownerId'),key(c.req.raw),{text:body.text,capturedAt:body.capturedAt,capturedLocalDate:body.capturedLocalDate,timeZone:body.timeZone,inSession:body.context?.inSession}));
   });
-  app.post('/api/v1/session/logout', async context => {
-    const headers = writeHeaders(context.req.raw.headers);
-    const receipt = await logoutSession(context.env.DB, identityFor(context.req.raw), headers.operationId, bodies.get(context.req.raw), clock, context.req.header('X-Account-Id'));
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) });
+  app.post('/v1/entries',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({entries:z.array(EntryDraft).min(1).max(100),inSession:z.boolean().optional()}).parse(await jsonBody(c.req.raw,1_000_000));return c.json(await v1.logEntries(c.env.DB,c.get('ownerId'),key(c.req.raw),body.entries,body.inSession));});
+  app.post('/v1/entries/:id/revert',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({reason:z.string().max(400).optional()}).parse(await jsonBody(c.req.raw));return c.json(await v1.undo(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id'),body.reason??''));});
+  app.post('/v1/held/:id/resolve',async c=>{userOnly(c.get('principal').kind);const body=ResolveHeldRequest.parse(await jsonBody(c.req.raw));return c.json(await v1.resolve(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id'),body));});
+  app.post('/v1/submissions/:id/decision',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({decision:z.enum(['accept','skip']),answers:z.record(z.string(),z.string()).optional(),expectedRevision:z.number().int().nonnegative()}).parse(await jsonBody(c.req.raw));return c.json(await v1.decideSubmission(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id'),body.decision,body.answers,body.expectedRevision));});
+  app.post('/v1/submissions/:id/review',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({answers:z.record(z.string(),z.string())}).parse(await jsonBody(c.req.raw));return c.json(await v1.reviewSubmission(c.env.DB,c.get('ownerId'),c.req.param('id'),body.answers));});
+  app.post('/v1/proposals',async c=>{allowed(c.get('principal'),'propose');const body=ProposeChangeRequest.parse(await jsonBody(c.req.raw));const principal=c.get('principal');return c.json(await v1.createProposal(c.env.DB,c.get('ownerId'),principal.clientId,key(c.req.raw),body,{actor:principal.kind==='user'?'user':'model',channel:principal.kind==='user'?'ui':'mcp',client:principal.clientId}));});
+  app.post('/v1/proposals/:id/decision',async c=>{userOnly(c.get('principal').kind);const body=ProposalDecisionRequest.parse(await jsonBody(c.req.raw));return c.json(await v1.proposalDecision(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id'),body.decision,body.note));});
+  app.post('/v1/triggers/:id/decision',async c=>{userOnly(c.get('principal').kind);const body=TriggerDecisionRequest.parse(await jsonBody(c.req.raw));return c.json(await v1.triggerDecision(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id'),body.decision,body.reason));});
+  app.get('/v1/export',async c=>{userOnly(c.get('principal').kind);const state=await v1.state(c.env.DB,c.get('ownerId'));return c.json({format:'lowkkey.v1',accountId:state.accountId,exportedAt:new Date().toISOString(),snapshot:Snapshot.parse(state)});});
+  app.post('/v1/import',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({format:z.literal('lowkkey.v1'),accountId:z.string(),exportedAt:z.iso.datetime({offset:true}).optional(),snapshot:z.unknown()}).parse(await jsonBody(c.req.raw,8_000_000));return c.json(await v1.importBackup(c.env.DB,c.get('ownerId'),key(c.req.raw),body));});
+  app.get('/v1/clients',async c=>{userOnly(c.get('principal').kind);return c.json(await v1.listClients(c.env.DB,c.get('ownerId')));});
+  app.post('/v1/clients/:id/revoke',async c=>{userOnly(c.get('principal').kind);z.strictObject({}).parse(await jsonBody(c.req.raw));return c.json(await v1.revokeClient(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id')));});
+  app.get('/v1/events',async c=>{
+    allowed(c.get('principal'),'read');
+    const ownerId=c.get('ownerId'),db=c.env.DB,starting=Number(c.req.header('Last-Event-ID')??c.req.query('after')??'0');
+    if(!Number.isSafeInteger(starting)||starting<0)throw new StoreError('bad_request',400);
+    const encoder=new TextEncoder();let cursor=starting, timer:ReturnType<typeof setInterval>|undefined,timeout:ReturnType<typeof setTimeout>|undefined;
+    const stream=new ReadableStream<Uint8Array>({start(controller){
+      const poll=async()=>{try{for(const row of await v1.eventsAfter(db,ownerId,cursor)){cursor=row.id;controller.enqueue(encoder.encode(`id: ${row.id}\ndata: ${JSON.stringify(row.event)}\n\n`));}}catch{controller.error(new Error('SSE_FAILED'));if(timer)clearInterval(timer);if(timeout)clearTimeout(timeout);}};
+      void poll();timer=setInterval(()=>void poll(),2000);timeout=setTimeout(()=>{if(timer)clearInterval(timer);controller.close();},25000);
+    },cancel(){if(timer)clearInterval(timer);if(timeout)clearTimeout(timeout);}});
+    return new Response(stream,{headers:{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Accel-Buffering':'no'}});
   });
-  app.use('/api/v1/*', async (context, next) => authentication<AppBindings>(async request => identityFor(request), memberLookup(drizzle(context.env.DB), clock))(context, next));
-  app.use('/api/v1/*', async (context, next) => {
-    // A stale tab's queue may outlive a cookie/account switch. This header is
-    // an assertion about the verified account, never an owner selector.
-    const expectedOwner = context.req.header('X-Account-Id');
-    if (expectedOwner !== undefined && expectedOwner !== context.get('auth').id) throw new DomainError('AUTH_REQUIRED', 401, { reason: 'accountChanged' });
-    const expectedEpoch = context.req.header('X-Restore-Epoch');
-    if (expectedEpoch !== undefined && expectedEpoch !== context.env.RESTORE_EPOCH) throw new DomainError('SYNC_CURSOR_EXPIRED', 410, { reason: 'restoreEpochChanged' });
-    await next();
+  app.onError((error) => {
+    const status = error instanceof StoreError ? error.status : error instanceof ZodError ? 400 : error instanceof NotFoundError ? 404 : error instanceof ForbiddenError ? 403 : 500;
+    const code = error instanceof StoreError ? error.code : error instanceof ZodError ? 'bad_request' : error instanceof NotFoundError ? 'not_found' : error instanceof ForbiddenError ? 'forbidden' : 'internal';
+    if (status === 500) console.error(error);
+    return Response.json({ error:{ code,message:code } },{ status, headers:{ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff' } });
   });
-  app.get('/api/v1/me', async context => {
-    z.strictObject({}).parse(context.req.query());
-    const readAt = clock();
-    const result = await readConsistent(context.env.DB, context.get('auth').id, async () => {
-      const profile = await readProfile(context.env.DB, context.get('auth').id);
-      const timezone = effectiveTimezone(profile.timezone, profile.pendingTimezone, profile.timezoneEffectiveDate, readAt);
-      const today = localDateAt(readAt, timezone);
-      return { profile, effectiveTimezone: timezone, localDate: today, goal: await readGoal(context.env.DB, profile.ownerId, today), nextGoal: await readGoal(context.env.DB, profile.ownerId, addDays(today, 1)), usage: null, environment: context.env.APP_ENV ?? null };
-    });
-    return context.json({ data: result.data, meta: meta(context.env, { revision: result.data.profile.revision, dataRevision: result.dataRevision }) });
-  });
-  app.patch('/api/v1/me', async context => {
-    const headers = writeHeaders(context.req.raw.headers, true);
-    const receipt = await patchProfile(context.env.DB, context.get('auth'), headers.operationId, headers.expectedRevision!, bodies.get(context.req.raw), clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision, revision: receipt.recordRefs[0].revision }) });
-  });
-  app.get('/api/v1/goals', async context => {
-    const query = z.strictObject({ localDate: localDateSchema.optional() }).parse(context.req.query());
-    const readAt = clock();
-    const result = await readConsistent(context.env.DB, context.get('auth').id, async () => {
-      const profile = await readProfile(context.env.DB, context.get('auth').id);
-      const date = query.localDate ?? localDateAt(readAt, effectiveTimezone(profile.timezone, profile.pendingTimezone, profile.timezoneEffectiveDate, readAt));
-      return { goal: await readGoal(context.env.DB, profile.ownerId, date), localDate: date };
-    });
-    return context.json({ data: result.data, meta: meta(context.env, { dataRevision: result.dataRevision }) });
-  });
-  app.post('/api/v1/goals', async context => {
-    const headers = writeHeaders(context.req.raw.headers);
-    const receipt = await createGoal(context.env.DB, context.get('auth'), headers.operationId, bodies.get(context.req.raw), clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) }, 201);
-  });
-  app.get('/api/v1/admin/members', async context => {
-    z.strictObject({}).parse(context.req.query());
-    return context.json({ data: await listMembers(context.env.DB, context.get('auth')), meta: meta(context.env) });
-  });
-  app.post('/api/v1/admin/invitations', async context => {
-    const headers = writeHeaders(context.req.raw.headers);
-    const receipt = await inviteMember(context.env.DB, context.get('auth'), headers.operationId, bodies.get(context.req.raw), context.env.APP_ORIGIN, clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId }) }, 201);
-  });
-  app.patch('/api/v1/admin/members/:id', async context => {
-    const headers = writeHeaders(context.req.raw.headers, true);
-    const receipt = await changeMember(context.env.DB, context.get('auth'), headers.operationId, context.req.param('id'), headers.expectedRevision!, bodies.get(context.req.raw), clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId }) });
-  });
-  app.get('/api/v1/weights/days/:date', async context => {
-    const result = await readConsistent(context.env.DB, context.get('auth').id, () => readDailyWeight(context.env.DB, context.get('auth').id, localDateSchema.parse(context.req.param('date'))));
-    return context.json({ data: result.data, meta: meta(context.env, { dataRevision: result.dataRevision }) });
-  });
-  app.post('/api/v1/weights/days/:date', async context => {
-    const headers = writeHeaders(context.req.raw.headers);
-    const receipt = await createDailyWeight(context.env.DB, context.get('auth'), headers.operationId, localDateSchema.parse(context.req.param('date')), bodies.get(context.req.raw), clock);
-    return context.json({ data: receipt, meta: meta(context.env, { dataRevision: receipt.dataRevision }) }, 201);
-  });
-  for (const method of ['patch', 'delete'] as const) app[method]('/api/v1/weights/days/:date/:id', async context => {
-    const headers = writeHeaders(context.req.raw.headers, true);
-    if (method === 'delete') z.strictObject({}).parse(bodies.get(context.req.raw));
-    const receipt = await editDailyWeight(context.env.DB, context.get('auth'), headers.operationId, localDateSchema.parse(context.req.param('date')), uuidSchema.parse(context.req.param('id')), headers.expectedRevision!, bodies.get(context.req.raw), method === 'delete', clock);
-    return context.json({ data: receipt, meta: meta(context.env, { dataRevision: receipt.dataRevision }) });
-  });
-  app.post('/api/v1/weights', async context => {
-    const headers = writeHeaders(context.req.raw.headers);
-    const receipt = await createWeight(context.env.DB, context.get('auth'), headers.operationId, bodies.get(context.req.raw), clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) }, 201);
-  });
-  app.get('/api/v1/weights/:id', async context => {
-    const weight = await readWeight(context.env.DB, context.get('auth').id, uuidSchema.parse(context.req.param('id')));
-    return context.json({ data: weight, meta: meta(context.env, { revision: weight.revision }) });
-  });
-  app.patch('/api/v1/weights/:id', async context => {
-    const headers = writeHeaders(context.req.raw.headers, true);
-    const receipt = await patchWeight(context.env.DB, context.get('auth'), headers.operationId, context.req.param('id'), headers.expectedRevision!, bodies.get(context.req.raw), clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) });
-  });
-  app.delete('/api/v1/weights/:id', async context => {
-    const headers = writeHeaders(context.req.raw.headers, true);
-    z.strictObject({}).parse(bodies.get(context.req.raw));
-    const receipt = await deleteWeight(context.env.DB, context.get('auth'), headers.operationId, context.req.param('id'), headers.expectedRevision!, clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) });
-  });
-  app.get('/api/v1/operations/:id', async context => {
-    const receipt = await readOperation(context.env.DB, context.get('auth').id, uuidSchema.parse(context.req.param('id')));
-    if (!receipt) throw new DomainError('RECORD_NOT_FOUND', 404);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) });
-  });
-  app.post('/api/v1/operations/:id/undo', async context => {
-    const headers = writeHeaders(context.req.raw.headers);
-    z.strictObject({}).parse(bodies.get(context.req.raw));
-    const id = uuidSchema.parse(context.req.param('id'));
-    const operation = await context.env.DB.prepare('SELECT kind FROM command_operations WHERE owner_id=? AND operation_id=?').bind(context.get('auth').id, id).first<{ kind: string }>();
-    if (!operation) throw new DomainError('RECORD_NOT_FOUND', 404);
-    const receipt = await (operation.kind.startsWith('training.') ? undoTraining : operation.kind.startsWith('nutrition.') ? undoNutrition : undoWeight)(context.env.DB, context.get('auth'), headers.operationId, id, clock);
-    return context.json({ data: receipt, meta: meta(context.env, { operationId: receipt.operationId, dataRevision: receipt.dataRevision }) });
-  });
-  registerTrainingRoutes(app, { bodies, clock, meta });
-  registerNutritionRoutes(app, { bodies, clock, meta });
-  registerArtifactRoutes(app, { clock, meta });
-  registerSyncRoutes(app, { clock, meta });
-  app.notFound(context => context.json({ error: { code: 'RECORD_NOT_FOUND', messageKey: 'errors.recordNotFound', retryable: false }, meta: { requestId: crypto.randomUUID() } }, 404));
-  app.onError((error, context) => {
-    const known = error instanceof DomainError ? error : error instanceof z.ZodError || error instanceof SyntaxError ? new DomainError('INVALID_INPUT', 400) : new DomainError('TEMPORARY_FAILURE', 503);
-    const messageKeys: Record<string, string> = { ADMIN_REQUIRED: 'errors.adminRequired', INVITATION_EXPIRED: 'errors.invitationExpired', MEMBER_LIMIT_REACHED: 'errors.memberLimit', LAST_ADMIN_REQUIRED: 'errors.lastAdmin', AUTH_REQUIRED: 'errors.authRequired', MEMBER_SUSPENDED: 'errors.memberSuspended', RECORD_NOT_FOUND: 'errors.recordNotFound', TEMPORARY_FAILURE: 'errors.temporaryFailure', REVISION_CONFLICT: 'errors.recordChanged', NEEDS_CONFIRMATION: 'errors.needsConfirmation', IDEMPOTENCY_KEY_REUSED: 'errors.idempotencyReused', DUPLICATE_CANDIDATE: 'errors.duplicateCandidate' };
-    return context.json({ error: { code: known.code, messageKey: messageKeys[known.code] ?? 'errors.invalidRequest', params: known.params, retryable: known.status === 503 }, meta: { requestId: crypto.randomUUID() } }, known.status);
-  });
+  app.notFound(context => context.json({ error:{ code:'NOT_FOUND' } },404));
   return app;
 }

@@ -1,0 +1,23 @@
+{
+  "name": "lowkkey",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/protocol",
+    "packages/core"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "protocol:emit": "node packages/protocol/scripts/emit.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

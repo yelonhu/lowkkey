@@ -1,0 +1,3695 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "lowkkey API",
+    "version": "1.0.0",
+    "description": "见 INTERFACE.md。网页用户由 Cloudflare Access 认证；Remote MCP 单独使用 OAuth。scope 见各操作的 x-scopes。"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Source": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "enum": [
+              "user",
+              "model",
+              "rule"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "text",
+              "voice",
+              "photo",
+              "ui",
+              "mcp",
+              "import"
+            ]
+          },
+          "client": {
+            "description": "客户端标识：web / claude / chatgpt / …",
+            "type": "string",
+            "maxLength": 64
+          },
+          "rawText": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "actor",
+          "channel"
+        ],
+        "additionalProperties": false
+      },
+      "Exercise": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "不透明 ID，推荐 ULID"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "aliases": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "barbell",
+              "dumbbell",
+              "machine",
+              "cable",
+              "assisted",
+              "bodyweight"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "kg",
+              "lb"
+            ]
+          },
+          "barLoad": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "perHand": {
+            "default": false,
+            "type": "boolean"
+          },
+          "muscles": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "chest",
+                "back",
+                "shoulders",
+                "rear_delts",
+                "biceps",
+                "triceps",
+                "quads",
+                "hamstrings",
+                "glutes",
+                "adductors",
+                "calves",
+                "core"
+              ]
+            },
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "肌群 → 计入有效组的权重（1 = 主动肌，0.5 = 协同）"
+          },
+          "increment": {
+            "description": "覆盖默认加重档位（同 unit）",
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "aliases",
+          "type",
+          "unit",
+          "perHand",
+          "muscles"
+        ],
+        "additionalProperties": false
+      },
+      "Program": {
+        "type": "object",
+        "properties": {
+          "cycleStart": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ramp": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "week": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "setMultiplier": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 1.5
+                },
+                "targetRir": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 20
+                }
+              },
+              "required": [
+                "week",
+                "setMultiplier",
+                "targetRir",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "days": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "description": "不透明 ID，推荐 ULID"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20,
+                  "description": "如「胸」「肩 + 手臂」"
+                },
+                "weekday": {
+                  "default": null,
+                  "description": "0 = 周日；仅作默认建议",
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "exerciseId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "description": "不透明 ID，推荐 ULID"
+                      },
+                      "sets": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10
+                      },
+                      "repMin": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "repMax": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "startLoad": {
+                        "default": null,
+                        "description": "首次处方重量；null = 第一次由你自选",
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "note": {
+                        "type": "string",
+                        "maxLength": 400
+                      }
+                    },
+                    "required": [
+                      "exerciseId",
+                      "sets",
+                      "repMin",
+                      "repMax",
+                      "startLoad"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "weekday",
+                "items"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "constraints": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "frequency_cap"
+                },
+                "muscles": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "chest",
+                      "back",
+                      "shoulders",
+                      "rear_delts",
+                      "biceps",
+                      "triceps",
+                      "quads",
+                      "hamstrings",
+                      "glutes",
+                      "adductors",
+                      "calves",
+                      "core"
+                    ]
+                  }
+                },
+                "perWeek": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 7
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "description": "界面显示，如「每周一次」"
+                }
+              },
+              "required": [
+                "kind",
+                "muscles",
+                "perWeek",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "targets": {
+            "default": {
+              "bodyweightKg": null,
+              "rateKgPerWeek": {
+                "min": 0.25,
+                "max": 0.35
+              },
+              "weeklySets": {
+                "min": 10,
+                "max": 20
+              },
+              "calorieTrigger": null
+            },
+            "type": "object",
+            "properties": {
+              "bodyweightKg": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rateKgPerWeek": {
+                "default": {
+                  "min": 0.25,
+                  "max": 0.35
+                },
+                "type": "object",
+                "properties": {
+                  "min": {
+                    "type": "number"
+                  },
+                  "max": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "min",
+                  "max"
+                ],
+                "additionalProperties": false
+              },
+              "weeklySets": {
+                "default": {
+                  "min": 10,
+                  "max": 20
+                },
+                "type": "object",
+                "properties": {
+                  "min": {
+                    "type": "number"
+                  },
+                  "max": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "min",
+                  "max"
+                ],
+                "additionalProperties": false
+              },
+              "calorieTrigger": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "thresholdKgPerWeek": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "kcalDelta": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "everyDays": {
+                        "type": "integer",
+                        "minimum": 7,
+                        "maximum": 56
+                      }
+                    },
+                    "required": [
+                      "thresholdKgPerWeek",
+                      "kcalDelta",
+                      "everyDays"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "bodyweightKg",
+              "rateKgPerWeek",
+              "weeklySets",
+              "calorieTrigger"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "cycleStart",
+          "ramp",
+          "days",
+          "constraints",
+          "targets"
+        ],
+        "additionalProperties": false
+      },
+      "Entry": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "weight"
+              },
+              "kg": {
+                "type": "number",
+                "minimum": 20,
+                "maximum": 400
+              },
+              "raw": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "kg",
+                      "lb"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "unit"
+                ],
+                "additionalProperties": false
+              },
+              "condition": {
+                "default": "unspecified",
+                "type": "string",
+                "enum": [
+                  "fasted",
+                  "post_bm",
+                  "unspecified"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "kg",
+              "raw",
+              "condition"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "set"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "exerciseId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "setIndex": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "load": {
+                "type": "number",
+                "minimum": 0,
+                "description": "单位见 unit；assist 时为辅助配重"
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "kg",
+                  "lb"
+                ]
+              },
+              "loadKind": {
+                "default": "external",
+                "type": "string",
+                "enum": [
+                  "external",
+                  "assist",
+                  "bodyweight"
+                ]
+              },
+              "reps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "rir": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "straps": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "sessionId",
+              "exerciseId",
+              "setIndex",
+              "load",
+              "unit",
+              "loadKind",
+              "reps",
+              "rir"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "session"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "start",
+                  "end"
+                ]
+              },
+              "dayId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "sessionId",
+              "event",
+              "dayId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "waist"
+              },
+              "cm": {
+                "type": "number",
+                "minimum": 30,
+                "maximum": 200
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "cm"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "note"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "directive"
+              },
+              "directive": {
+                "type": "string",
+                "const": "calorie_delta"
+              },
+              "kcal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "effectiveFrom": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "triggerId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "directive",
+              "kcal",
+              "effectiveFrom",
+              "triggerId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "revert"
+              },
+              "targetId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "reason": {
+                "default": "",
+                "type": "string",
+                "maxLength": 400
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "targetId",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "EntryDraft": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "weight"
+              },
+              "kg": {
+                "type": "number",
+                "minimum": 20,
+                "maximum": 400
+              },
+              "raw": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "kg",
+                      "lb"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "unit"
+                ],
+                "additionalProperties": false
+              },
+              "condition": {
+                "default": "unspecified",
+                "type": "string",
+                "enum": [
+                  "fasted",
+                  "post_bm",
+                  "unspecified"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "date",
+              "dateOrigin",
+              "source",
+              "kind",
+              "kg",
+              "raw",
+              "condition"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "set"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "exerciseId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "setIndex": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "load": {
+                "type": "number",
+                "minimum": 0,
+                "description": "单位见 unit；assist 时为辅助配重"
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "kg",
+                  "lb"
+                ]
+              },
+              "loadKind": {
+                "default": "external",
+                "type": "string",
+                "enum": [
+                  "external",
+                  "assist",
+                  "bodyweight"
+                ]
+              },
+              "reps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "rir": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "straps": {
+                "type": "boolean"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "date",
+              "dateOrigin",
+              "source",
+              "kind",
+              "sessionId",
+              "exerciseId",
+              "setIndex",
+              "load",
+              "unit",
+              "loadKind",
+              "reps",
+              "rir"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "session"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "start",
+                  "end"
+                ]
+              },
+              "dayId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "date",
+              "dateOrigin",
+              "source",
+              "kind",
+              "sessionId",
+              "event",
+              "dayId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "waist"
+              },
+              "cm": {
+                "type": "number",
+                "minimum": 30,
+                "maximum": 200
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "date",
+              "dateOrigin",
+              "source",
+              "kind",
+              "cm"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "note"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "date",
+              "dateOrigin",
+              "source",
+              "kind",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "directive"
+              },
+              "directive": {
+                "type": "string",
+                "const": "calorie_delta"
+              },
+              "kcal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "effectiveFrom": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "triggerId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "date",
+              "dateOrigin",
+              "source",
+              "kind",
+              "directive",
+              "kcal",
+              "effectiveFrom",
+              "triggerId"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "Held": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "不透明 ID，推荐 ULID"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "ISO 8601 时间戳"
+          },
+          "gate": {
+            "type": "string",
+            "enum": [
+              "G1",
+              "G2",
+              "G3",
+              "G4",
+              "G5"
+            ]
+          },
+          "drafts": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntryDraft"
+            }
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "标题就是问题本身"
+          },
+          "context": {
+            "description": "一句补充说明，如「有两组 125 lb。」",
+            "type": "string",
+            "maxLength": 400
+          },
+          "highlight": {
+            "description": "原话中需要高亮的片段",
+            "type": "string",
+            "maxLength": 200
+          },
+          "options": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "hint": {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "suggested": {
+                  "default": false,
+                  "description": "模型或规则的推测；界面只加「推测」标记，不预选",
+                  "type": "boolean"
+                },
+                "action": {
+                  "default": "commit",
+                  "type": "string",
+                  "enum": [
+                    "commit",
+                    "discard"
+                  ]
+                },
+                "reverts": {
+                  "default": [],
+                  "description": "选中后同时撤销的已有记录（如「替换」今天的旧体重）",
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  }
+                },
+                "patches": {
+                  "default": [],
+                  "description": "选中后对 drafts[draft] 做的字段覆盖",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "draft": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "set": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "draft",
+                      "set"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "suggested",
+                "action",
+                "reverts",
+                "patches"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "skip": {
+            "type": "string",
+            "enum": [
+              "commit",
+              "discard"
+            ],
+            "description": "用户选择「跳过」时如何处理 drafts"
+          },
+          "deferUntilSessionEnd": {
+            "default": false,
+            "description": "训练中产生的拦截延后到训练完成页（I10）",
+            "type": "boolean"
+          },
+          "approvedQuestions": {
+            "default": [],
+            "description": "本草稿已由用户回答的闸门问题",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pendingReverts": {
+            "default": [],
+            "description": "全部闸门完成后才追加的替换撤销",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "不透明 ID，推荐 ULID"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "gate",
+          "drafts",
+          "question",
+          "options",
+          "skip",
+          "deferUntilSessionEnd",
+          "approvedQuestions",
+          "pendingReverts"
+        ],
+        "additionalProperties": false
+      },
+      "Proposal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "不透明 ID，推荐 ULID"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "ISO 8601 时间戳"
+          },
+          "author": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "program_change",
+              "note"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "rationale": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "ruleRefs": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "V1",
+                "V2",
+                "V3",
+                "V4",
+                "V5",
+                "V6",
+                "V7",
+                "V8",
+                "V9",
+                "V10"
+              ]
+            }
+          },
+          "patch": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "对 Program 的 JSON Merge Patch（RFC 7396）"
+          },
+          "status": {
+            "default": "open",
+            "type": "string",
+            "enum": [
+              "open",
+              "accepted",
+              "rejected",
+              "expired"
+            ]
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "ISO 8601 时间戳"
+          },
+          "decisionNote": {
+            "type": "string",
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "author",
+          "kind",
+          "title",
+          "rationale",
+          "ruleRefs",
+          "patch",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Trigger": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "不透明 ID，推荐 ULID"
+          },
+          "rule": {
+            "type": "string",
+            "enum": [
+              "V1",
+              "V2",
+              "V3",
+              "V4",
+              "V5",
+              "V6",
+              "V7",
+              "V8",
+              "V9",
+              "V10"
+            ]
+          },
+          "dueDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
+          },
+          "metric": {
+            "type": "string",
+            "const": "slope7d"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "current": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "action": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "calorie_delta"
+              },
+              "kcal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "type",
+              "kcal"
+            ],
+            "additionalProperties": false
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "will_fire",
+              "fired",
+              "accepted_early",
+              "vetoed",
+              "not_met"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "id",
+          "rule",
+          "dueDate",
+          "metric",
+          "threshold",
+          "current",
+          "action",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Derived": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rule": {
+            "type": "string",
+            "enum": [
+              "V1",
+              "V2",
+              "V3",
+              "V4",
+              "V5",
+              "V6",
+              "V7",
+              "V8",
+              "V9",
+              "V10"
+            ]
+          },
+          "ruleVersion": {
+            "type": "string"
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "不透明 ID，推荐 ULID"
+            }
+          },
+          "asOf": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
+          },
+          "formula": {
+            "type": "string",
+            "maxLength": 400,
+            "description": "代入数字后的公式，用于 ƒ 抽屉"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "value",
+          "unit",
+          "rule",
+          "ruleVersion",
+          "inputs",
+          "asOf",
+          "formula"
+        ],
+        "additionalProperties": false
+      },
+      "Snapshot": {
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string"
+          },
+          "today": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA 时区，如 America/Chicago"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Entry"
+            }
+          },
+          "held": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Held"
+            }
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            }
+          },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Trigger"
+            }
+          },
+          "program": {
+            "$ref": "#/components/schemas/Program"
+          },
+          "exercises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Exercise"
+            }
+          }
+        },
+        "required": [
+          "protocol",
+          "today",
+          "timezone",
+          "entries",
+          "held",
+          "proposals",
+          "triggers",
+          "program",
+          "exercises"
+        ],
+        "additionalProperties": false
+      },
+      "StateResponse": {
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string"
+          },
+          "today": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA 时区，如 America/Chicago"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Entry"
+            }
+          },
+          "held": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Held"
+            }
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            }
+          },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Trigger"
+            }
+          },
+          "program": {
+            "$ref": "#/components/schemas/Program"
+          },
+          "exercises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Exercise"
+            }
+          },
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "不透明 ID，推荐 ULID"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "eventCursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "derived": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Derived"
+            }
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "description": "不透明 ID，推荐 ULID"
+                },
+                "clientId": {
+                  "type": "string"
+                },
+                "rawText": {
+                  "type": "string"
+                },
+                "drafts": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EntryDraft"
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "accepted",
+                    "skipped"
+                  ]
+                },
+                "capturedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "timeZone": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "questions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "gate": {
+                        "type": "string"
+                      },
+                      "question": {
+                        "type": "string"
+                      },
+                      "context": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "gate",
+                      "question",
+                      "options"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "clientId",
+                "rawText",
+                "drafts",
+                "status",
+                "capturedAt",
+                "timeZone",
+                "createdAt",
+                "questions"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "description": "不透明 ID，推荐 ULID"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "scopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "submit",
+                      "propose"
+                    ]
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "revoked"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "lastUsedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "scopes",
+                "status",
+                "createdAt",
+                "lastUsedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "protocol",
+          "today",
+          "timezone",
+          "entries",
+          "held",
+          "proposals",
+          "triggers",
+          "program",
+          "exercises",
+          "accountId",
+          "revision",
+          "eventCursor",
+          "derived",
+          "submissions",
+          "clients"
+        ],
+        "additionalProperties": false
+      },
+      "WriteResult": {
+        "type": "object",
+        "properties": {
+          "committed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Entry"
+            }
+          },
+          "held": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Held"
+            }
+          },
+          "unparsed": {
+            "default": [],
+            "description": "既不能规则解析、也无模型可用的片段",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "committed",
+          "held",
+          "unparsed"
+        ],
+        "additionalProperties": false
+      },
+      "ServerEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "entry.committed"
+              },
+              "entry": {
+                "$ref": "#/components/schemas/Entry"
+              }
+            },
+            "required": [
+              "type",
+              "entry"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "entry.reverted"
+              },
+              "revert": {
+                "$ref": "#/components/schemas/Entry"
+              }
+            },
+            "required": [
+              "type",
+              "revert"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "held.created"
+              },
+              "held": {
+                "$ref": "#/components/schemas/Held"
+              }
+            },
+            "required": [
+              "type",
+              "held"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "held.resolved"
+              },
+              "heldId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              }
+            },
+            "required": [
+              "type",
+              "heldId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "proposal.created"
+              },
+              "proposal": {
+                "$ref": "#/components/schemas/Proposal"
+              }
+            },
+            "required": [
+              "type",
+              "proposal"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "proposal.decided"
+              },
+              "proposal": {
+                "$ref": "#/components/schemas/Proposal"
+              }
+            },
+            "required": [
+              "type",
+              "proposal"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "trigger.updated"
+              },
+              "trigger": {
+                "$ref": "#/components/schemas/Trigger"
+              }
+            },
+            "required": [
+              "type",
+              "trigger"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "program.updated"
+              },
+              "program": {
+                "$ref": "#/components/schemas/Program"
+              }
+            },
+            "required": [
+              "type",
+              "program"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "submission.created"
+              },
+              "submissionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              }
+            },
+            "required": [
+              "type",
+              "submissionId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "submission.decided"
+              },
+              "submissionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "accept",
+                  "skip"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "submissionId",
+              "decision"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "client.revoked"
+              },
+              "clientId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              }
+            },
+            "required": [
+              "type",
+              "clientId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "backup.imported"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "type",
+              "count"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "bad_request",
+                  "unauthorized",
+                  "forbidden",
+                  "not_found",
+                  "conflict",
+                  "invalid_state",
+                  "internal"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "accessAssertion": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Cf-Access-Jwt-Assertion"
+      },
+      "accessCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "CF_Authorization"
+      }
+    }
+  },
+  "security": [
+    {
+      "accessAssertion": []
+    },
+    {
+      "accessCookie": []
+    }
+  ],
+  "paths": {
+    "/v1/state": {
+      "get": {
+        "operationId": "getState",
+        "summary": "读取快照与派生值",
+        "x-scopes": [
+          "user",
+          "read"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "用户本地日期 YYYY-MM-DD"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "用户本地日期 YYYY-MM-DD"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/capture": {
+      "post": {
+        "operationId": "capture",
+        "summary": "捕获一句话：解析 → 过闸 → 入账或需要确认",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "capturedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "capturedLocalDate": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "context": {
+                    "description": "训练中捕获时带上，闸门拦截会延后到训练结束（I10）",
+                    "type": "object",
+                    "properties": {
+                      "sessionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "description": "不透明 ID，推荐 ULID"
+                      },
+                      "inSession": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "capturedAt",
+                  "capturedLocalDate",
+                  "timeZone"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entries": {
+      "post": {
+        "operationId": "log",
+        "summary": "用户直接写入草稿（过闸）",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/EntryDraft"
+                    }
+                  },
+                  "inSession": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "entries"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/submissions/{id}/decision": {
+      "post": {
+        "operationId": "decideBatch",
+        "summary": "原子确认或跳过模型批次",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "accept",
+                      "skip"
+                    ]
+                  },
+                  "answers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "decision",
+                  "expectedRevision"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/submissions/{id}/review": {
+      "post": {
+        "operationId": "reviewBatch",
+        "summary": "预览逐级闸门问题，不写入账本",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "gate": {
+                            "type": "string"
+                          },
+                          "question": {
+                            "type": "string"
+                          },
+                          "context": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "gate",
+                          "question",
+                          "options"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "questions",
+                    "ready",
+                    "revision"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "answers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "answers"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/entries/{id}/revert": {
+      "post": {
+        "operationId": "revert",
+        "summary": "撤销一条记录（追加一条 revert）",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entry"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/held/{id}/resolve": {
+      "post": {
+        "operationId": "resolveHeld",
+        "summary": "回答一个确认问题",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "optionId": {
+                        "type": "string",
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "optionId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "skip": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "skip"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/proposals/{id}/decision": {
+      "post": {
+        "operationId": "decideProposal",
+        "summary": "采用或拒绝提议",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "accept",
+                      "reject"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                },
+                "required": [
+                  "decision"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/triggers/{id}/decision": {
+      "post": {
+        "operationId": "decideTrigger",
+        "summary": "采用或推迟触发器",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trigger"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "accept",
+                      "later"
+                    ]
+                  },
+                  "reason": {
+                    "description": "decision=later 时建议填写",
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                },
+                "required": [
+                  "decision"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/proposals": {
+      "post": {
+        "operationId": "propose",
+        "summary": "提出计划修改（进收件箱）",
+        "x-scopes": [
+          "user",
+          "propose"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "program_change",
+                      "note"
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "rationale": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "ruleRefs": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "patch": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "rationale"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/program": {
+      "get": {
+        "operationId": "getProgram",
+        "summary": "读取训练计划",
+        "x-scopes": [
+          "user",
+          "read"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "putProgram",
+        "summary": "替换训练计划（仅用户）",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Program"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/preferences/timezone": {
+      "get": {
+        "operationId": "getTimeZone",
+        "summary": "读取用户专属时区",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "timeZone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    }
+                  },
+                  "required": [
+                    "timeZone"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "putTimeZone",
+        "summary": "设置用户专属 IANA 时区",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "timeZone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    }
+                  },
+                  "required": [
+                    "timeZone"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "timeZone"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/clients": {
+      "get": {
+        "operationId": "getClients",
+        "summary": "查看本人 OAuth 客户端授权",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "description": "不透明 ID，推荐 ULID"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "scopes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "read",
+                            "submit",
+                            "propose"
+                          ]
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "active",
+                          "revoked"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      "lastUsedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "scopes",
+                      "status",
+                      "createdAt",
+                      "lastUsedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/clients/{id}/revoke": {
+      "post": {
+        "operationId": "revokeClient",
+        "summary": "撤销本人 OAuth 客户端",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "revoked"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/export": {
+      "get": {
+        "operationId": "exportAll",
+        "summary": "导出本人数据",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "format": {
+                      "type": "string",
+                      "const": "lowkkey.v1"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    },
+                    "exportedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "snapshot": {
+                      "$ref": "#/components/schemas/Snapshot"
+                    }
+                  },
+                  "required": [
+                    "format",
+                    "accountId",
+                    "snapshot"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/import": {
+      "post": {
+        "operationId": "importAll",
+        "summary": "导入本人备份（仅追加）",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imported": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "imported"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "const": "lowkkey.v1"
+                  },
+                  "accountId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  "exportedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "snapshot": {
+                    "$ref": "#/components/schemas/Snapshot"
+                  }
+                },
+                "required": [
+                  "format",
+                  "accountId",
+                  "snapshot"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "operationId": "events",
+        "summary": "实时事件流（Server-Sent Events），每条 data 为一个 ServerEvent",
+        "x-scopes": [
+          "user",
+          "read"
+        ],
+        "responses": {
+          "200": {
+            "description": "text/event-stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerEvent"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

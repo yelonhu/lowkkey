@@ -1,0 +1,665 @@
+{
+  "tools": [
+    {
+      "name": "get_state",
+      "title": "读取状态",
+      "description": "读取用户的训练与体征状态：条目、训练计划、需要确认的事项、提议、触发器，以及所有派生值（带公式与输入）。引用任何数字（斜率、e1RM、下一组重量、周组数）前必须先读取这里的派生值，不得自行计算。",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "from": {
+            "description": "可选起始日期",
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "to": {
+            "description": "可选结束日期",
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "get_history",
+      "title": "读取动作历史",
+      "description": "读取某个动作最近 n 次训练的全部组（按时间倒序）。",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "exerciseId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "不透明 ID，推荐 ULID"
+          },
+          "limit": {
+            "default": 10,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "exerciseId"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "run_verifiers",
+      "title": "运行验证器",
+      "description": "按需运行验证器（V1–V10）并返回派生值。用于回答「为什么是这个数」。",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "默认全部",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "V1",
+                "V2",
+                "V3",
+                "V4",
+                "V5",
+                "V6",
+                "V7",
+                "V8",
+                "V9",
+                "V10"
+              ]
+            }
+          },
+          "asOf": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "propose_entries",
+      "title": "提交待审批次",
+      "description": "把用户原话或截图内容提交成结构化草稿。用户回答批次内歧义后，一次确认才会原子入账。捕获时刻、本地日期与 IANA 时区必须固定，离线重试沿用同一幂等键和内容。",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "rawText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "capturedLocalDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "entries": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/EntryDraft"
+            }
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "rawText",
+          "capturedAt",
+          "capturedLocalDate",
+          "timeZone",
+          "entries"
+        ],
+        "$defs": {
+          "EntryDraft": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "dateOrigin": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "device",
+                      "inferred"
+                    ]
+                  },
+                  "source": {
+                    "$ref": "#/$defs/Source"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "weight"
+                  },
+                  "kg": {
+                    "type": "number",
+                    "minimum": 20,
+                    "maximum": 400
+                  },
+                  "raw": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "kg",
+                          "lb"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "unit"
+                    ]
+                  },
+                  "condition": {
+                    "default": "unspecified",
+                    "type": "string",
+                    "enum": [
+                      "fasted",
+                      "post_bm",
+                      "unspecified"
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "date",
+                  "dateOrigin",
+                  "source",
+                  "kind",
+                  "kg",
+                  "raw"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "dateOrigin": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "device",
+                      "inferred"
+                    ]
+                  },
+                  "source": {
+                    "$ref": "#/$defs/Source"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "set"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  "exerciseId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  "setIndex": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "load": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "单位见 unit；assist 时为辅助配重"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "kg",
+                      "lb"
+                    ]
+                  },
+                  "loadKind": {
+                    "default": "external",
+                    "type": "string",
+                    "enum": [
+                      "external",
+                      "assist",
+                      "bodyweight"
+                    ]
+                  },
+                  "reps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "rir": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "straps": {
+                    "type": "boolean"
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "date",
+                  "dateOrigin",
+                  "source",
+                  "kind",
+                  "sessionId",
+                  "exerciseId",
+                  "setIndex",
+                  "load",
+                  "unit",
+                  "reps"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "dateOrigin": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "device",
+                      "inferred"
+                    ]
+                  },
+                  "source": {
+                    "$ref": "#/$defs/Source"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "session"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "不透明 ID，推荐 ULID"
+                  },
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "end"
+                    ]
+                  },
+                  "dayId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "description": "不透明 ID，推荐 ULID"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "date",
+                  "dateOrigin",
+                  "source",
+                  "kind",
+                  "sessionId",
+                  "event"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "dateOrigin": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "device",
+                      "inferred"
+                    ]
+                  },
+                  "source": {
+                    "$ref": "#/$defs/Source"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "waist"
+                  },
+                  "cm": {
+                    "type": "number",
+                    "minimum": 30,
+                    "maximum": 200
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "date",
+                  "dateOrigin",
+                  "source",
+                  "kind",
+                  "cm"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "dateOrigin": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "device",
+                      "inferred"
+                    ]
+                  },
+                  "source": {
+                    "$ref": "#/$defs/Source"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "note"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "date",
+                  "dateOrigin",
+                  "source",
+                  "kind",
+                  "text"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "dateOrigin": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "device",
+                      "inferred"
+                    ]
+                  },
+                  "source": {
+                    "$ref": "#/$defs/Source"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "directive"
+                  },
+                  "directive": {
+                    "type": "string",
+                    "const": "calorie_delta"
+                  },
+                  "kcal": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "effectiveFrom": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "用户本地日期 YYYY-MM-DD"
+                  },
+                  "triggerId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "description": "不透明 ID，推荐 ULID"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "date",
+                  "dateOrigin",
+                  "source",
+                  "kind",
+                  "directive",
+                  "kcal",
+                  "effectiveFrom"
+                ]
+              }
+            ]
+          },
+          "Source": {
+            "type": "object",
+            "properties": {
+              "actor": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "model",
+                  "rule"
+                ]
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "voice",
+                  "photo",
+                  "ui",
+                  "mcp",
+                  "import"
+                ]
+              },
+              "client": {
+                "description": "客户端标识：web / claude / chatgpt / …",
+                "type": "string",
+                "maxLength": 64
+              },
+              "rawText": {
+                "type": "string",
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "actor",
+              "channel"
+            ]
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      }
+    },
+    {
+      "name": "propose_change",
+      "title": "提出计划修改",
+      "description": "提出对训练计划的修改（JSON Merge Patch）。只用于规则覆盖不到的事，例如换动作、调整训练日。规则已经能算出的处方（如双进阶加重）不要提议。提议进入收件箱，由用户决定。",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "rationale": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "ruleRefs": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "V1",
+                "V2",
+                "V3",
+                "V4",
+                "V5",
+                "V6",
+                "V7",
+                "V8",
+                "V9",
+                "V10"
+              ]
+            }
+          },
+          "patch": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "title",
+          "rationale",
+          "patch"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      }
+    },
+    {
+      "name": "list_inbox",
+      "title": "读取收件箱",
+      "description": "读取待用户处理的事项：需要确认、未决提议、待决触发器。",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    }
+  ]
+}

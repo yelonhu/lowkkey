@@ -14,6 +14,9 @@ export function environment(extra = {}) {
   const inherited = Object.fromEntries(['HOME', 'CODEX_HOME', 'USER', 'LOGNAME', 'LANG', 'TERM'].flatMap(key => process.env[key] ? [[key, process.env[key]]] : []));
   return {
     ...inherited, PATH: `${nodeBin}:/usr/bin:/bin:/usr/sbin:/sbin`,
+    // Chromium on macOS uses its own documented temporary-directory override.
+    // Keep download staging inside the same project fence as final artifacts.
+    MAC_CHROMIUM_TMPDIR: path.join(root, '.tmp'),
     TMPDIR: path.join(root, '.tmp'), XDG_CONFIG_HOME: path.join(root, '.local/config'),
     XDG_CACHE_HOME: path.join(root, '.cache'), XDG_STATE_HOME: path.join(root, '.local/state'),
     npm_config_cache: path.join(root, '.cache/npm'), npm_config_userconfig: path.join(root, '.local/config/npmrc'),
