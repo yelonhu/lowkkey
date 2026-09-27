@@ -27,6 +27,7 @@ export function prototypeScreen(screen: Screen): HTMLElement {
   // non-visual lookup hooks at the same element positions.
   const hooks = bindingHooks[screen] as {elements:number;hooks:[number,string,string,string][]};
   const targetElements = [node, ...node.querySelectorAll('*')];
+  targetElements.forEach((element, index) => element.setAttribute('data-node-key', `${screen}:${index}`));
   if (hooks.elements !== targetElements.length) throw new Error(`Handoff structure changed: ${screen}`);
   for (const [index,tag,name,value] of hooks.hooks) {
     const target = targetElements[index];

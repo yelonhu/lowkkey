@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('progress adds a verified exercise only to the user-selected training day',async({page})=>{
-  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
   const original=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   const program={...original.program,days:[{id:'row_day',name:'划船日',weekday:3,items:[{exerciseId:'seated_row',sets:3,repMin:8,repMax:12,startLoad:null}]}]};
@@ -15,7 +15,7 @@ test('progress adds a verified exercise only to the user-selected training day',
       await input.fill(value);await input.press('Enter');
       await expect(page.getByRole('status')).toContainText('已记录');
     }
-    await page.goto('/#Progress');
+    await page.goto('/#Progress');await page.reload();
     const progress=page.locator('.screen[data-screen="Progress"]');
     await expect(progress.getByRole('button',{name:'加入计划'})).toBeVisible();
     await progress.getByRole('button',{name:'加入计划'}).click();

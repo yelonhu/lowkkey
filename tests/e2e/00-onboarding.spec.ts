@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('a new account chooses a template, starts an unscheduled day, and records its first set',async({page})=>{
   await page.goto('/');
   const login=page.getByRole('button',{name:'进入状态舱'});
-  if(await login.isVisible())await login.click();
+  await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   const main=page.locator('.screen[data-screen="Main"]');
   await expect(main).toBeVisible();
   await expect(main.locator('a[data-action="plan-setup"]')).toHaveText('训练计划待设置');

@@ -5,10 +5,10 @@ import { resolve } from 'node:path';
 const source=readFileSync(resolve('docs/lowkkey-handoff/frontend/lowkkey-frontend.html'),'utf8');
 const screens=['Main','Capture','Session','Body','Progress','Ledger','Connect','Transition','Debrief','Icon'] as const;
 
-test('ten source artboards keep their original container styles and render account state',async({page})=>{
+test('ten source artboards keep their original container styles and render account state',async({page},testInfo)=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/');
-  const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen').waitFor();
   const account=await page.evaluate(async()=>{const response=await fetch('/v1/state');if(!response.ok)throw new Error(String(response.status));return response.json();});
   for(const screen of screens){
@@ -18,7 +18,7 @@ test('ten source artboards keep their original container styles and render accou
     await page.evaluate(()=>document.fonts.ready);
     const original=await page.evaluate(({html,name})=>new DOMParser().parseFromString(html,'text/html').querySelector(`.screen[data-screen="${name}"]`)?.firstElementChild?.getAttribute('style'),{html:source,name:screen});
     expect(await board.locator(':scope > *').first().getAttribute('style')).toBe(original);
-    await expect(async()=>await board.screenshot({path:`.artifacts/playwright/v1-${screen}.png`})).toPass({timeout:5000});
+    await expect(async()=>await board.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/v1-${screen}.png`})).toPass({timeout:5000});
   }
   expect(errors).toEqual([]);
   await page.goto('/#Connect');
@@ -41,7 +41,7 @@ test('ten source artboards keep their original container styles and render accou
 });
 
 test('capture records the user value and the ledger supports append-only undo',async({page})=>{
-  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   const input=page.getByLabel('今天发生了什么？');await input.fill('卧推 118lb 7次');await input.press('Enter');
   await expect(page.getByRole('status')).toContainText('已记录');
   await page.goto('/#Ledger');
@@ -51,7 +51,7 @@ test('capture records the user value and the ledger supports append-only undo',a
 });
 
 test('photo and voice controls direct the user to an authorized external client',async({page})=>{
-  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
   await page.getByRole('button',{name:'照片使用说明'}).click();
   await expect(page.getByRole('status')).toContainText('外部客户端发送照片');

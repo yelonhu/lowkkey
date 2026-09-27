@@ -5,7 +5,7 @@ const screens=['Main','Capture','Session','Body','Progress','Ledger','Connect','
 test('every visible control navigates, acts, or is explicitly disabled on an empty account',async({page})=>{
   await page.goto('/');
   const login=page.getByRole('button',{name:'进入状态舱'});
-  if(await login.isVisible())await login.click();
+  await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   for(const screen of screens){
     await page.goto(`/#${screen}`);
     await page.locator(`.screen[data-screen="${screen}"]`).waitFor();

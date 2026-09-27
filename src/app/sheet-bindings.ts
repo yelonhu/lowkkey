@@ -24,6 +24,7 @@ export function bindDecisionSheet(root:HTMLElement,state:V1State,sheet:SheetStat
     if(!template)return;
     const button=template.cloneNode(true) as HTMLButtonElement;
     text(button.children[0],label);text(button.children[1],hint);
+    button.dataset.rowKey=id??label;
     if(action){button.dataset.action=action;button.dataset.id=id;button.setAttribute('aria-pressed',String(selected));if(selected)button.style.borderColor='#141415';}
     else button.disabled=true;
     options.append(button);

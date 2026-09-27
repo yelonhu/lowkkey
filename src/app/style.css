@@ -18,3 +18,32 @@ html,body,#root{margin:0;min-height:100%;width:100%}
 .formula-drawer h2{font:700 23px/1.5 "Noto Serif SC","Songti SC",serif;margin:8px 0 18px}
 .formula-drawer p{overflow-wrap:anywhere;margin:0 0 12px;color:#545458}
 .formula-drawer button{border:0;background:transparent;color:#2C4A66;font:600 15px/44px inherit;float:right}
+/* Interaction layers do not alter the resting handoff styles. */
+.prototype-host{position:relative}
+.prototype-host.phone>.screen>div{height:var(--page-height,844px)!important}
+.prototype-host.phone>.screen:not(.sheet-layer){padding-top:env(safe-area-inset-top,0px);box-sizing:border-box}
+.prototype-host.phone>.screen:not(.sheet-layer)>div{height:calc(var(--page-height,844px) - env(safe-area-inset-top,0px))!important;padding-bottom:env(safe-area-inset-bottom,0px)}
+.prototype-host.phone main[data-scrollable="true"]{overflow-y:auto!important;overscroll-behavior-y:contain}
+.prototype-host :is(button,a,[role="button"]){touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:scale 180ms ease-out}
+.prototype-host :is(button,a,[role="button"]):not(:disabled):not([aria-disabled="true"]):active{scale:.97;transition-duration:100ms}
+.prototype-host :is(button,a,input,[tabindex]):focus-visible{outline:2px solid #2C4A66;outline-offset:3px}
+.prototype-host [aria-busy="true"]{opacity:.65;cursor:progress}
+.prototype-host input{scroll-margin-block:20px}
+.motion-outgoing{position:absolute!important;inset:0;pointer-events:none!important}
+.sheet-layer{position:absolute;inset:0;z-index:10}
+.sheet-layer>div{background:transparent!important}
+.sheet-layer [data-scrim]{height:100%!important}
+.sheet-layer [role="dialog"]{max-height:calc(100% - env(safe-area-inset-top,0px) - 12px);overflow-y:auto;overscroll-behavior:contain;padding-bottom:max(34px,env(safe-area-inset-bottom,0px))!important}
+.sheet-layer[aria-hidden="true"]{pointer-events:none}
+[data-sheet-handle]{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.prototype-host>.formula-scrim{position:absolute}
+.formula-drawer{max-height:calc(100% - 20px);overflow-y:auto;overscroll-behavior:contain}
+.action-status{position:fixed;z-index:30;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);box-sizing:border-box;width:min(calc(100% - 40px),350px);display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:#141415;color:#F7F7F5;font:13px/1.5 -apple-system,"PingFang SC",sans-serif}
+.action-status button{flex:none;background:transparent;border:0;min-height:44px;padding:0 4px;color:inherit;font:600 14px inherit;touch-action:manipulation}
+@media(prefers-reduced-motion:reduce){.prototype-host :is(button,a,[role="button"]):active{scale:1}}
+/* The source stylesheet is installed later; scope overlays above its .screen rule. */
+.prototype-host>.sheet-layer{position:absolute}
+.prototype-host.phone>.screen{height:var(--page-height,844px)}
+.prototype-shell[data-compact="true"] .prototype-host.phone main{flex:1 1 0%;min-height:0;overflow-y:auto!important;overscroll-behavior-y:contain}
+.prototype-host.phone [data-screen="Main"]>div>div:last-child{flex-shrink:0}
+.prototype-host [role="dialog"]:focus-visible{outline:none}

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('first-load unit confirmation preserves the raw unit and converts the next-set rule',async({page})=>{
-  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
   const original=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   const weekday=new Date(`${original.today}T12:00:00Z`).getUTCDay();

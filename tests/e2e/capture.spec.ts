@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 async function enterAccount(page:Page) {
   await page.goto('/');
   const login=page.getByRole('button',{name:'进入状态舱'});
-  if(await login.isVisible())await login.click();
+  await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
 }
 

@@ -35,7 +35,7 @@ lowkkey 是一个记录训练与体征变化的个人状态舱。它把每天的
 node tests/oauth-mcp.e2e.mjs
 ```
 
-API、Playwright 与 OAuth/MCP 端到端测试需要可监听本机 loopback 的环境。Playwright 启动隔离 D1；手动运行 OAuth/MCP 测试前先启动 `node scripts/serve.mjs --e2e`。十屏截图输出在 `.artifacts/playwright/v1-*.png`。
+API、Playwright 与 OAuth/MCP 端到端测试需要可监听本机 loopback 的环境。Playwright 为 Chromium 和 WebKit 分别启动隔离 D1 与本地 HTTPS（需要 OpenSSL）；手动运行 OAuth/MCP 测试前先启动 `node scripts/serve.mjs --e2e`。十屏截图输出在 `.artifacts/playwright/{chromium,webkit}/v1-*.png`。交互实现、视觉对比与真机待验收项见 [交互验收记录](docs/interaction-qa.md)。
 
 画板的可见结构、内联样式和 SVG 只从交接包原始 HTML 读取；[绑定定位清单](src/app/binding-hooks.json) 仅标记元素，不包含第二份页面或示例事实。
 

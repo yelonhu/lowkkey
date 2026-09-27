@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('training uses the plan, V5 next set, and a real debrief',async({page})=>{
-  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
   const original=await page.evaluate(async()=>{const response=await fetch('/v1/state');if(!response.ok)throw new Error(String(response.status));return response.json();});
   const weekday=new Date(`${original.today}T12:00:00Z`).getUTCDay();
@@ -29,7 +29,7 @@ test('training uses the plan, V5 next set, and a real debrief',async({page})=>{
 });
 
 test('a question captured during training waits for the completion sheet',async({page})=>{
-  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
   const original=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   for(const held of original.held){
@@ -57,7 +57,8 @@ test('a question captured during training waits for the completion sheet',async(
     const review=page.getByRole('dialog',{name:'确认'});
     await expect(review).toContainText('RIR');
     await review.locator('[data-held-option]').first().click();
-    await expect(page.locator('.screen[data-screen="Main"]')).toBeVisible();
+    await expect(debrief).toBeVisible();
+    await expect(review).toHaveCount(0);
     expect((await page.evaluate(async()=>await (await fetch('/v1/state')).json())).held).toHaveLength(0);
   }finally{
     await page.evaluate(async value=>{await fetch('/v1/program',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(value)});},original.program);

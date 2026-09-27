@@ -64,7 +64,7 @@ function bindMain(root:HTMLElement,c:HandoffContext){
     for(const row of kids(plan).slice(1,-1))row.remove();
     const items=day?.items??[];text(kids(heading)[0],'训练计划');text(kids(heading)[1],day?`${items.length} 个动作 · ${items.reduce((n,i)=>n+i.sets,0)} 组`:s.program.days.length?'今天未排训练':'尚未设置');
     heading.dataset.action='plan-setup';heading.setAttribute('role','button');heading.tabIndex=0;heading.setAttribute('aria-label','选择或更换训练模板');
-    if(items.length&&template)for(const item of items){const row=template.cloneNode(true) as HTMLElement;const [name,,load]=kids(row);const rx=s.derived[`rx.${day!.id}.${item.exerciseId}`];text(name,exName(s,item.exerciseId));text(load,rx?.value==null?'首次重量待设置':`${rx.value} ${rx.unit??''}`);plan.insertBefore(row,plan.lastElementChild);}
+    if(items.length&&template)for(const item of items){const row=template.cloneNode(true) as HTMLElement;row.dataset.rowKey=item.exerciseId;const [name,,load]=kids(row);const rx=s.derived[`rx.${day!.id}.${item.exerciseId}`];text(name,exName(s,item.exerciseId));text(load,rx?.value==null?'首次重量待设置':`${rx.value} ${rx.unit??''}`);plan.insertBefore(row,plan.lastElementChild);}
     else if(template){const row=template.cloneNode(true) as HTMLElement;text(kids(row)[0],s.program.days.length?'今天未排训练':'尚无训练计划');text(kids(row)[2],s.program.days.length?'可任选训练日':'待设置');plan.insertBefore(row,plan.lastElementChild);}
     const start=plan.lastElementChild as HTMLElement;if(session){text(start,'继续训练');start.dataset.action='resume-session';enable(start);start.setAttribute('href','#Session');}
     else if(day){text(start,'开始训练');start.dataset.action='start-session';enable(start);start.setAttribute('href','#Session');}
@@ -92,13 +92,13 @@ function bindCapture(root:HTMLElement,c:HandoffContext){
     text(title,question?.question??`确认写入 ${sub.drafts.length} 条记录？`);
     explanation.replaceChildren(document.createTextNode(question?.context??'模型理解的原话：'),document.createElement('mark'));
     const mark=one(explanation,'mark')!;text(mark,sub.rawText);mark.setAttribute('style','background:#F0E9F2;color:#141415;padding:2px 4px;border-radius:4px;font-weight:600');
-    if(rowTemplate){for(const item of question?.options??sub.drafts.map((draft,index)=>({id:String(index),label:draftLabel(c.state,draft)}))){const row=rowTemplate.cloneNode(true) as HTMLButtonElement;const children=kids(row);text(children[0],item.label);text(children[1],question?'选择此项':`第 ${Number(item.id)+1} 条`);if(question){row.dataset.answerGate=question.id;row.dataset.answerOption=item.id;}else row.disabled=true;options.append(row);}}
+    if(rowTemplate){for(const item of question?.options??sub.drafts.map((draft,index)=>({id:String(index),label:draftLabel(c.state,draft)}))){const row=rowTemplate.cloneNode(true) as HTMLButtonElement;row.dataset.rowKey=`draft:${sub.id}:${item.id}`;const children=kids(row);text(children[0],item.label);text(children[1],question?'选择此项':`第 ${Number(item.id)+1} 条`);if(question){row.dataset.rowKey=`${question.id}:${item.id}`;row.dataset.answerGate=question.id;row.dataset.answerOption=item.id;}else row.disabled=true;options.append(row);}}
     text(left,question?'请先选择':c.reviewLoading?'正在确认问题':'写入 '+sub.drafts.length+' 条');left.removeAttribute('href');left.dataset.action='submission-accept';left.dataset.id=sub.id;if(question||c.reviewLoading)left.setAttribute('aria-disabled','true');else enable(left);
     text(right,'跳过');right.dataset.action='submission-skip';right.dataset.id=sub.id;enable(right);
   }else if(held){
     text(kids(heading)[0],'需要确认');legendText(kids(heading)[1],`待确认 ${c.state.held.length} 项`);text(title,held.question);
     explanation.replaceChildren(document.createTextNode(held.context??''),document.createElement('mark'));const mark=one(explanation,'mark')!;text(mark,held.highlight??'');mark.setAttribute('style','background:#F0E9F2;color:#141415;padding:2px 4px;border-radius:4px;font-weight:600');
-    if(rowTemplate)for(const option of held.options){const row=rowTemplate.cloneNode(true) as HTMLButtonElement;text(kids(row)[0],option.label);text(kids(row)[1],option.hint??'');row.dataset.heldOption=option.id;row.dataset.id=held.id;options.append(row);}
+    if(rowTemplate)for(const option of held.options){const row=rowTemplate.cloneNode(true) as HTMLButtonElement;text(kids(row)[0],option.label);text(kids(row)[1],option.hint??'');row.dataset.rowKey=`${held.id}:${option.id}`;row.dataset.heldOption=option.id;row.dataset.id=held.id;options.append(row);}
     text(left,'查看记录');left.href='#Ledger';text(right,'跳过');right.dataset.action='held-skip';right.dataset.id=held.id;enable(right);
   }
 }
@@ -193,13 +193,13 @@ function bindLedger(root:HTMLElement,c:HandoffContext){
   const entries=s.entries.filter(e=>e.kind!=='revert').sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
   let shown=0,lastDate='';
   for(const entry of entries){const source=entry.source.actor;if(c.filter!=='all'&&source!==(c.filter==='you'?'user':c.filter))continue;
-    if(entry.date!==lastDate&&templates.date){const header=templates.date.cloneNode(true) as HTMLElement;text(header.lastElementChild,`${dateLabel(entry.date)} · ${['周日','周一','周二','周三','周四','周五','周六'][weekday(entry.date)]}`);timeline.append(header);lastDate=entry.date;}
+    if(entry.date!==lastDate&&templates.date){const header=templates.date.cloneNode(true) as HTMLElement;header.dataset.rowKey=`date:${entry.date}`;text(header.lastElementChild,`${dateLabel(entry.date)} · ${['周日','周一','周二','周三','周四','周五','周六'][weekday(entry.date)]}`);timeline.append(header);lastDate=entry.date;}
     const template=reverted.has(entry.id)?templates.reverted:templates[source];if(!template)continue;
     const row=template.cloneNode(true) as HTMLElement,body=row.children[1];text(body.children[0],entryLabel(s,entry));text(body.children[1],reverted.has(entry.id)?`已撤销 · ${reversals.find(e=>e.targetId===entry.id)?.reason??''}`:source==='model'?`来自 ${entry.source.client??'模型'} · 用户已确认`:source==='rule'?`由规则 ${entry.source.client??''} 执行`:entry.source.rawText?`你输入「${entry.source.rawText}」`:'你在应用中记录');
     row.dataset.entryId=entry.id;row.classList.add('record-card');if(!reverted.has(entry.id)){const button=document.createElement('button');button.type='button';button.textContent='撤销';button.dataset.action='entry-revert';button.setAttribute('style','align-self:flex-start;min-height:44px;padding:0 12px;border:0;background:transparent;color:#9E4536;font:inherit;font-size:13px');body.append(button);}timeline.append(row);shown++;
   }
-  for(const sub of s.submissions){const template=templates.model;if(!template)continue;const row=template.cloneNode(true) as HTMLElement;const body=row.children[1];text(body.children[0],`待确认 · ${sub.drafts.length} 条记录`);text(body.children[1],`来自 ${sub.clientId} · ${sub.rawText.slice(0,60)}`);row.dataset.action='view-submission';row.dataset.id=sub.id;timeline.append(row);shown++;}
-  for(const held of s.held){const template=templates.rule;if(!template)continue;const row=template.cloneNode(true) as HTMLElement,body=row.children[1];text(body.children[0],held.question);text(body.children[1],`${held.gate} · ${held.deferUntilSessionEnd&&openSession(s.entries)?'训练结束后确认':'等待你确认'}`);if(!held.deferUntilSessionEnd||!openSession(s.entries)){row.dataset.action='view-submission';row.dataset.id=held.id;}else row.setAttribute('aria-disabled','true');timeline.append(row);shown++;}
+  for(const sub of s.submissions){const template=templates.model;if(!template)continue;const row=template.cloneNode(true) as HTMLElement;const body=row.children[1];text(body.children[0],`待确认 · ${sub.drafts.length} 条记录`);text(body.children[1],`来自 ${sub.clientId} · ${sub.rawText.slice(0,60)}`);row.dataset.rowKey=`submission:${sub.id}`;row.dataset.action='view-submission';row.dataset.id=sub.id;timeline.append(row);shown++;}
+  for(const held of s.held){const template=templates.rule;if(!template)continue;const row=template.cloneNode(true) as HTMLElement,body=row.children[1];row.dataset.rowKey=`held:${held.id}`;text(body.children[0],held.question);text(body.children[1],`${held.gate} · ${held.deferUntilSessionEnd&&openSession(s.entries)?'训练结束后确认':'等待你确认'}`);if(!held.deferUntilSessionEnd||!openSession(s.entries)){row.dataset.action='view-submission';row.dataset.id=held.id;}else row.setAttribute('aria-disabled','true');timeline.append(row);shown++;}
   if(!shown){const row=templates.user?.cloneNode(true) as HTMLElement|undefined;if(row){text(row.children[1].children[0],'还没有记录');text(row.children[1].children[1],'在「今日」输入体重或训练组。');timeline.append(row);}}
 }
 function bindConnect(root:HTMLElement,c:HandoffContext){
@@ -208,7 +208,7 @@ function bindConnect(root:HTMLElement,c:HandoffContext){
   const rows=Array.from(root.querySelectorAll<HTMLElement>('div[style*="min-height: 52px"]')).filter(e=>e.querySelector('span[style*="width: 6px"]'));
   const parent=rows[0]?.parentElement,template=rows[0];if(parent&&template){parent.replaceChildren();for(const [index,client] of (s.clients.length?s.clients:[null]).entries()){
     const row=template.cloneNode(true) as HTMLElement,left=kids(row)[0],status=kids(row)[1],dot=one<HTMLElement>(status,'span');
-    row.style.borderTop=index?'1px solid #EDEDEB':'none';text(kids(left)[0],client?.name??'暂无授权客户端');text(kids(left)[1],client?`MCP · ${client.scopes.join(' + ')}`:'连接后显示实际授权与权限');
+    row.dataset.rowKey=client?.id??'empty-client';row.style.borderTop=index?'1px solid #EDEDEB':'none';text(kids(left)[0],client?.name??'暂无授权客户端');text(kids(left)[1],client?`MCP · ${client.scopes.join(' + ')}`:'连接后显示实际授权与权限');
     if(status.lastChild?.nodeType===Node.TEXT_NODE)status.lastChild.textContent=client?.status==='active'?'撤销接入':client?'已撤销':'未连接';
     if(client?.status!=='active'){status.style.color='#6C6C71';if(dot)dot.style.background='#A1A1A5';}
     if(client?.status==='active'){row.dataset.action='client-revoke';row.dataset.id=client.id;row.setAttribute('role','button');row.tabIndex=0;row.setAttribute('aria-label',`撤销 ${client.name} 的接入`);}
