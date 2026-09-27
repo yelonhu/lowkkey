@@ -9,7 +9,7 @@ const testTLS=process.env.LOWKKEY_E2E_DIR&&process.env.LOWKKEY_E2E_TLS==='1';
 
 export default defineConfig(({ command }) => ({
   envDir: '.local/config/no-env', envPrefix: 'LOWKKEY_NO_AUTO_ENV_', cacheDir: process.env.LOWKKEY_E2E_DIR?`.cache/vite-e2e-${localPort}`:'.cache/vite',
-  plugins: [react(), cloudflare({ configPath: process.env.LOWKKEY_WRANGLER_CONFIG, remoteBindings: false, tunnel: false, inspectorPort: false,
+  plugins: [react(), cloudflare({ configPath: process.env.LOWKKEY_WRANGLER_CONFIG ?? (command === 'serve' ? 'wrangler.local.json' : 'wrangler.json'), remoteBindings: false, tunnel: false, inspectorPort: false,
     persistState: { path: process.env.LOWKKEY_E2E_DIR ?? '.data/v02' },
     config: { vars: command === 'serve' ? { APP_ENV: 'development', APP_ORIGIN: `${testTLS?'https':'http'}://127.0.0.1:${localPort}` } : { APP_ENV: 'production' } },
   })],

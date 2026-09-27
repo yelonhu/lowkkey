@@ -16,6 +16,8 @@
     "protocol:emit": "./scripts/run protocol:emit",
     "test": "./scripts/run test",
     "build": "./scripts/run build",
+    "build:preview": "vite build",
+    "deploy:preview": "wrangler deploy --config .artifacts/build/lowkkey_preview/wrangler.json",
     "test:e2e": "./scripts/run test:e2e"
   },
   "dependencies": {
