@@ -32,13 +32,6 @@ export function weekStart(d: LocalDate): LocalDate {
   return addDays(d, wd === 0 ? -6 : 1 - wd);
 }
 
-/** 用户本地「今天」。timeZone 为空时使用运行环境时区。 */
-export function localToday(now: Date = new Date(), timeZone?: string): LocalDate {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
-
 /* ── 单位 ── */
 
 export function toKg(v: number, unit: Unit): number {

@@ -58,10 +58,6 @@ export function e1rm(load: number, reps: number): number | null {
   return load * (1 + reps / 30);
 }
 
-export function e1rmReliable(reps: number): boolean {
-  return reps >= 1 && reps <= 12;
-}
-
 /**
  * V3 有效负荷，统一换算到动作单位（exercise.unit）。
  * assist：体重 − 辅助（kg）；bodyweight：体重（+ 负重）。无体重时辅助动作返回 null。
@@ -76,12 +72,6 @@ export function effectiveLoad(set: SetEntry, ex: Exercise, bodyweightKg: number 
     return convert(bodyweightKg + toKg(set.load, set.unit), 'kg', ex.unit);
   }
   return convert(set.load, set.unit, ex.unit);
-}
-
-export function setE1rm(set: SetEntry, ex: Exercise, entries: Entry[]): { value: number | null; load: number | null; bw: WeightEntry | null } {
-  const bw = bodyweightOn(entries, set.date);
-  const load = effectiveLoad(set, ex, bw?.kg ?? null);
-  return { value: load == null ? null : e1rm(load, set.reps), load, bw };
 }
 
 /* ═══════════════ V4 热身 ═══════════════ */
@@ -258,18 +248,6 @@ export function weeklyVolume(entries: Entry[], exercises: Exercise[], asOf: Loca
     }
   }
   return [...acc.entries()].map(([m, s]) => classify(m, s, program.targets, program.constraints,ids.get(m)??[])).sort((a, b) => b.sets - a.sets);
-}
-
-/** V7（计划）：满容量周按计划应完成的有效组。 */
-export function plannedVolume(program: Program, exercises: Exercise[]): VolumeRow[] {
-  const acc = new Map<Muscle, number>();
-  for (const day of program.days)
-    for (const it of day.items) {
-      const ex = exercises.find((x) => x.id === it.exerciseId);
-      if (!ex) continue;
-      for (const [m, w] of Object.entries(ex.muscles) as [Muscle, number][]) acc.set(m, (acc.get(m) ?? 0) + it.sets * w);
-    }
-  return [...acc.entries()].map(([m, s]) => classify(m, s, program.targets, program.constraints)).sort((a, b) => b.sets - a.sets);
 }
 
 /* ═══════════════ V8 热量触发器 ═══════════════ */

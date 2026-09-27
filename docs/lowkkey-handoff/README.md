@@ -1,6 +1,6 @@
 # lowkkey · 交接包
 
-AI 原生的训练状态舱。本包把**前端定稿**和**对外暴露的接口**说清楚，后端与 MCP 由 coding agent 按此开发。
+AI 原生的训练状态舱。本目录是前端画板、产品原则与对外接口的规格；当前实现位于仓库根目录的 `src/` 与 `packages/`。
 包内不含任何真实个人数据；前端里的数字均为示例。
 
 | 路径 | 内容 | 先读顺序 |
@@ -11,6 +11,7 @@ AI 原生的训练状态舱。本包把**前端定稿**和**对外暴露的接�
 | `protocol/openapi.json` | REST v1，OpenAPI 3.1 | 按需 |
 | `protocol/mcp-tools.json` | MCP `tools/list` 返回体 | 按需 |
 | `protocol/schema.json` | 全部实体的 JSON Schema | 按需 |
-| `reference/`（可选） | 上述协议的 zod 源码 + 规则引擎参考实现（解析器、闸门、验证器、派生值），`npm i && npm test` 可跑 | 按需 |
+
+协议与规则源码分别位于仓库根目录的 `packages/protocol` 和 `packages/core`。运行 `npm run protocol:emit` 可从协议源码更新 `protocol/` 下的机器可读文件。
 
 一句话：**模型负责理解，规则负责计算和把关，数据只属于用户。**

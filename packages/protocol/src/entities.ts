@@ -177,7 +177,6 @@ export const Entry = z.discriminatedUnion('kind', [
   RevertEntry,
 ]);
 export type Entry = z.infer<typeof Entry>;
-export type EntryKind = Entry['kind'];
 export type WeightEntry = z.infer<typeof WeightEntry>;
 export type SetEntry = z.infer<typeof SetEntry>;
 export type SessionEntry = z.infer<typeof SessionEntry>;

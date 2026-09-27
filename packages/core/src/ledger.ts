@@ -1,4 +1,4 @@
-import type { Entry, Exercise, LocalDate, SessionEntry, SetEntry, Snapshot, WeightEntry } from '@lowkkey/protocol';
+import type { Entry, LocalDate, SessionEntry, SetEntry, WeightEntry } from '@lowkkey/protocol';
 
 /** 被撤销的条目 id 集合。 */
 export function revertedIds(entries: Entry[]): Set<string> {
@@ -31,12 +31,6 @@ export function bodyweightOn(entries: Entry[], date: LocalDate): WeightEntry | n
   let hit: WeightEntry | null = null;
   for (const w of dailyWeights(entries)) if (w.date <= date) hit = w;
   return hit;
-}
-
-export function sets(entries: Entry[]): SetEntry[] {
-  return active(entries)
-    .filter((e): e is SetEntry => e.kind === 'set')
-    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
 }
 
 export type Session = {
@@ -80,8 +74,4 @@ export function openSession(entries: Entry[]): Session | null {
   const list = sessions(entries);
   const last = list[list.length - 1];
   return last && last.startedAt && !last.endedAt ? last : null;
-}
-
-export function exerciseById(snap: Pick<Snapshot, 'exercises'>, id: string): Exercise | undefined {
-  return snap.exercises.find((x) => x.id === id);
 }

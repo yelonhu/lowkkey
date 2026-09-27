@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "./scripts/run dev",
     "check": "./scripts/run check",
+    "protocol:emit": "./scripts/run protocol:emit",
     "test": "./scripts/run test",
     "build": "./scripts/run build",
     "test:e2e": "./scripts/run test:e2e"

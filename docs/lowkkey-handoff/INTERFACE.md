@@ -1,6 +1,6 @@
 # lowkkey 接口说明 v1.0
 
-> 给开发后端与 MCP 的 coding agent。前端已由 `frontend/lowkkey-frontend.html` 定稿（示例数据，非真实记录）；本文件规定**谁能做什么、前端要什么、后端和 MCP 暴露什么**。视觉与交互细节见 `DESIGN.md`。
+> 前端画板见 `frontend/lowkkey-frontend.html`（示例数据，非真实记录）；本文件规定**谁能做什么、前端要什么、后端和 MCP 暴露什么**。视觉与交互细节见 `DESIGN.md`，当前实现见仓库根目录的 `src/` 与 `packages/`。
 
 ---
 
@@ -98,7 +98,7 @@ SSE 事件：`entry.committed`、`entry.reverted`、`held.created`、`held.resol
 
 ## 5. 数据实体（摘要）
 
-完整定义见 `protocol/schema.json`（也可直接用 `reference/packages/protocol/src/*.ts` 的 zod 定义）。
+完整定义见 `protocol/schema.json`；其 Zod 源码位于仓库根目录的 `packages/protocol/src/`。
 
 - **Entry（只追加的事件日志）** 公共字段：`id, kind, date(用户本地日期), dateOrigin(explicit|device|inferred), createdAt, source{actor, channel, client, rawText}`
   - `weight`：`kg, raw{value,unit}, condition(fasted|post_bm|unspecified)`
@@ -190,17 +190,16 @@ SSE 事件：`entry.committed`、`entry.reverted`、`held.created`、`held.resol
 | `protocol/openapi.json` | REST v1（OpenAPI 3.1），可直接生成服务端桩与客户端 |
 | `protocol/mcp-tools.json` | MCP `tools/list` 返回体 |
 | `protocol/schema.json` | 全部实体的 JSON Schema（2020-12），其他语言可据此生成类型 |
-| `reference/`（可选） | 以上文件的 TypeScript 源（zod）与规则引擎参考实现，含 22 个单测；可复用，也可丢弃按本文重写。注意：参考实现尚未产出 `next.<ex>`，可在有进行中训练时用其中的 `nextSet()` 生成 |
+| `../../packages/protocol/src/` | 协议的 Zod 源码；`npm run protocol:emit` 更新本目录的机器可读文件 |
 
-`/clients` 三个接口尚未写进 `openapi.json`，按第 3 节补充。
+规则实现与测试位于仓库根目录的 `packages/core/`。`next.<ex>` 已由当前派生值实现提供，OAuth 客户端接口已写入 `openapi.json`。
 
 ---
 
-## 11. 给 coding agent 的开发顺序
+## 11. 当前实现位置
 
-1. **服务层**：实现 §7 的写入流程、§9 的验证器、§6 的派生值（可直接用 `reference/core`）。
-2. **存储**：Postgres，`entries` 只追加（撤销用 `revert` 行）；`held / proposals / triggers / program` 为可变表。
-3. **REST + SSE**：按 §3 与 `openapi.json`。
-4. **MCP**：按 §4，复用同一服务层；工具清单里不得出现撤销、修改、决定。
-5. **前端**：把 `lowkkey-frontend.html` 的各屏接到 §2 的读取与调用上，示例数据换成 `/v1/state`。
-6. **验收**：§8 每条有自动化测试；「卧推 135lb 8次」这类明确输入零额外点击入账；用 Claude 连接后能读、能记、不能撤销。
+1. **规则与派生值**：`packages/core/src/`；协议与工具契约：`packages/protocol/src/`。
+2. **存储**：Cloudflare D1，迁移位于 `db/migrations/`；新版条目只追加，旧账本通过读取适配保留。
+3. **REST、SSE 与 MCP**：`src/server/`，入口为 `src/server/worker.ts`。
+4. **前端**：`src/app/` 直接读取本目录的画板 HTML，并绑定 `/v1/state` 与写入接口。
+5. **验证**：`packages/core/test/`、`tests/`；本地检查命令见仓库根目录 `README.md`。

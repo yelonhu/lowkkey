@@ -5,6 +5,7 @@ process.chdir(root);
 const commands = {
   dev: [['scripts/serve.mjs']],
   check: [['node_modules/typescript/bin/tsc', '--noEmit'], ['node_modules/eslint/bin/eslint.js', '.']],
+  'protocol:emit': [['packages/protocol/scripts/emit.ts']],
   test: [['node_modules/vitest/vitest.mjs', 'run']],
   build: [['node_modules/vite/bin/vite.js', 'build']],
   'test:e2e': [['node_modules/playwright/cli.js', 'test']],

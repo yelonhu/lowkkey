@@ -1,5 +1,15 @@
 # lowkkey
 
+lowkkey 是一个记录训练与体征变化的个人状态舱。它把每天的训练组、体重和计划放在同一份账本里，用可追溯的规则计算趋势、下一组建议与训练进步。
+
+- **轻松记录**：用一句话或训练中的快捷操作记下真实发生的事。
+- **看懂变化**：查看体重趋势、力量进步和每周训练量；每个计算结果都能追溯到公式与原始记录。
+- **自己做决定**：模型可以提交待审草稿和建议，最终确认、调整计划与撤销记录由用户完成。
+
+记录采用只追加事件日志：修改通过追加新事件表达，已有记录保留出处。
+
+## 设计与实现
+
 `docs/lowkkey-handoff` 是新版唯一规格。运行界面直接使用其中的 [前端 HTML](docs/lowkkey-handoff/frontend/lowkkey-frontend.html)、内联样式与 SVG，并将十个画板绑定到本人 D1 账本及 V1–V10 规则派生值。缺数据时显示真实空状态；交接包中的示例事实不进入运行账户。
 
 应用内标准文字由确定性解析器处理。网页不调用付费模型。外部客户端经 OAuth 连接 `/mcp`，可读取本人状态、提交待审批次或提出计划建议。模型草稿在用户完成批量审阅并一次确认前不入账；撤销和所有决策只属于 Access 验证的网页用户。原有 D1 条目及 ID 保留，新版条目只追加，撤销追加 `revert`。
@@ -19,10 +29,9 @@
 
 ```sh
 ./scripts/run check
-./node_modules/.bin/tsc --noEmit
-./node_modules/.bin/vitest run
-./node_modules/.bin/vite build
-./node_modules/.bin/playwright test
+./scripts/run test
+./scripts/run build
+./scripts/run test:e2e
 node tests/oauth-mcp.e2e.mjs
 ```
 

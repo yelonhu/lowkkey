@@ -27,5 +27,3 @@ const named: Record<string, z.ZodType> = {
 for (const [id, schema] of Object.entries(named)) {
   if (!z.globalRegistry.has(schema)) z.globalRegistry.add(schema, { id });
 }
-
-export const NAMED_SCHEMAS = named;

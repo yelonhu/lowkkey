@@ -91,7 +91,6 @@ export const MCP_TOOLS = [
   },
 ] as const satisfies readonly McpTool[];
 
-export type McpToolName = (typeof MCP_TOOLS)[number]['name'];
 
 /** 生成 MCP `tools/list` 所需的 JSON Schema 描述。 */
 export function mcpToolList() {

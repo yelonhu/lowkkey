@@ -1,8 +1,8 @@
 /**
  * 从 zod 生成语言无关的协议产物（提交进仓库，供其他语言的后端生成类型）：
- *   packages/protocol/dist/schema.json     —— 所有实体的 JSON Schema（draft 2020-12）
- *   packages/protocol/dist/openapi.json    —— REST v1 的 OpenAPI 3.1
- *   packages/protocol/dist/mcp-tools.json  —— MCP tools/list 的返回体
+ *   docs/lowkkey-handoff/protocol/schema.json     —— 所有实体的 JSON Schema（draft 2020-12）
+ *   docs/lowkkey-handoff/protocol/openapi.json    —— REST v1 的 OpenAPI 3.1
+ *   docs/lowkkey-handoff/protocol/mcp-tools.json  —— MCP tools/list 的返回体
  * 用法：npm run protocol:emit
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import * as P from '../src/index.ts';
 
-const out = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+const out = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'lowkkey-handoff', 'protocol');
 mkdirSync(out, { recursive: true });
 const opts = { unrepresentable: 'any' } as const;
 

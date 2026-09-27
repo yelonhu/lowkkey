@@ -24,8 +24,8 @@ import { calorieCheck, e1rm, effectiveLoad } from './verifiers.ts';
 import { convert, diffDays, newId, round } from './util.ts';
 
 /**
- * 参考引擎：协议语义的可执行定义。纯函数——输入快照，输出新快照与结果，不做 I/O。
- * 前端本地模式直接使用；后端用同一套函数，外面包一层持久化、鉴权与事件推送。
+ * 规则引擎：输入快照，输出新快照与结果，不做 I/O。
+ * 服务端在此之上处理持久化、鉴权与事件推送。
  */
 
 export type EngineContext = {

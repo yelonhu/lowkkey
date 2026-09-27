@@ -135,7 +135,6 @@ export const ROUTES = {
   exportAll: { method: 'GET', path: '/v1/export', scope: 'user', summary: '导出本人数据', response: Backup },
   importAll: { method: 'POST', path: '/v1/import', scope: 'user', summary: '导入本人备份（仅追加）', request: Backup, response: z.object({imported:z.number().int()}) },
 } satisfies Record<string, Route>;
-export type RouteName = keyof typeof ROUTES;
 
 /* ───────────────────────────── 实时事件（SSE：GET /v1/events） ───────────────────────────── */
 

@@ -204,7 +204,6 @@ function bindLedger(root:HTMLElement,c:HandoffContext){
 }
 function bindConnect(root:HTMLElement,c:HandoffContext){
   const s=c.state;setHeading(one(root,'h1'),'模型可以换，','数据只有一份。');
-  const panel=one(root,'div[style*="已接入"]');void panel;
   const candidates=Array.from(root.querySelectorAll<HTMLElement>('div')).filter(e=>e.children.length===0&&e.textContent?.trim()==='已接入');if(candidates[0])text(candidates[0],s.clients.some(client=>client.status==='active')?'已接入':'尚未接入');
   const rows=Array.from(root.querySelectorAll<HTMLElement>('div[style*="min-height: 52px"]')).filter(e=>e.querySelector('span[style*="width: 6px"]'));
   const parent=rows[0]?.parentElement,template=rows[0];if(parent&&template){parent.replaceChildren();for(const [index,client] of (s.clients.length?s.clients:[null]).entries()){
