@@ -42,4 +42,11 @@ test('a model batch stays pending until the user writes all five rows',async({pa
   await expect(page.locator('.screen[data-screen="Main"]')).toBeVisible();
   const after=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   expect(after.entries.filter((entry:{source:{rawText?:string}})=>entry.source.rawText===rawText)).toHaveLength(5);
+  await page.goto('/#Connect');
+  const connection=page.locator('.screen[data-screen="Connect"] [data-action="client-revoke"]').filter({hasText:'Browser Batch Test'});
+  await expect(connection).toBeVisible();
+  await connection.click();
+  await expect(page.locator('.screen[data-screen="Connect"]')).toContainText('已撤销');
+  const revoked=await fetch(`${origin}/mcp`,{method:'POST',headers:{Authorization:`Bearer ${token.access_token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2025-06-18'},body:JSON.stringify({jsonrpc:'2.0',id:3,method:'tools/list',params:{}})});
+  expect(revoked.status).toBe(401);
 });

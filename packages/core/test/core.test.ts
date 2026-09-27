@@ -197,6 +197,17 @@ describe('engine：闸门与撤销', () => {
     s = endSession(out.snap, sessionId, user());
     expect(SnapshotSchema.parse(s)).toBeTruthy();
   });
+  it('V5：首次输入另一单位时先换算再给出下一组', () => {
+    const started=startSession(fresh(),'upper_a',user());
+    const recorded=logSet(started.snap,{sessionId:started.sessionId,exerciseId:'bench_press',load:70,unit:'kg',reps:8,rir:2},user());
+    expect(recorded.result.held[0]?.gate).toBe('G4');
+    const approved=resolveHeld(recorded.snap,recorded.result.held[0]!.id,{optionId:'as_is'},user());
+    const next=derive(approved.snap)['next.bench_press'];
+    expect(next.value).toBeGreaterThan(150);
+    expect(next.unit).toBe('lb');
+    expect(next.formula).toContain('70 kg →');
+    expect(next.inputs).toHaveLength(1);
+  });
 });
 
 describe('派生值与触发器', () => {

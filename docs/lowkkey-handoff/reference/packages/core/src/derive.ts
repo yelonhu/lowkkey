@@ -1,7 +1,7 @@
 import { MUSCLE_LABEL, VERIFIERS, type Derived, type LocalDate, type SetEntry, type Snapshot, type VerifierId } from '@lowkkey/protocol';
 import { active, bodyweightOn, dailyWeights, openSession } from './ledger.ts';
 import { calorieCheck, cycleWeek, e1rm, effectiveLoad, nextSet, prescribe, projectDate, trend, trendAt, waistRatio, warmupFlags, weeklyVolume, weighinObservation } from './verifiers.ts';
-import { diffDays, round, toKg } from './util.ts';
+import { convert, diffDays, round, toKg } from './util.ts';
 
 /**
  * 把快照算成派生值表。键名是协议的一部分（见 docs/PROTOCOL.md §派生值），前端、MCP、后端都按键读取。
@@ -94,8 +94,9 @@ export function derive(snap: Snapshot, asOf: LocalDate = snap.today): Record<str
       if (!ex) continue;
       const previous = session.sets.filter((s) => s.exerciseId === ex.id).at(-1);
       if (previous) {
-        const next = nextSet(ex, previous, item.repMin, item.repMax);
-        put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', next.load, ex.unit, `${previous.load} ${ex.unit} × ${previous.reps}，RIR ${previous.rir ?? '未记'} → ${next.reason} → ${next.load} ${ex.unit}`, [previous.id]);
+        const normalized=convert(previous.load,previous.unit,ex.unit);
+        const next = nextSet(ex, {...previous,load:normalized}, item.repMin, item.repMax);
+        put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', next.load, ex.unit, `${previous.load} ${previous.unit}${previous.unit===ex.unit?'':` → ${round(normalized,2)} ${ex.unit}`} × ${previous.reps}，RIR ${previous.rir ?? '未记'} → ${next.reason} → ${next.load} ${ex.unit}`, [previous.id]);
       } else {
         const rx = prescribe(item, ex, entries, asOf, program);
         put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', rx.load, ex.unit, `本场首组使用处方：${rx.reason}`, rx.basedOn);

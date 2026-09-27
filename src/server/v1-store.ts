@@ -112,7 +112,7 @@ export async function captureText(db:D1Database,ownerId:string,key:string,input:
     const anchored={...snap,today:input.capturedLocalDate,timeZone:input.timeZone};
     const out=capture(anchored,input.text,{now,today:input.capturedLocalDate,source:{actor:'user',channel:'text',client:'web',rawText:input.text}},{inSession:input.inSession});
     const next=refreshTriggers(out.snap,actor({actor:'rule',channel:'ui',client:'V8'},now,input.timeZone));
-    return {snap:next,result:out.result,events:[...eventDiff(snap,next),...out.result.held.map(held=>({type:'held.created',held}))]};
+    return {snap:{...next,timezone:snap.timezone,today:localDate(now,snap.timezone)},result:out.result,events:[...eventDiff(snap,next),...out.result.held.map(held=>({type:'held.created',held}))]};
   });
 }
 export async function logEntries(db:D1Database,ownerId:string,key:string,drafts:EntryDraft[],inSession=false):Promise<WriteResult> {

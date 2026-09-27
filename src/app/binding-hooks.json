@@ -1,0 +1,284 @@
+{
+  "Main": {
+    "elements": 76,
+    "hooks": [
+      [
+        6,
+        "SPAN",
+        "data-bind",
+        "header-date"
+      ],
+      [
+        16,
+        "H1",
+        "data-bind",
+        "main-title"
+      ],
+      [
+        26,
+        "SECTION",
+        "data-bind",
+        "main-advice"
+      ],
+      [
+        33,
+        "SECTION",
+        "data-bind",
+        "main-plan"
+      ],
+      [
+        59,
+        "DIV",
+        "data-bind",
+        "capture-status"
+      ],
+      [
+        71,
+        "INPUT",
+        "data-action",
+        "capture-input"
+      ]
+    ]
+  },
+  "Capture": {
+    "elements": 42,
+    "hooks": [
+      [
+        17,
+        "DIV",
+        "data-bind",
+        "question"
+      ]
+    ]
+  },
+  "Session": {
+    "elements": 54,
+    "hooks": [
+      [
+        2,
+        "DIV",
+        "data-bind",
+        "session-header"
+      ]
+    ]
+  },
+  "Body": {
+    "elements": 77,
+    "hooks": [
+      [
+        6,
+        "SPAN",
+        "data-bind",
+        "header-date"
+      ],
+      [
+        16,
+        "H1",
+        "data-bind",
+        "body-title"
+      ],
+      [
+        19,
+        "svg",
+        "data-bind",
+        "body-chart"
+      ],
+      [
+        20,
+        "line",
+        "data-bind",
+        "body-goal-grid"
+      ],
+      [
+        21,
+        "text",
+        "data-bind",
+        "body-goal-label"
+      ],
+      [
+        22,
+        "line",
+        "data-bind",
+        "body-reference-grid"
+      ],
+      [
+        23,
+        "text",
+        "data-bind",
+        "body-reference-label"
+      ],
+      [
+        24,
+        "line",
+        "data-bind",
+        "body-today-grid"
+      ],
+      [
+        25,
+        "line",
+        "data-bind",
+        "body-goal-trend"
+      ],
+      [
+        26,
+        "line",
+        "data-bind",
+        "body-observed-trend"
+      ],
+      [
+        27,
+        "line",
+        "data-bind",
+        "body-forecast-trend"
+      ],
+      [
+        39,
+        "circle",
+        "data-bind",
+        "body-forecast-point"
+      ],
+      [
+        40,
+        "text",
+        "data-bind",
+        "body-forecast-date"
+      ],
+      [
+        41,
+        "text",
+        "data-bind",
+        "body-goal-speed"
+      ],
+      [
+        42,
+        "text",
+        "data-bind",
+        "body-start-date"
+      ],
+      [
+        43,
+        "text",
+        "data-bind",
+        "body-current-date"
+      ],
+      [
+        44,
+        "text",
+        "data-bind",
+        "body-middle-date"
+      ],
+      [
+        45,
+        "text",
+        "data-bind",
+        "body-end-date"
+      ]
+    ]
+  },
+  "Progress": {
+    "elements": 64,
+    "hooks": [
+      [
+        6,
+        "SPAN",
+        "data-bind",
+        "header-date"
+      ],
+      [
+        16,
+        "H1",
+        "data-bind",
+        "progress-title"
+      ],
+      [
+        26,
+        "svg",
+        "data-bind",
+        "progress-chart"
+      ]
+    ]
+  },
+  "Ledger": {
+    "elements": 96,
+    "hooks": [
+      [
+        6,
+        "SPAN",
+        "data-bind",
+        "header-date"
+      ],
+      [
+        18,
+        "DIV",
+        "data-bind",
+        "ledger-filters"
+      ],
+      [
+        28,
+        "DIV",
+        "data-bind",
+        "ledger-timeline"
+      ],
+      [
+        30,
+        "DIV",
+        "data-row",
+        "date"
+      ],
+      [
+        34,
+        "DIV",
+        "data-row",
+        "user"
+      ],
+      [
+        45,
+        "DIV",
+        "data-row",
+        "model"
+      ],
+      [
+        53,
+        "DIV",
+        "data-row",
+        "rule"
+      ],
+      [
+        88,
+        "DIV",
+        "data-row",
+        "reverted"
+      ]
+    ]
+  },
+  "Connect": {
+    "elements": 77,
+    "hooks": [
+      [
+        6,
+        "SPAN",
+        "data-bind",
+        "header-date"
+      ]
+    ]
+  },
+  "Transition": {
+    "elements": 113,
+    "hooks": []
+  },
+  "Debrief": {
+    "elements": 35,
+    "hooks": [
+      [
+        4,
+        "H1",
+        "data-bind",
+        "debrief-title"
+      ]
+    ]
+  },
+  "Icon": {
+    "elements": 5,
+    "hooks": []
+  }
+}

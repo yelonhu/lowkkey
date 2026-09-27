@@ -13,9 +13,12 @@
 
 打开 `http://127.0.0.1:5173`。开发登录使用本机测试身份，不读取旧库或实验 JSON。直接打开 `index.html` 的 `file://` 页面只显示启动说明。
 
+首次进入后，在「今日」点按「训练计划待设置」，从现有的「上肢 / 下肢」或「推 / 拉 / 腿」模板中选择，并查看训练日后确认保存。当天没有排训练时可选择计划中的任一天开始本次训练，不改变每周安排。首次训练组需要输入重量并确认单位；完成后记录写入 D1，下一组建议和体征、进步、日志均从本人状态刷新。
+
 ## 验证
 
 ```sh
+./scripts/run check
 ./node_modules/.bin/tsc --noEmit
 ./node_modules/.bin/vitest run
 ./node_modules/.bin/vite build
@@ -24,6 +27,8 @@ node tests/oauth-mcp.e2e.mjs
 ```
 
 API、Playwright 与 OAuth/MCP 端到端测试需要可监听本机 loopback 的环境。Playwright 启动隔离 D1；手动运行 OAuth/MCP 测试前先启动 `node scripts/serve.mjs --e2e`。十屏截图输出在 `.artifacts/playwright/v1-*.png`。
+
+画板的可见结构、内联样式和 SVG 只从交接包原始 HTML 读取；[绑定定位清单](src/app/binding-hooks.json) 仅标记元素，不包含第二份页面或示例事实。
 
 ## 接口与部署
 

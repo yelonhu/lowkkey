@@ -33,6 +33,7 @@ test('ten source artboards keep their original container styles and render accou
   const body=page.locator('.screen[data-screen="Body"]');
   await expect(body).not.toContainText('目标 75 kg');
   await expect(body).not.toContainText('目标速度 → 5 月中');
+  await expect(body.locator('[data-bind="body-reference-label"]')).toHaveText('');
   await page.goto('/#Session');
   await expect(page.locator('.screen[data-screen="Session"]')).not.toContainText('115 × 8');
   await page.goto('/#Debrief');

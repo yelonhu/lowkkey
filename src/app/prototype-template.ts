@@ -1,9 +1,8 @@
 import prototypeHtml from '../../docs/lowkkey-handoff/frontend/lowkkey-frontend.html?raw';
-import bindingTemplate from './prototype.html?raw';
+import bindingHooks from './binding-hooks.json';
 import type { Screen } from './navigation.ts';
 
 let parsed: Document | null = null;
-let bindings: Document | null = null;
 
 function source(): Document {
   parsed ??= new DOMParser().parseFromString(prototypeHtml, 'text/html');
@@ -24,21 +23,15 @@ export function prototypeScreen(screen: Screen): HTMLElement {
   const original = source().querySelector<HTMLElement>(`.screen[data-screen="${screen}"]`);
   if (!original) throw new Error(`Prototype screen missing: ${screen}`);
   const node = document.importNode(original, true);
-  // The handoff HTML is the visual source. The previous template supplies only
-  // non-visual hooks until the binding code no longer needs them.
-  bindings ??= new DOMParser().parseFromString(bindingTemplate, 'text/html');
-  const reference = bindings.querySelector<HTMLElement>(`.screen[data-screen="${screen}"]`);
-  if (!reference) throw new Error(`Binding template missing: ${screen}`);
-  const sourceElements = [reference, ...reference.querySelectorAll('*')];
+  // The handoff HTML alone supplies every visible node; this compact index adds
+  // non-visual lookup hooks at the same element positions.
+  const hooks = bindingHooks[screen] as {elements:number;hooks:[number,string,string,string][]};
   const targetElements = [node, ...node.querySelectorAll('*')];
-  if (sourceElements.length !== targetElements.length) throw new Error(`Handoff structure changed: ${screen}`);
-  sourceElements.forEach((element, index) => {
+  if (hooks.elements !== targetElements.length) throw new Error(`Handoff structure changed: ${screen}`);
+  for (const [index,tag,name,value] of hooks.hooks) {
     const target = targetElements[index];
-    if (element.tagName !== target.tagName) throw new Error(`Handoff node changed: ${screen}:${index}`);
-    for (const name of ['data-bind', 'data-row', 'data-action']) {
-      const value = element.getAttribute(name);
-      if (value !== null) target.setAttribute(name, value);
-    }
-  });
+    if (target.tagName !== tag) throw new Error(`Handoff node changed: ${screen}:${index}`);
+    target.setAttribute(name,value);
+  }
   return node;
 }

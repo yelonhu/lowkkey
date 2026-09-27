@@ -34,6 +34,13 @@ describe('v1 REST and atomic model review',()=>{
     expect((await call('/v1/capture','a','POST',{...input,text:'昨天体重 61kg'},key)).status).toBe(409);
     expect((await call('/v1/capture','a','POST',{...input,capturedLocalDate:'2030-03-15'})).status).toBe(400);
   });
+  it('keeps an explicit account timezone when a capture came from another device zone',async()=>{
+    expect((await call('/v1/preferences/timezone','zone','PUT',{timeZone:'UTC'})).status).toBe(200);
+    const result=await call('/v1/capture','zone','POST',{text:'昨天体重 60kg',...clock});
+    expect(result.status).toBe(200);
+    expect(result.body.committed[0].date).toBe('2030-03-13');
+    expect((await call('/v1/state','zone')).body.timezone).toBe('UTC');
+  });
   it('isolates users and appends a revert once',async()=>{
     const own=(await call('/v1/state','a')).body,entry=own.entries[0];
     expect((await call(`/v1/entries/${entry.id}/revert`,'b','POST',{})).status).toBe(404);

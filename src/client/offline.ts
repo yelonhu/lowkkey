@@ -1,4 +1,4 @@
-export type QueuedCapture = { id: string; accountId: string; rawText: string; capturedAt: string; capturedLocalDate: string; timeZone: string; createdAt: string };
+export type QueuedCapture = { id: string; accountId: string; rawText: string; capturedAt: string; capturedLocalDate: string; timeZone: string; inSession?:boolean; createdAt: string };
 const DB_NAME = 'lowkkey-v02-captures';
 const STORE = 'pending';
 
