@@ -14,12 +14,21 @@ export function patchNode(current: Node, next: Node): void {
     if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
     return;
   }
-  const top = current.scrollTop, left = current.scrollLeft;
+  // Only scroll owners need layout reads; reading every SVG/text descendant
+  // after each mutation would force repeated layout during taps and SSE updates.
+  const scrollable=current.matches('[data-scroll-region],[role="dialog"]');
+  const top = scrollable?current.scrollTop:0, left = scrollable?current.scrollLeft:0;
+  const motionStyle=current instanceof HTMLElement?['--sheet-y','--sheet-scrim-opacity'].map(name=>[name,current.style.getPropertyValue(name)] as const):[];
   for (const attribute of [...current.attributes]) {
+    if(['data-pressed','data-motion-above'].includes(attribute.name))continue;
     if (!next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
   }
   for (const attribute of [...next.attributes]) {
     if (current.getAttribute(attribute.name) !== attribute.value) current.setAttribute(attribute.name, attribute.value);
+  }
+  if(current instanceof HTMLElement){
+    for(const [name,value] of motionStyle)if(value)current.style.setProperty(name,value);
+    if(current.matches(':disabled,[aria-disabled="true"]'))current.removeAttribute('data-pressed');
   }
   if (current instanceof HTMLInputElement && next instanceof HTMLInputElement) {
     // The live input owns its edit/composition buffer until an explicit submit.
@@ -43,6 +52,6 @@ export function patchNode(current: Node, next: Node): void {
     }
   }
   for (const removed of remaining) removed.parentNode?.removeChild(removed);
-  if (current.scrollTop !== top) current.scrollTop = top;
-  if (current.scrollLeft !== left) current.scrollLeft = left;
+  if (scrollable && current.scrollTop !== top) current.scrollTop = top;
+  if (scrollable && current.scrollLeft !== left) current.scrollLeft = left;
 }

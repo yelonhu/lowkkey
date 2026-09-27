@@ -1,13 +1,18 @@
 /* The ten screens and visual rules come from docs/lowkkey-handoff/frontend/lowkkey-frontend.html. */
-html,body,#root{margin:0;min-height:100%;width:100%}
-.prototype-shell{width:100%;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}
+html,body,#root{margin:0;width:100%;height:100dvh;overflow:hidden;overscroll-behavior-y:none}
+*{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text}
+:root{--motion-curve:cubic-bezier(0.32,0.72,0,1);--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+.prototype-shell{position:fixed;inset:0;width:100%;height:100dvh;display:flex;justify-content:center;align-items:flex-start;overflow:hidden;overscroll-behavior-y:none}
+.prototype-shell[data-theme="dark"]{background:#000}
+.prototype-shell[data-theme="light"]{background:#F1F1EF}
 .prototype-host{flex:none;transform-origin:top center}
 .prototype-host .screen{display:block}
 .prototype-host [hidden]{display:none!important}
 .prototype-host [aria-disabled="true"]{cursor:default}
 .prototype-host button{cursor:pointer}
 .prototype-host button:disabled{cursor:default}
-.access-gate{width:min(100%,390px);min-height:100dvh;margin:auto;box-sizing:border-box;padding:24px 20px 25vh;background:#F1F1EF;color:#141415;display:flex;flex-direction:column;justify-content:flex-end;font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif}
+.access-gate{overflow-y:auto;overscroll-behavior-y:none;max-height:100dvh;width:min(100%,390px);min-height:100dvh;margin:auto;box-sizing:border-box;padding:24px 20px 25vh;background:#F1F1EF;color:#141415;display:flex;flex-direction:column;justify-content:flex-end;font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif}
 .access-gate>div{font-family:"Noto Serif SC","Songti SC",serif;font-size:20px;font-weight:700;margin-bottom:auto}
 .access-gate h1{font-family:"Noto Serif SC","Songti SC",serif;font-size:27px;line-height:1.5}
 .access-gate p{font-size:14px;color:#545458}
@@ -20,30 +25,44 @@ html,body,#root{margin:0;min-height:100%;width:100%}
 .formula-drawer button{border:0;background:transparent;color:#2C4A66;font:600 15px/44px inherit;float:right}
 /* Interaction layers do not alter the resting handoff styles. */
 .prototype-host{position:relative}
-.prototype-host.phone>.screen>div{height:var(--page-height,844px)!important}
-.prototype-host.phone>.screen:not(.sheet-layer){padding-top:env(safe-area-inset-top,0px);box-sizing:border-box}
-.prototype-host.phone>.screen:not(.sheet-layer)>div{height:calc(var(--page-height,844px) - env(safe-area-inset-top,0px))!important;padding-bottom:env(safe-area-inset-bottom,0px)}
-.prototype-host.phone main[data-scrollable="true"]{overflow-y:auto!important;overscroll-behavior-y:contain}
-.prototype-host :is(button,a,[role="button"]){touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:scale 180ms ease-out}
-.prototype-host :is(button,a,[role="button"]):not(:disabled):not([aria-disabled="true"]):active{scale:.97;transition-duration:100ms}
+/* Safe areas are outside the original artboard padding, and counted once. */
+.prototype-host.phone>.screen:not(.sheet-layer){height:var(--page-height,844px);box-sizing:border-box;background:#F1F1EF;padding:calc(var(--safe-top) / var(--viewport-scale,1)) 0 calc(var(--safe-bottom) / var(--viewport-scale,1))}
+.prototype-host.phone>.screen:is([data-screen="Session"],[data-screen="Debrief"]){background:#000}
+.prototype-host.phone>.screen:not(.sheet-layer)>div{height:100%!important;overflow:hidden}
+:where(.prototype-host.phone>.screen>div>*,[data-scroll-region]>*,[data-scroll-frame]>*){flex-shrink:0}
+.prototype-host.phone [data-scroll-region],.prototype-host.phone [data-scroll-frame]{flex:1 1 auto;min-height:0;min-width:0}
+.prototype-host.phone [data-scroll-region]{overflow-x:hidden;overflow-y:auto!important;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch}
+.prototype-host.phone [data-scroll-frame]{overflow:hidden!important}
+.prototype-host.phone [data-bind="ledger-timeline"]{flex-grow:0}
+.prototype-host.phone [data-scroll-region="session"]{justify-content:safe center!important}
+.prototype-host.phone [data-scroll-region="debrief"]{display:flex;flex-direction:column}
+.prototype-host.phone [data-scroll-region="debrief"]>[style*="flex-grow"]{flex:1 0 0}
+.prototype-shell[data-keyboard="true"]{--safe-bottom:0px}
+.prototype-host :is(button,a,[role="button"],[role="radio"]),.action-status button,.access-gate button{touch-action:manipulation;transition:scale 120ms var(--motion-curve),opacity 120ms var(--motion-curve)}
+.prototype-host [data-pressed]:not(:disabled):not([aria-disabled="true"]),.action-status button[data-pressed],.access-gate button[data-pressed]{scale:.97}
 .prototype-host :is(button,a,input,[tabindex]):focus-visible{outline:2px solid #2C4A66;outline-offset:3px}
 .prototype-host [aria-busy="true"]{opacity:.65;cursor:progress}
 .prototype-host input{scroll-margin-block:20px}
+.prototype-host [data-motion-above]{position:relative;z-index:1}
 .motion-outgoing{position:absolute!important;inset:0;pointer-events:none!important}
 .sheet-layer{position:absolute;inset:0;z-index:10}
-.sheet-layer>div{background:transparent!important}
+.sheet-layer>div{background:transparent!important;height:var(--page-height,844px)!important}
 .sheet-layer [data-scrim]{height:100%!important}
-.sheet-layer [role="dialog"]{max-height:calc(100% - env(safe-area-inset-top,0px) - 12px);overflow-y:auto;overscroll-behavior:contain;padding-bottom:max(34px,env(safe-area-inset-bottom,0px))!important}
+.sheet-layer [role="dialog"]{max-height:calc(100% - var(--safe-top) / var(--viewport-scale,1) - 12px);overflow-y:auto;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch;padding-bottom:max(34px,calc(var(--safe-bottom) / var(--viewport-scale,1)))!important}
 .sheet-layer[aria-hidden="true"]{pointer-events:none}
 [data-sheet-handle]{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
 .prototype-host>.formula-scrim{position:absolute}
-.formula-drawer{max-height:calc(100% - 20px);overflow-y:auto;overscroll-behavior:contain}
+.formula-drawer{max-height:calc(100% - var(--safe-top) / var(--viewport-scale,1) - 12px);padding-bottom:max(34px,calc(var(--safe-bottom) / var(--viewport-scale,1)));overflow-y:auto;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch}
 .action-status{position:fixed;z-index:30;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);box-sizing:border-box;width:min(calc(100% - 40px),350px);display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:#141415;color:#F7F7F5;font:13px/1.5 -apple-system,"PingFang SC",sans-serif}
 .action-status button{flex:none;background:transparent;border:0;min-height:44px;padding:0 4px;color:inherit;font:600 14px inherit;touch-action:manipulation}
-@media(prefers-reduced-motion:reduce){.prototype-host :is(button,a,[role="button"]):active{scale:1}}
+[role="dialog"]{transform:translateY(var(--sheet-y,0px))}
+[data-scrim]{opacity:var(--sheet-scrim-opacity,1)}
+.endpoint-copy-input{box-sizing:border-box;width:100%;min-width:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-overflow:ellipsis}
+@media(prefers-reduced-motion:reduce){.prototype-host [data-pressed],.action-status button[data-pressed],.access-gate button[data-pressed]{scale:1!important;opacity:.7}}
 /* The source stylesheet is installed later; scope overlays above its .screen rule. */
 .prototype-host>.sheet-layer{position:absolute}
-.prototype-host.phone>.screen{height:var(--page-height,844px)}
-.prototype-shell[data-compact="true"] .prototype-host.phone main{flex:1 1 0%;min-height:0;overflow-y:auto!important;overscroll-behavior-y:contain}
 .prototype-host.phone [data-screen="Main"]>div>div:last-child{flex-shrink:0}
 .prototype-host [role="dialog"]:focus-visible{outline:none}
+
+/* Keep iOS from zooming the viewport while editing small display text. */
+@media(pointer:coarse){input[data-action="capture-input"]:focus,.endpoint-copy-input:focus{font-size:16px!important}}

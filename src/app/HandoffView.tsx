@@ -13,7 +13,7 @@ import { RequestError } from './useHandoff.ts';
 import type { useHandoff } from './useHandoff.ts';
 import { patchNode } from './dom-patch.ts';
 import { Motion, reducedMotion } from './motion.ts';
-import { observeViewport, updateScrollability } from './viewport.ts';
+import { observeViewport, prepareViewport } from './viewport.ts';
 
 type Chamber=ReturnType<typeof useHandoff>;
 const writes=new Set(['program-save','day-start','progress-confirm-add','capture-submit','toast-revert','entry-revert','submission-accept','submission-skip','held-skip','start-session','end-session','complete-set','trigger-accept','trigger-later','proposal-accept','proposal-reject','client-revoke']);
@@ -27,10 +27,12 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const [formula,setFormula]=useState<string|null>(null),[sheet,setSheet]=useState<SheetState|null>(null),[manualLoad,setManualLoad]=useState(''),[manualUnit,setManualUnit]=useState<'kg'|'lb'|null>(null);
   const [review,setReview]=useState<{id:string;questions:NonNullable<Chamber['state']>['submissions'][number]['questions'];revision:number}|null>(null);
   const [reviewLoading,setReviewLoading]=useState(false),[activeAction,setActiveAction]=useState<string|null>(null),[notice,setNotice]=useState(''),[captureRetry,setCaptureRetry]=useState(false);
+  const [copyFallback,setCopyFallback]=useState(false);
   const reviewSequence=useRef(0),running=useRef(false),lastBase=useRef<Screen>('Main'),base=useRef<HTMLElement|null>(null),overlay=useRef<HTMLElement|null>(null),overlayType=useRef<string|null>(null);
   const scrollPositions=useRef(new WeakMap<HTMLElement,{node:Element;top:number;left:number}[]>());
   const cache=useRef(new Map<Screen,HTMLElement>()),pageMotion=useRef(new Motion()),sheetMotion=useRef(new Motion()),returnFocus=useRef<HTMLElement|null>(null);
-  const press=useRef<{x:number;y:number}|null>(null),drag=useRef<{node:HTMLElement;y:number;last:number;time:number;id:number}|null>(null),dragAnimation=useRef<Animation|null>(null);
+  const press=useRef<{x:number;y:number}|null>(null);
+  const drag=useRef<{node:HTMLElement;layer:HTMLElement;grip:HTMLElement;y:number;offset:number;last:number;id:number;samples:{y:number;time:number}[]}|null>(null),dragFrame=useRef(0);
   const state=chamber.state,submissionId=state?.submissions[0]?.id;
   const live=useRef({sheet,formula,screen});live.current={sheet,formula,screen};
   const baseScreen=screen==='Capture'?lastBase.current:screen;
@@ -43,7 +45,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     if(draft.current.trim()===failedCapture.current){draft.current='';const input=host.current?.querySelector<HTMLInputElement>('[data-action="capture-input"]');if(input)input.value='';}
     failedCapture.current='';setCaptureRetry(false);
   },[chamber.confirmedCapture]);
-  useEffect(()=>()=>{pageMotion.current.settle();sheetMotion.current.settle();},[]);
+  useEffect(()=>{
+    return()=>{cancelAnimationFrame(dragFrame.current);pageMotion.current.settle();sheetMotion.current.settle();};
+  },[]);
 
   function openSheet(value:SheetState){
     if(!sheet&&!formula)history.pushState({...history.state,lowkkeyOverlay:true},'',location.href);
@@ -73,13 +77,18 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     installPrototypeStyle();
     const context={state,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps,rir,exerciseId,manualLoad,manualUnit};
     const target=prototypeScreen(baseScreen);prepareHandoff(target,baseScreen,state.today);bindHandoff(target,context);
+    prepareViewport(target,baseScreen);
+    if(copyFallback&&baseScreen==='Connect'){
+      const endpoint=target.querySelector<HTMLElement>('[data-bind="connect-endpoint"]');
+      if(endpoint){const copy=document.createElement('input');copy.className='endpoint-copy-input';copy.readOnly=true;copy.value=`${location.origin}/mcp`;copy.setAttribute('aria-label','MCP 连接地址，长按复制');endpoint.replaceChildren(copy);}
+    }
     const input=target.querySelector<HTMLInputElement>('input[data-action="capture-input"]');if(input)input.value=draft.current;
     decorate(target);
     const from=base.current?.dataset.screen as Screen|undefined;
     if(from===baseScreen&&base.current)patchNode(base.current,target);
     else {
-      pageMotion.current.settle();const old=base.current;
-      if(old){scrollPositions.current.set(old,[old,...old.querySelectorAll('*')].filter(node=>node.scrollTop||node.scrollLeft).map(node=>({node,top:node.scrollTop,left:node.scrollLeft})));cache.current.set(from!,old);}
+      pageMotion.current.settle();sheetMotion.current.settle();cancelAnimationFrame(dragFrame.current);drag.current=null;const old=base.current;
+      if(old){scrollPositions.current.set(old,[...old.querySelectorAll('[data-scroll-region]')].filter(node=>node.scrollTop||node.scrollLeft).map(node=>({node,top:node.scrollTop,left:node.scrollLeft})));cache.current.set(from!,old);}
       const retained=cache.current.get(baseScreen);if(retained)patchNode(retained,target);
       const next=retained??target;host.current.replaceChildren(next);base.current=next;
       for(const position of scrollPositions.current.get(next)??[]){position.node.scrollTop=position.top;position.node.scrollLeft=position.left;}
@@ -87,7 +96,6 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       pageMotion.current.screen(host.current,old,next,from??null,baseScreen,press.current);
     }
     lastBase.current=baseScreen;
-    updateScrollability(host.current);
     let layer:HTMLElement|null=null;
     if(sheet||screen==='Capture'){
       layer=prototypeScreen('Capture');
@@ -126,8 +134,13 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     }
   });
   useLayoutEffect(()=>{
+    if(!copyFallback)return;
+    const input=host.current?.querySelector<HTMLInputElement>('.endpoint-copy-input');input?.focus({preventScroll:true});input?.select();
+  },[copyFallback]);
+  useLayoutEffect(()=>{
     if(!host.current||!shell.current)return;
     const width=baseScreen==='Transition'?1160:baseScreen==='Icon'?512:390,height=baseScreen==='Transition'?840:baseScreen==='Icon'?512:844;
+    shell.current.dataset.theme=['Session','Debrief'].includes(baseScreen)?'dark':'light';
     host.current.className=`prototype-host${width===390?' phone':''}`;
     return observeViewport(shell.current,host.current,width,height);
   },[baseScreen]);
@@ -225,7 +238,10 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='trigger-later'&&id)run(action,()=>chamber.decideTrigger(id,'later'));
         else if(action==='proposal-accept'&&id)run(action,()=>chamber.decideProposal(id,'accept'));
         else if(action==='proposal-reject'&&id)run(action,()=>chamber.decideProposal(id,'reject'));
-        else if(action==='copy-endpoint')void navigator.clipboard.writeText(`${location.origin}/mcp`).then(()=>setNotice('连接地址已复制')).catch(()=>chamber.setError('复制未完成，请选中连接地址复制。'));
+        else if(action==='copy-endpoint')void (async()=>{
+          try{await navigator.clipboard.writeText(`${location.origin}/mcp`);setCopyFallback(false);setNotice('连接地址已复制');}
+          catch{setCopyFallback(true);setNotice('请长按连接地址，选择复制。');}
+        })();
         else if(action==='external-photo'||action==='external-voice')chamber.setError(`请在已连接的外部客户端发送${action==='external-photo'?'照片':'语音'}，可从「接入」页查看连接地址。`);
         else if(action==='client-revoke'&&id)run(action,()=>chamber.revokeClient(id));
         else if(action==='resume-session')go('Session');
@@ -248,23 +264,37 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     else if((event.key==='Enter'||event.key===' ')&&target.matches('[role="button"][data-action]')){event.preventDefault();(target as HTMLElement).click();}
   };
   const pointerDown=(event:React.PointerEvent<HTMLDivElement>)=>{
-    pageMotion.current.settle();sheetMotion.current.settle();press.current={x:event.clientX,y:event.clientY};
+    if(!event.isPrimary||event.button!==0)return;
+    press.current={x:event.clientX,y:event.clientY};
     const grip=(event.target as Element).closest<HTMLElement>('[data-sheet-handle]'),dialog=grip?.closest<HTMLElement>('[role="dialog"]');
-    if(dialog&&grip){grip.setPointerCapture(event.pointerId);drag.current={node:dialog,y:event.clientY,last:event.clientY,time:performance.now(),id:event.pointerId};}
+    if(dialog&&grip&&overlay.current){
+      const offset=sheetMotion.current.holdSheet(overlay.current);grip.setPointerCapture(event.pointerId);
+      drag.current={node:dialog,layer:overlay.current,grip,y:event.clientY,offset,last:event.clientY,id:event.pointerId,samples:[{y:event.clientY,time:performance.now()}]};
+    }
+  };
+  const paintDrag=()=>{
+    dragFrame.current=0;const active=drag.current;if(!active||reducedMotion())return;
+    const scale=host.current!.getBoundingClientRect().width/host.current!.offsetWidth;
+    const distance=Math.max(0,active.offset+(active.last-active.y)/scale);
+    active.node.style.setProperty('--sheet-y',`${distance}px`);
+    active.layer.querySelector<HTMLElement>('[data-scrim]')?.style.setProperty('--sheet-scrim-opacity',String(Math.max(0,1-distance/active.node.offsetHeight)));
   };
   const pointerMove=(event:React.PointerEvent<HTMLDivElement>)=>{
     const active=drag.current;if(!active||active.id!==event.pointerId)return;
-    active.last=event.clientY;const distance=Math.max(0,event.clientY-active.y);dragAnimation.current?.cancel();
-    if(!reducedMotion())dragAnimation.current=active.node.animate([{transform:`translateY(${distance}px)`},{transform:`translateY(${distance}px)`}],{duration:1,fill:'forwards'});
+    active.last=event.clientY;const time=performance.now();active.samples=active.samples.filter(sample=>time-sample.time<100);active.samples.push({y:event.clientY,time});
+    if(!dragFrame.current)dragFrame.current=requestAnimationFrame(paintDrag);
   };
   const pointerEnd=(event:React.PointerEvent<HTMLDivElement>)=>{
-    const active=drag.current;if(!active)return;drag.current=null;dragAnimation.current?.cancel();
-    const distance=active.last-active.y,close=event.type!=='pointercancel'&&(distance>80||distance>24&&distance/(performance.now()-active.time)>.5);
-    if(close)dismiss();else if(!reducedMotion())void active.node.animate([{transform:`translateY(${Math.max(0,distance)}px)`},{transform:'translateY(0)'}],{duration:180,easing:'ease-out'});
+    const active=drag.current;if(!active||active.id!==event.pointerId)return;
+    cancelAnimationFrame(dragFrame.current);paintDrag();drag.current=null;
+    if(active.grip.hasPointerCapture(event.pointerId))active.grip.releasePointerCapture(event.pointerId);
+    const distance=active.last-active.y,sample=active.samples[0],velocity=(active.last-sample.y)/Math.max(1,performance.now()-sample.time);
+    const close=event.type==='pointerup'&&(distance>80||distance>24&&velocity>.5);
+    if(close)dismiss();else sheetMotion.current.sheet(active.layer,true);
   };
   const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]'))draft.current=target.value;else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.value);}};
   const feedback=chamber.error||notice;
-  return <div className="prototype-shell" ref={shell} onClick={click} onKeyDown={keydown} onInput={onInput} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd}>
+  return <div className="prototype-shell" ref={shell} onClick={click} onKeyDown={keydown} onInput={onInput} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd}>
     <div ref={host}/>
     {feedback&&<div className="action-status" role="status" aria-live="polite"><span>{feedback}</span>{chamber.retry?<button type="button" data-action="retry-operation">重试</button>:captureRetry&&chamber.error?<button type="button" data-action="retry-capture">重试</button>:null}</div>}
   </div>;

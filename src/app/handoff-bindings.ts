@@ -221,7 +221,7 @@ function bindConnect(root:HTMLElement,c:HandoffContext){
     if(node.textContent?.includes('规划中的 MCP 工具'))text(node,'MCP 工具');
     if(node.textContent?.includes('尚未开放'))text(node,'复制');
   }
-  const endpoint=Array.from(root.querySelectorAll<HTMLElement>('div')).find(e=>e.children.length===0&&e.textContent?.trim()==='[YOUR-ENDPOINT]/mcp');if(endpoint)text(endpoint,`${location.origin}/mcp`);
+  const endpoint=Array.from(root.querySelectorAll<HTMLElement>('div')).find(e=>e.children.length===0&&e.textContent?.trim()==='[YOUR-ENDPOINT]/mcp');if(endpoint){endpoint.dataset.bind='connect-endpoint';text(endpoint,`${location.origin}/mcp`);}
   const copy=Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(e=>e.textContent?.trim()==='复制');if(copy){copy.dataset.action='copy-endpoint';enable(copy);}
 }
 function bindTransition(root:HTMLElement,c:HandoffContext){

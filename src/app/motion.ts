@@ -1,27 +1,41 @@
 import type { Screen } from './navigation.ts';
 
 export const reducedMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const curve='cubic-bezier(0.32, 0.72, 0, 1)';
+const motionCurve='cubic-bezier(0.32, 0.72, 0, 1)';
 export class Motion {
-  private animations:Animation[]=[];
-  private cleanups:(()=>void)[]=[];
-  settle(){for(const animation of this.animations)animation.cancel();this.animations=[];for(const cleanup of this.cleanups)cleanup();this.cleanups=[];}
+  private animations=new Set<Animation>();
+  private cleanups=new Set<()=>void>();
+  private generation=0;
+  settle(){
+    this.generation++;
+    for(const animation of this.animations)animation.cancel();this.animations.clear();
+    for(const cleanup of this.cleanups)cleanup();this.cleanups.clear();
+  }
   private play(node:Element,frames:Keyframe[],duration:number,delay=0){
-    const animation=node.animate(frames,{duration,delay,easing:curve,fill:'backwards'});
-    this.animations.push(animation);return animation.finished.catch(()=>{});
+    const generation=this.generation,segmented=frames.some(frame=>frame.offset!==undefined);
+    // Explicit timeline offsets use easing per segment so 380 ms stays 380 ms.
+    const animation=node.animate(segmented?frames.map(frame=>({...frame,easing:motionCurve})):frames,{duration,delay,easing:segmented?'linear':motionCurve,fill:'backwards'});
+    this.animations.add(animation);
+    return animation.finished.then(()=>generation===this.generation,()=>false).finally(()=>this.animations.delete(animation));
   }
   screen(host:HTMLElement,old:HTMLElement|null,next:HTMLElement,from:Screen|null,to:Screen,point:{x:number;y:number}|null){
     this.settle();if(!old||from===to)return;
     const training=from==='Main'&&to==='Session',returning=from==='Debrief'&&to==='Main';
-    if(!training&&!returning){void this.play(next,[{opacity:0},{opacity:1}],160);return;}
-    const outgoing=old.cloneNode(true) as HTMLElement;
+    if(!training&&!returning){if(!reducedMotion())void this.play(next,[{opacity:0},{opacity:1}],160);return;}
+    // Reuse the retained outgoing page instead of cloning every control and SVG.
+    const outgoing=old,wasInert=old.inert,wasHidden=old.getAttribute('aria-hidden');
     outgoing.classList.add('motion-outgoing');outgoing.inert=true;outgoing.setAttribute('aria-hidden','true');host.append(outgoing);
-    const remove=()=>outgoing.remove();this.cleanups.push(remove);
+    const remove=()=>{
+      outgoing.remove();outgoing.classList.remove('motion-outgoing');outgoing.style.removeProperty('z-index');outgoing.inert=wasInert;
+      if(wasHidden===null)outgoing.removeAttribute('aria-hidden');else outgoing.setAttribute('aria-hidden',wasHidden);
+    };
+    const restore=()=>{next.removeAttribute('data-motion-above');};
+    this.cleanups.add(remove);this.cleanups.add(restore);
+    const finish=(completed:boolean)=>{if(completed){remove();restore();this.cleanups.delete(remove);this.cleanups.delete(restore);}};
     if(reducedMotion()){
-      outgoing.style.zIndex='0';next.style.position='relative';next.style.zIndex='1';
-      const restore=()=>{next.style.removeProperty('position');next.style.removeProperty('z-index');};this.cleanups.push(restore);
+      outgoing.style.zIndex='0';next.setAttribute('data-motion-above','');
       void this.play(outgoing,[{opacity:1},{opacity:0}],200);
-      void this.play(next,[{opacity:0},{opacity:1}],200).then(()=>{remove();restore();});return;
+      void this.play(next,[{opacity:0},{opacity:1}],200).then(finish);return;
     }
     const rect=host.getBoundingClientRect(),scale=rect.width/host.offsetWidth;
     const anchor=next.querySelector<HTMLElement>('[data-bind="main-plan"]')?.lastElementChild?.getBoundingClientRect();
@@ -30,25 +44,37 @@ export class Motion {
     const radius=Math.hypot(Math.max(x,host.offsetWidth-x),Math.max(y,host.offsetHeight-y));
     const circle=(r:number)=>`circle(${r}px at ${x}px ${y}px)`;
     if(training){
-      outgoing.style.zIndex='0';next.style.position='relative';next.style.zIndex='1';
+      outgoing.style.zIndex='0';next.setAttribute('data-motion-above','');
       void this.play(outgoing,[{transform:'scale(1)',opacity:1,filter:'blur(0)'},{transform:'scale(.92)',opacity:.35,filter:'blur(3px)'}],380);
-      const restore=()=>{next.style.removeProperty('position');next.style.removeProperty('z-index');};
-      void this.play(next,[{clipPath:circle(0),offset:0},{clipPath:circle(radius),offset:380/620},{clipPath:circle(radius),offset:1}],620).then(()=>{remove();restore();});
-      const center=next.firstElementChild?.children[2];
+      void this.play(next,[{clipPath:circle(0),offset:0},{clipPath:circle(radius),offset:380/620},{clipPath:circle(radius),offset:1}],620).then(finish);
+      const center=next.querySelector('[data-scroll-region="session"]');
       if(center?.children[1])void this.play(center.children[1],[{transform:'translateY(12px)',opacity:0},{transform:'translateY(0)',opacity:1}],240,380);
       const bar=center?.querySelector('svg[role="img"]');if(bar)void this.play(bar,[{opacity:0},{opacity:1}],160,460);
-      this.cleanups.push(restore);
     }else{
       outgoing.style.zIndex='1';
       void this.play(next,[{transform:'scale(.92)',opacity:.35,filter:'blur(3px)'},{transform:'scale(1)',opacity:1,filter:'blur(0)'}],480);
-      void this.play(outgoing,[{clipPath:circle(radius)},{clipPath:circle(0)}],480).then(remove);
+      void this.play(outgoing,[{clipPath:circle(radius)},{clipPath:circle(0)}],480).then(finish);
     }
   }
+  holdSheet(layer:HTMLElement){
+    const dialog=layer.querySelector<HTMLElement>('[role="dialog"]');if(!dialog)return 0;
+    const transform=getComputedStyle(dialog).transform,y=transform==='none'?0:new DOMMatrixReadOnly(transform).m42;
+    const scrim=layer.querySelector<HTMLElement>('[data-scrim]'),opacity=scrim?getComputedStyle(scrim).opacity:'1';
+    this.settle();dialog.style.setProperty('--sheet-y',`${y}px`);scrim?.style.setProperty('--sheet-scrim-opacity',opacity);
+    return y;
+  }
   sheet(layer:HTMLElement,opening:boolean,done?:()=>void){
-    this.settle();const dialog=layer.querySelector('[role="dialog"]');if(!dialog){done?.();return;}
-    if(reducedMotion()){done?.();return;}
-    const frames=opening?[{transform:'translateY(100%)'},{transform:'translateY(0)'}]:[{transform:'translateY(0)'},{transform:'translateY(100%)'}];
-    void this.play(dialog,frames,320).then(()=>done?.());
-    const scrim=layer.querySelector('[data-scrim]');if(scrim)void this.play(scrim,opening?[{opacity:0},{opacity:1}]:[{opacity:1},{opacity:0}],320);
+    const dialog=layer.querySelector<HTMLElement>('[role="dialog"]');if(!dialog){done?.();return;}
+    const held=!!dialog.style.getPropertyValue('--sheet-y');
+    const from=opening&&!held?'translateY(100%)':getComputedStyle(dialog).transform;
+    const scrim=layer.querySelector<HTMLElement>('[data-scrim]'),opacity=opening&&!held?0:scrim?Number(getComputedStyle(scrim).opacity):1;
+    this.settle();
+    const clear=()=>{dialog.style.removeProperty('--sheet-y');scrim?.style.removeProperty('--sheet-scrim-opacity');};
+    if(reducedMotion()){clear();done?.();return;}
+    const finish=()=>{clear();done?.();};
+    if(!opening)this.cleanups.add(finish);
+    // Finish callbacks only run for this generation, never after a cancellation.
+    void this.play(dialog,[{transform:from},{transform:opening?'translateY(0)':'translateY(100%)'}],320).then(completed=>{if(completed){finish();this.cleanups.delete(finish);}});
+    if(scrim)void this.play(scrim,[{opacity},{opacity:opening?1:0}],320);
   }
 }
