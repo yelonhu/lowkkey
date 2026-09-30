@@ -6,7 +6,7 @@ test('a new account chooses a template, starts an unscheduled day, and records i
   await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   const main=page.locator('.screen[data-screen="Main"]');
   await expect(main).toBeVisible();
-  await expect(main.locator('a[data-action="plan-setup"]')).toHaveText('训练计划待设置');
+  await expect(main.locator('a[data-action="plan-setup"]')).toHaveText('选择计划');
   await main.locator('a[data-action="plan-setup"]').click();
   const sheet=page.getByRole('dialog',{name:'选择训练模板'});
   await expect(sheet).toContainText('上肢 / 下肢');

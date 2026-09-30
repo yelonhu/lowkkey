@@ -19,7 +19,10 @@ export class Motion {
     return animation.finished.then(()=>generation===this.generation,()=>false).finally(()=>this.animations.delete(animation));
   }
   screen(host:HTMLElement,old:HTMLElement|null,next:HTMLElement,from:Screen|null,to:Screen,point:{x:number;y:number}|null){
-    this.settle();if(!old||from===to)return;
+    this.settle();if(!old){
+      if(to==='Main')for(const [index,node] of [...next.querySelectorAll('main > *')].entries())void this.play(node,reducedMotion()?[{opacity:0},{opacity:1}]:[{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],reducedMotion()?120:280,reducedMotion()?0:Math.min(index,3)*30);
+      return;
+    }if(from===to)return;
     const training=from==='Main'&&to==='Session',returning=from==='Debrief'&&to==='Main';
     if(!training&&!returning){if(!reducedMotion())void this.play(next,[{opacity:0},{opacity:1}],160);return;}
     // Reuse the retained outgoing page instead of cloning every control and SVG.
@@ -56,19 +59,22 @@ export class Motion {
       void this.play(outgoing,[{clipPath:circle(radius)},{clipPath:circle(0)}],480).then(finish);
     }
   }
-  holdSheet(layer:HTMLElement){
+  holdSheet(layer:HTMLElement,background:HTMLElement|null){
     const dialog=layer.querySelector<HTMLElement>('[role="dialog"]');if(!dialog)return 0;
     const transform=getComputedStyle(dialog).transform,y=transform==='none'?0:new DOMMatrixReadOnly(transform).m42;
     const scrim=layer.querySelector<HTMLElement>('[data-scrim]'),opacity=scrim?getComputedStyle(scrim).opacity:'1';
-    this.settle();dialog.style.setProperty('--sheet-y',`${y}px`);scrim?.style.setProperty('--sheet-scrim-opacity',opacity);
+    const depth=background?getComputedStyle(background).scale:'1';this.settle();background?.style.setProperty('--sheet-depth',depth==='none'?'1':depth);dialog.style.setProperty('--sheet-y',`${y}px`);scrim?.style.setProperty('--sheet-scrim-opacity',opacity);
     return y;
   }
-  sheet(layer:HTMLElement,opening:boolean,done?:()=>void){
+  sheet(layer:HTMLElement,opening:boolean,done?:()=>void,background?:HTMLElement|null){
     const dialog=layer.querySelector<HTMLElement>('[role="dialog"]');if(!dialog){done?.();return;}
     const held=!!dialog.style.getPropertyValue('--sheet-y');
     const from=opening&&!held?'translateY(100%)':getComputedStyle(dialog).transform;
     const scrim=layer.querySelector<HTMLElement>('[data-scrim]'),opacity=opening&&!held?0:scrim?Number(getComputedStyle(scrim).opacity):1;
+    const depth=background?getComputedStyle(background).scale:'1';
     this.settle();
+    if(background)background.style.setProperty('--sheet-depth',opening&&!reducedMotion()?'.96':'1');
+    if(background&&!reducedMotion())void this.play(background,[{scale:depth==='none'?'1':depth},{scale:opening?'.96':'1'}],320);
     const clear=()=>{dialog.style.removeProperty('--sheet-y');scrim?.style.removeProperty('--sheet-scrim-opacity');};
     if(reducedMotion()){clear();done?.();return;}
     const finish=()=>{clear();done?.();};

@@ -18,7 +18,7 @@ export function patchNode(current: Node, next: Node): void {
   // after each mutation would force repeated layout during taps and SSE updates.
   const scrollable=current.matches('[data-scroll-region],[role="dialog"]');
   const top = scrollable?current.scrollTop:0, left = scrollable?current.scrollLeft:0;
-  const motionStyle=current instanceof HTMLElement?['--sheet-y','--sheet-scrim-opacity'].map(name=>[name,current.style.getPropertyValue(name)] as const):[];
+  const motionStyle=current instanceof HTMLElement?['--sheet-y','--sheet-scrim-opacity','--sheet-depth'].map(name=>[name,current.style.getPropertyValue(name)] as const):[];
   for (const attribute of [...current.attributes]) {
     if(['data-pressed','data-motion-above'].includes(attribute.name))continue;
     if (!next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);

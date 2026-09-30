@@ -82,7 +82,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       const endpoint=target.querySelector<HTMLElement>('[data-bind="connect-endpoint"]');
       if(endpoint){const copy=document.createElement('input');copy.className='endpoint-copy-input';copy.readOnly=true;copy.value=`${location.origin}/mcp`;copy.setAttribute('aria-label','MCP 连接地址，长按复制');endpoint.replaceChildren(copy);}
     }
-    const input=target.querySelector<HTMLInputElement>('input[data-action="capture-input"]');if(input)input.value=draft.current;
+    const input=target.querySelector<HTMLInputElement>('input[data-action="capture-input"]');if(input){input.value=draft.current;const submit=target.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit&&draft.current.trim()){submit.textContent='提交';submit.setAttribute('aria-label','提交记录');}}
     decorate(target);
     const from=base.current?.dataset.screen as Screen|undefined;
     if(from===baseScreen&&base.current)patchNode(base.current,target);
@@ -113,14 +113,14 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       const done=document.createElement('button');done.type='button';done.textContent='完成';done.dataset.action='modal-close';done.setAttribute('aria-label','关闭');dialog.append(done);
       const title=document.createElement('h2');title.textContent=derived.label;title.setAttribute('data-sheet-handle','');dialog.append(title);
       for(const value of [derived.formula,`${derived.rule} · v${derived.ruleVersion}`,`输入记录：${derived.inputs.length?derived.inputs.join('、'):'计划设置'}`]){const p=document.createElement('p');p.textContent=value;dialog.append(p);}
-      layer.append(dialog);
+      const scrim=document.createElement('div');scrim.dataset.scrim='';layer.append(scrim,dialog);
     }
     if(layer){
       if(!overlay.current||overlayType.current!==modalType){
         sheetMotion.current.settle();overlay.current?.remove();
         returnFocus.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
         host.current.append(layer);overlay.current=layer;overlayType.current=modalType;
-        layer.querySelector<HTMLElement>('[role="dialog"]')?.focus({preventScroll:true});sheetMotion.current.sheet(layer,true);
+        layer.querySelector<HTMLElement>('[role="dialog"]')?.focus({preventScroll:true});sheetMotion.current.sheet(layer,true,undefined,base.current);
       }else if(!drag.current)patchNode(overlay.current,layer);
       base.current!.inert=true;base.current!.setAttribute('aria-hidden','true');
     }else{
@@ -128,7 +128,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       if(overlay.current){
         const outgoing=overlay.current;overlay.current=null;overlayType.current=null;
         outgoing.inert=true;outgoing.setAttribute('aria-hidden','true');outgoing.removeAttribute('data-screen');
-        sheetMotion.current.sheet(outgoing,false,()=>outgoing.remove());outgoing.querySelector('[role="dialog"]')?.removeAttribute('role');
+        sheetMotion.current.sheet(outgoing,false,()=>outgoing.remove(),base.current);outgoing.querySelector('[role="dialog"]')?.removeAttribute('role');
         const previous=returnFocus.current;if(previous?.isConnected)previous.focus({preventScroll:true});returnFocus.current=null;
       }
     }
@@ -268,7 +268,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     press.current={x:event.clientX,y:event.clientY};
     const grip=(event.target as Element).closest<HTMLElement>('[data-sheet-handle]'),dialog=grip?.closest<HTMLElement>('[role="dialog"]');
     if(dialog&&grip&&overlay.current){
-      const offset=sheetMotion.current.holdSheet(overlay.current);grip.setPointerCapture(event.pointerId);
+      const offset=sheetMotion.current.holdSheet(overlay.current,base.current);grip.setPointerCapture(event.pointerId);
       drag.current={node:dialog,layer:overlay.current,grip,y:event.clientY,offset,last:event.clientY,id:event.pointerId,samples:[{y:event.clientY,time:performance.now()}]};
     }
   };
@@ -277,6 +277,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const scale=host.current!.getBoundingClientRect().width/host.current!.offsetWidth;
     const distance=Math.max(0,active.offset+(active.last-active.y)/scale);
     active.node.style.setProperty('--sheet-y',`${distance}px`);
+    base.current?.style.setProperty('--sheet-depth',String(1-.04*Math.max(0,1-distance/active.node.offsetHeight)));
     active.layer.querySelector<HTMLElement>('[data-scrim]')?.style.setProperty('--sheet-scrim-opacity',String(Math.max(0,1-distance/active.node.offsetHeight)));
   };
   const pointerMove=(event:React.PointerEvent<HTMLDivElement>)=>{
@@ -290,9 +291,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     if(active.grip.hasPointerCapture(event.pointerId))active.grip.releasePointerCapture(event.pointerId);
     const distance=active.last-active.y,sample=active.samples[0],velocity=(active.last-sample.y)/Math.max(1,performance.now()-sample.time);
     const close=event.type==='pointerup'&&(distance>80||distance>24&&velocity>.5);
-    if(close)dismiss();else sheetMotion.current.sheet(active.layer,true);
+    if(close)dismiss();else sheetMotion.current.sheet(active.layer,true,undefined,base.current);
   };
-  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]'))draft.current=target.value;else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.value);}};
+  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]')){draft.current=target.value;const submit=host.current?.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit){submit.textContent=target.value.trim()?'提交':'语音';submit.setAttribute('aria-label',target.value.trim()?'提交记录':'语音使用说明');}}else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.value);}};
   const feedback=chamber.error||notice;
   return <div className="prototype-shell" ref={shell} onClick={click} onKeyDown={keydown} onInput={onInput} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd}>
     <div ref={host}/>

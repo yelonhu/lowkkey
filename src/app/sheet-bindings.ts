@@ -35,10 +35,10 @@ export function bindDecisionSheet(root:HTMLElement,state:V1State,sheet:SheetStat
     const selected=PROGRAM_TEMPLATES.find(item=>item.id===sheet.templateId);
     if(!selected){
       text(title,'选择训练模板');text(detail,'先看训练日与动作，再由你确认保存。');
-      for(const item of PROGRAM_TEMPLATES)row(item.name,item.summary,'program-template',item.id);
+      for(const item of PROGRAM_TEMPLATES)row(item.name,`每周 ${item.program.days.filter(day=>day.weekday!==null).length} 练`,'program-template',item.id);
       text(left,'取消');left.dataset.action='sheet-cancel';text(right,'');right.disabled=true;
     }else{
-      text(title,selected.name);text(detail,`${selected.summary}。训练日如下；首次重量在训练中由你填写。`);
+      text(title,selected.name);text(detail,`每周 ${selected.program.days.filter(day=>day.weekday!==null).length} 练。首次重量在训练时填写。`);
       for(const day of selected.program.days)row(day.name,`${day.weekday==null?'按需':days[day.weekday]} · ${day.items.length} 个动作`);
       text(left,'确认并保存');left.dataset.action='program-save';text(right,'返回模板');right.dataset.action='program-back';
     }

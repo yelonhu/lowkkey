@@ -66,3 +66,16 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 
 /* Keep iOS from zooming the viewport while editing small display text. */
 @media(pointer:coarse){input[data-action="capture-input"]:focus,.endpoint-copy-input:focus{font-size:16px!important}}
+
+/* Fluid phone layout: preserve type and hit areas instead of scaling the artboard. */
+.prototype-host.phone>.screen,.prototype-host.phone>.screen>div,.prototype-host.phone [data-scrim],.prototype-host.phone .sheet-layer [role="dialog"]{width:100%!important}
+.prototype-host.phone svg[width="350"]{width:100%;height:auto}
+.prototype-host.phone>.screen:not(.sheet-layer){scale:var(--sheet-depth,1);transform-origin:center center}
+.prototype-host.phone :is(button,a,[role="button"]){min-height:44px}
+.prototype-host.phone input{min-width:0;max-width:100%;box-sizing:border-box}
+.prototype-host.phone [data-bind="main-plan"]{overflow-wrap:anywhere}
+.prototype-host.phone [data-scrim]{background:rgba(20,20,21,.24)!important}
+.formula-scrim{background:transparent}
+.formula-scrim>[data-scrim]{position:absolute;inset:0;background:rgba(20,20,21,.24)}
+.formula-drawer{position:relative;width:100%}
+@media(prefers-reduced-motion:reduce){.prototype-host.phone>.screen{scale:1!important}}

@@ -23,13 +23,13 @@ export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,
   let frame=0;
   const resize=()=>{
     frame=0;
-    const viewport=window.visualViewport,scale=Math.min(1,window.innerWidth/width);
+    const viewport=window.visualViewport,phone=width===390,scale=phone?1:Math.min(1,window.innerWidth/width);
     // Pinch zoom stays a browser operation; don't resize the app into it.
     const zoomed=!!viewport&&Math.abs(viewport.scale-1)>.01;
     const editable=document.activeElement?.matches('input,textarea,[contenteditable="true"]');
     const keyboard=!!viewport&&!zoomed&&!!editable&&window.innerHeight-viewport.height>120;
     const available=width===390?(!zoomed&&viewport?viewport.height:window.innerHeight):height*scale;
-    host.style.width=`${width}px`;host.style.height=`${available/scale}px`;host.style.transform=`scale(${scale})`;
+    host.style.width=phone?`${Math.min(window.innerWidth,600)}px`:`${width}px`;host.style.height=`${available/scale}px`;host.style.transform=`scale(${scale})`;
     host.style.setProperty('--page-height',`${available/scale}px`);host.style.setProperty('--viewport-scale',String(scale));
     shell.style.height=`${available}px`;shell.style.top=keyboard?`${viewport!.offsetTop}px`:'0px';
     shell.dataset.keyboard=String(keyboard);shell.dataset.compact=String(available/scale<844);

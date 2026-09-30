@@ -81,3 +81,18 @@ test('visual viewport keyboard changes restore the fixed shell and safe areas ar
   await page.addStyleTag({content:':root{--safe-top:47px;--safe-bottom:34px}'});
   await expect.poll(()=>page.locator('[data-screen="Session"]').evaluate(el=>({background:getComputedStyle(el).backgroundColor,pageHeight:el.getBoundingClientRect().height,innerHeight:el.firstElementChild!.getBoundingClientRect().height,top:el.firstElementChild!.getBoundingClientRect().top}))).toEqual({background:'rgb(0, 0, 0)',pageHeight:844,innerHeight:763,top:47});
 });
+
+
+test('phone artboards use the viewport width and sheet depth restores after dismissal',async({page})=>{
+  await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
+  for(const width of [375,390,393,402,430,440]){
+    await page.setViewportSize({width,height:844});
+    const board=page.locator('[data-screen="Main"]');
+    await expect.poll(async()=>(await board.boundingBox())!.width).toBe(width);
+    expect(await board.evaluate(el=>getComputedStyle(el.querySelector('h1')!).fontSize)).toBe('27px');
+  }
+  await page.getByRole('button',{name:'选择或更换训练模板'}).click();
+  await expect.poll(()=>page.locator('[data-screen="Main"]').evaluate(el=>getComputedStyle(el).scale)).toBe('0.96');
+  await page.keyboard.press('Escape');
+  await expect.poll(()=>page.locator('[data-screen="Main"]').evaluate(el=>getComputedStyle(el).scale)).toBe('1');
+});
