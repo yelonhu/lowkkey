@@ -8,16 +8,16 @@ export const VerifierId = z.enum(['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8'
 export type VerifierId = z.infer<typeof VerifierId>;
 
 export const VERIFIERS: Record<VerifierId, { name: string; summary: string; version: string }> = {
-  V1: { name: 'trend_slope', summary: '体重 OLS 斜率 × 7 = kg/周（7 日窗口与全程）', version: '1.0.0' },
-  V2: { name: 'e1rm', summary: 'Epley：有效负荷 × (1 + 次数/30)；>12 次标记偏差大，>20 次不计算', version: '1.0.0' },
-  V3: { name: 'net_load', summary: '辅助动作有效负荷 = 当日体重 − 辅助（kg）', version: '1.0.0' },
-  V4: { name: 'warmup_tag', summary: '同场同动作中负荷 < 最高组 85% 的组为热身，不计入有效组', version: '1.0.0' },
-  V5: { name: 'intra_session', summary: '组内调节：根据上一组次数与 RIR 给出下一组重量', version: '1.0.0' },
-  V6: { name: 'double_progression', summary: '双进阶 + 周期：下次处方重量与组数、目标 RIR', version: '1.0.0' },
-  V7: { name: 'weekly_volume', summary: '每肌群每周有效组 = Σ 组 × 肌群权重；用户约束优先', version: '1.0.0' },
-  V8: { name: 'calorie_trigger', summary: '判决日 7 日斜率超过阈值 → 热量调整', version: '1.0.0' },
-  V9: { name: 'waist_ratio', summary: 'Δ腰围 / Δ体重 ≤ 0.5 cm/kg', version: '1.0.0' },
-  V10: { name: 'weighin_condition', summary: '非标准称重条件标注；系统性偏离时给出观察', version: '1.0.0' },
+  V1: { name: 'trend_slope', summary: '体重 OLS 斜率 × 7 = kg/周（7 日窗口与全程）', version: '1.1.0' },
+  V2: { name: 'e1rm', summary: 'Epley：有效负荷 × (1 + 次数/30)；>12 次标记偏差大，>20 次不计算', version: '1.1.0' },
+  V3: { name: 'net_load', summary: '辅助动作有效负荷 = 当日体重 − 辅助（kg）', version: '1.1.0' },
+  V4: { name: 'warmup_tag', summary: '仅明确标记的热身组不计入正式组；未知分类单独展示', version: '1.1.0' },
+  V5: { name: 'intra_session', summary: '组内调节：根据上一组次数与 RIR 给出下一组重量', version: '1.1.0' },
+  V6: { name: 'double_progression', summary: '双进阶 + 周期：下次处方重量与组数、目标 RIR', version: '1.1.0' },
+  V7: { name: 'weekly_volume', summary: '每肌群每周有效组 = Σ 组 × 肌群权重；用户约束优先', version: '1.1.0' },
+  V8: { name: 'calorie_trigger', summary: '用户确认的观察期与目标 → 待审建议；只有采用才追加指令', version: '1.1.0' },
+  V9: { name: 'waist_ratio', summary: 'Δ腰围 / Δ体重，仅作描述，不判合格', version: '1.1.0' },
+  V10: { name: 'weighin_condition', summary: '称重条件仅作背景标注', version: '1.1.0' },
 };
 
 /**

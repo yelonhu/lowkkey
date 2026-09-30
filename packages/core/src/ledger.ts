@@ -1,4 +1,4 @@
-import type { Entry, LocalDate, SessionEntry, SetEntry, WeightEntry } from '@lowkkey/protocol';
+import type { Entry, ProgramItem, LocalDate, SessionEntry, SetEntry, WeightEntry } from '@lowkkey/protocol';
 
 /** 被撤销的条目 id 集合。 */
 export function revertedIds(entries: Entry[]): Set<string> {
@@ -10,7 +10,10 @@ export function revertedIds(entries: Entry[]): Set<string> {
 /** 有效条目：未被撤销，且不含 revert 本身。 */
 export function active(entries: Entry[]): Exclude<Entry, { kind: 'revert' }>[] {
   const gone = revertedIds(entries);
-  return entries.filter((e): e is Exclude<Entry, { kind: 'revert' }> => e.kind !== 'revert' && !gone.has(e.id));
+  const live=entries.filter((e): e is Exclude<Entry, { kind: 'revert' }> => e.kind !== 'revert' && !gone.has(e.id));
+  const roles=new Map<string,'work'|'warmup'|'unknown'>();
+  for(const e of live)if(e.kind==='set_annotation')roles.set(e.targetId,e.setRole);
+  return live.map(e=>e.kind==='set'&&roles.has(e.id)?{...e,setRole:roles.get(e.id)!}:e);
 }
 
 export function weights(entries: Entry[]): WeightEntry[] {
@@ -40,6 +43,7 @@ export type Session = {
   startedAt: string | null;
   endedAt: string | null;
   sets: SetEntry[];
+  prescription?:ProgramItem[];
 };
 
 /** 把 session 事件与组聚合成训练。没有 start 事件的组（如事后补录）也会成组。 */
@@ -59,7 +63,7 @@ export function sessions(entries: Entry[]): Session[] {
       const ev = e as SessionEntry;
       if (ev.event === 'start') {
         s.startedAt = ev.createdAt;
-        s.dayId = ev.dayId;
+        s.dayId = ev.dayId;s.prescription=ev.prescription;
       } else s.endedAt = ev.createdAt;
     } else if (e.kind === 'set') {
       ensure(e.sessionId, e.date).sets.push(e);

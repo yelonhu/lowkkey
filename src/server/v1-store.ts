@@ -1,6 +1,6 @@
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
-import { Entry as EntrySchema, EntryDraft as DraftSchema, Program as ProgramSchema, Snapshot as SnapshotSchema, VerifierId, type Entry, type EntryDraft, type Snapshot, type Source, type WriteResult } from '@lowkkey/protocol';
-import { capture, decideProposal, decideTrigger, derive, emptySnapshot, log, propose, putProgram, refreshTriggers, resolveHeld, revert } from '@lowkkey/core';
+import { PROTOCOL_VERSION, Entry as EntrySchema, EntryDraft as DraftSchema, Program as ProgramSchema, Snapshot as SnapshotSchema, VerifierId, type Entry, type EntryDraft, type Snapshot, type Source, type WriteResult } from '@lowkkey/protocol';
+import { capture, claimDailyDecision, decideProposal, decideTrigger, derive, emptySnapshot, log, propose, putProgram, refreshTriggers, resolveHeld, revert } from '@lowkkey/core';
 import { parse } from '@lowkkey/core';
 import { StoreError } from './account.ts';
 
@@ -43,7 +43,7 @@ async function storedState(db:D1Database,ownerId:string,at:string):Promise<Snaps
     db.prepare('SELECT * FROM entries WHERE owner_id=? ORDER BY created_at,id').bind(ownerId).all<OldRow>(),
   ]);
   const entries=[...old.results.map(legacyEntry),...fresh.results.map(r=>EntrySchema.parse(JSON.parse(r.entry_json)))].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));
-  return {...mutable,entries,today:localDate(at,mutable.timezone)};
+  return {...mutable,protocol:PROTOCOL_VERSION,entries,today:localDate(at,mutable.timezone)};
 }
 async function revision(db:D1Database,ownerId:string):Promise<number> {
   const row=await db.prepare('SELECT data_revision FROM users WHERE id=?').bind(ownerId).first<{data_revision:number}>();
@@ -61,14 +61,14 @@ async function replay(db:D1Database,ownerId:string,clientId:string,operation:str
   return JSON.parse(row.response_json);
 }
 type Mutation<T> = {snap:Snapshot;result:T;extra?:D1PreparedStatement[];events?:unknown[]};
-export async function mutate<T>(db:D1Database,ownerId:string,clientId:string,operation:string,key:string,input:unknown,change:(snap:Snapshot,now:string)=>Promise<Mutation<T>>|Mutation<T>):Promise<T> {
+export async function mutate<T>(db:D1Database,ownerId:string,clientId:string,operation:string,key:string,input:unknown,change:(snap:Snapshot,now:string,revision:number)=>Promise<Mutation<T>>|Mutation<T>):Promise<T> {
   if(!key || key.length>128)throw new StoreError('bad_request',400);
   const requestHash=await digest(input);
   const done=await replay(db,ownerId,clientId,operation,key,requestHash);
   if(done!==null)return done as T;
   for(let attempt=0;attempt<4;attempt++) {
     const expected=await revision(db,ownerId),now=new Date().toISOString(),before=await storedState(db,ownerId,now);
-    const {snap,result,extra=[],events=[]}=await change(before,now);
+    const {snap,result,extra=[],events=[]}=await change(before,now,expected);
     const oldIds=new Set(before.entries.map(e=>e.id));
     const added=snap.entries.filter(e=>!oldIds.has(e.id));
     const mutable={...snap,entries:[]};
@@ -96,10 +96,12 @@ function eventDiff(before:Snapshot,after:Snapshot):unknown[] {
   const prior=new Set(before.entries.map(e=>e.id));
   return after.entries.filter(e=>!prior.has(e.id)).map(e=>e.kind==='revert'?{type:'entry.reverted',revert:e}:{type:'entry.committed',entry:e});
 }
-export async function state(db:D1Database,ownerId:string,at=new Date().toISOString()):Promise<V1State> {
+export async function state(db:D1Database,ownerId:string,at=new Date().toISOString(),attempt=0):Promise<V1State> {
+  const beforeRevision=await revision(db,ownerId);
   const eventCursor=await latestEventId(db,ownerId);
   const snap=await storedState(db,ownerId,at);
   const [submissions,clients,currentRevision]=await Promise.all([listSubmissions(db,ownerId,snap),listClients(db,ownerId),revision(db,ownerId)]);
+  if(beforeRevision!==currentRevision){if(attempt>=4)throw new StoreError('conflict',409);return state(db,ownerId,at,attempt+1);}
   return {...snap,accountId:ownerId,revision:currentRevision,eventCursor,derived:derive(snap),submissions,clients};
 }
 export async function setTimeZone(db:D1Database,ownerId:string,key:string,timeZone:string) {
@@ -140,7 +142,7 @@ export async function writeProgram(db:D1Database,ownerId:string,key:string,value
   const program=ProgramSchema.parse(value);
   return mutate(db,ownerId,'web','program.put',key,program,snap=>{
     const next=putProgram(snap,program,actor({actor:'user',channel:'ui',client:'web'},new Date().toISOString(),snap.timezone));
-    return {snap:next,result:program,events:[{type:'program.updated',program}]};
+    return {snap:next,result:next.program,events:[{type:'program.updated',program:next.program}]};
   });
 }
 export async function createProposal(db:D1Database,ownerId:string,clientId:string,key:string,value:{kind:'program_change'|'note';title:string;rationale:string;ruleRefs:string[];patch:Record<string,unknown>},source:Source) {
@@ -149,15 +151,19 @@ export async function createProposal(db:D1Database,ownerId:string,clientId:strin
     return {snap:out.snap,result:out.proposal,events:[{type:'proposal.created',proposal:out.proposal}]};
   });
 }
-export async function proposalDecision(db:D1Database,ownerId:string,key:string,id:string,decision:'accept'|'reject',note?:string) {
-  return mutate(db,ownerId,'web','proposal.decision',key,{id,decision,note},snap=>{
+export async function proposalDecision(db:D1Database,ownerId:string,key:string,id:string,decision:'accept'|'reject'|'later',note?:string,expectedRevision?:number) {
+  return mutate(db,ownerId,'web','proposal.decision',key,{id,decision,note,expectedRevision},(snap,_now,currentRevision)=>{
+    if(expectedRevision!==currentRevision)throw new StoreError('conflict',409);
+    if(!snap.proposals.some(p=>p.id===id&&p.status==='open'))throw new StoreError('conflict',409);
     const next=decideProposal(snap,id,decision,note,actor({actor:'user',channel:'ui',client:'web'},new Date().toISOString(),snap.timezone));
     const result=next.proposals.find(p=>p.id===id)!;
     return {snap:next,result,events:[{type:'proposal.decided',proposal:result}]};
   });
 }
-export async function triggerDecision(db:D1Database,ownerId:string,key:string,id:string,decision:'accept'|'later',reason?:string) {
-  return mutate(db,ownerId,'web','trigger.decision',key,{id,decision,reason},snap=>{
+export async function triggerDecision(db:D1Database,ownerId:string,key:string,id:string,decision:'accept'|'later',reason?:string,expectedRevision?:number) {
+  return mutate(db,ownerId,'web','trigger.decision',key,{id,decision,reason,expectedRevision},(snap,_now,currentRevision)=>{
+    if(expectedRevision!==currentRevision)throw new StoreError('conflict',409);
+    if(!snap.triggers.some(t=>t.id===id&&['pending','will_fire'].includes(t.status)))throw new StoreError('conflict',409);
     const next=decideTrigger(snap,id,decision,reason,actor({actor:'user',channel:'ui',client:'web'},new Date().toISOString(),snap.timezone));
     const result=next.triggers.find(t=>t.id===id)!;
     return {snap:next,result,events:[...eventDiff(snap,next),{type:'trigger.updated',trigger:result}]};
@@ -276,5 +282,12 @@ export async function importBackup(db:D1Database,ownerId:string,key:string,backu
     for(const existing of current.entries){const match=byId.get(existing.id);if(!match||JSON.stringify(match)!==JSON.stringify(existing))throw new StoreError('conflict',409);}
     const merged={...incoming,today:localDate(now,incoming.timezone),entries:[...incoming.entries].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id))};
     return {snap:merged,result:{imported:incoming.entries.length-current.entries.length},events:[{type:'backup.imported',count:incoming.entries.length-current.entries.length}]};
+  });
+}
+
+export async function claimDecision(db:D1Database,ownerId:string,key:string){
+  return mutate(db,ownerId,'web','decision.claim',key,{},(snap,now)=>{
+    const next=claimDailyDecision(refreshTriggers(snap,actor({actor:'rule',channel:'ui',client:'V8'},now,snap.timezone)));
+    return {snap:next,result:next,events:[{type:'decision.updated'}]};
   });
 }

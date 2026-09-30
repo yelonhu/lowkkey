@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "lowkkey API",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "见 INTERFACE.md。网页用户由 Cloudflare Access 认证；Remote MCP 单独使用 OAuth。scope 见各操作的 x-scopes。"
   },
   "servers": [
@@ -342,18 +342,63 @@
           "targets": {
             "default": {
               "bodyweightKg": null,
-              "rateKgPerWeek": {
-                "min": 0.25,
-                "max": 0.35
-              },
-              "weeklySets": {
-                "min": 10,
-                "max": 20
-              },
+              "rateKgPerWeek": null,
+              "weeklySets": null,
               "calorieTrigger": null
             },
             "type": "object",
             "properties": {
+              "goal": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "gain",
+                      "lose",
+                      "maintain",
+                      "record"
+                    ]
+                  },
+                  "confirmedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "ISO 8601 时间戳"
+                  },
+                  "maintenanceKg": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "min": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "max": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": [
+                          "min",
+                          "max"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "mode",
+                  "maintenanceKg"
+                ],
+                "additionalProperties": false
+              },
               "bodyweightKg": {
                 "default": null,
                 "anyOf": [
@@ -367,44 +412,54 @@
                 ]
               },
               "rateKgPerWeek": {
-                "default": {
-                  "min": 0.25,
-                  "max": 0.35
-                },
-                "type": "object",
-                "properties": {
-                  "min": {
-                    "type": "number"
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "type": "number"
+                      },
+                      "max": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "min",
+                      "max"
+                    ],
+                    "additionalProperties": false
                   },
-                  "max": {
-                    "type": "number"
+                  {
+                    "type": "null"
                   }
-                },
-                "required": [
-                  "min",
-                  "max"
-                ],
-                "additionalProperties": false
+                ]
               },
               "weeklySets": {
-                "default": {
-                  "min": 10,
-                  "max": 20
-                },
-                "type": "object",
-                "properties": {
-                  "min": {
-                    "type": "number"
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "max": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "min",
+                      "max"
+                    ],
+                    "additionalProperties": false
                   },
-                  "max": {
-                    "type": "number"
+                  {
+                    "type": "null"
                   }
-                },
-                "required": [
-                  "min",
-                  "max"
-                ],
-                "additionalProperties": false
+                ]
               },
               "calorieTrigger": {
                 "default": null,
@@ -413,8 +468,20 @@
                     "type": "object",
                     "properties": {
                       "thresholdKgPerWeek": {
-                        "type": "number",
-                        "exclusiveMinimum": 0
+                        "type": "number"
+                      },
+                      "comparison": {
+                        "type": "string",
+                        "enum": [
+                          "above",
+                          "below"
+                        ]
+                      },
+                      "confirmedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                        "description": "ISO 8601 时间戳"
                       },
                       "kcalDelta": {
                         "type": "integer",
@@ -636,6 +703,51 @@
               },
               "straps": {
                 "type": "boolean"
+              },
+              "setRole": {
+                "type": "string",
+                "enum": [
+                  "work",
+                  "warmup",
+                  "unknown"
+                ]
+              },
+              "recommendation": {
+                "type": "object",
+                "properties": {
+                  "ruleVersion": {
+                    "type": "string"
+                  },
+                  "inputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    }
+                  },
+                  "load": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "kg",
+                      "lb"
+                    ]
+                  }
+                },
+                "required": [
+                  "ruleVersion",
+                  "inputs",
+                  "load",
+                  "unit"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -653,6 +765,68 @@
               "loadKind",
               "reps",
               "rir"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "ISO 8601 时间戳"
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "set_annotation"
+              },
+              "targetId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "setRole": {
+                "type": "string",
+                "enum": [
+                  "work",
+                  "warmup",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "dateOrigin",
+              "createdAt",
+              "source",
+              "kind",
+              "targetId",
+              "setRole"
             ],
             "additionalProperties": false
           },
@@ -717,6 +891,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "prescription": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "exerciseId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    },
+                    "sets": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10
+                    },
+                    "repMin": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 50
+                    },
+                    "repMax": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 50
+                    },
+                    "startLoad": {
+                      "default": null,
+                      "description": "首次处方重量；null = 第一次由你自选",
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "note": {
+                      "type": "string",
+                      "maxLength": 400
+                    }
+                  },
+                  "required": [
+                    "exerciseId",
+                    "sets",
+                    "repMin",
+                    "repMax",
+                    "startLoad"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [
@@ -1133,6 +1361,51 @@
               "straps": {
                 "type": "boolean"
               },
+              "setRole": {
+                "type": "string",
+                "enum": [
+                  "work",
+                  "warmup",
+                  "unknown"
+                ]
+              },
+              "recommendation": {
+                "type": "object",
+                "properties": {
+                  "ruleVersion": {
+                    "type": "string"
+                  },
+                  "inputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    }
+                  },
+                  "load": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "kg",
+                      "lb"
+                    ]
+                  }
+                },
+                "required": [
+                  "ruleVersion",
+                  "inputs",
+                  "load",
+                  "unit"
+                ],
+                "additionalProperties": false
+              },
               "confidence": {
                 "type": "number",
                 "minimum": 0,
@@ -1152,6 +1425,59 @@
               "loadKind",
               "reps",
               "rir"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "用户本地日期 YYYY-MM-DD"
+              },
+              "dateOrigin": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "device",
+                  "inferred"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Source"
+              },
+              "kind": {
+                "type": "string",
+                "const": "set_annotation"
+              },
+              "targetId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "不透明 ID，推荐 ULID"
+              },
+              "setRole": {
+                "type": "string",
+                "enum": [
+                  "work",
+                  "warmup",
+                  "unknown"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "date",
+              "dateOrigin",
+              "source",
+              "kind",
+              "targetId",
+              "setRole"
             ],
             "additionalProperties": false
           },
@@ -1204,6 +1530,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "prescription": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "exerciseId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    },
+                    "sets": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10
+                    },
+                    "repMin": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 50
+                    },
+                    "repMax": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 50
+                    },
+                    "startLoad": {
+                      "default": null,
+                      "description": "首次处方重量；null = 第一次由你自选",
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "note": {
+                      "type": "string",
+                      "maxLength": 400
+                    }
+                  },
+                  "required": [
+                    "exerciseId",
+                    "sets",
+                    "repMin",
+                    "repMax",
+                    "startLoad"
+                  ],
+                  "additionalProperties": false
+                }
               },
               "confidence": {
                 "type": "number",
@@ -1633,6 +2013,11 @@
           "decisionNote": {
             "type": "string",
             "maxLength": 400
+          },
+          "snoozedUntil": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
           }
         },
         "required": [
@@ -1723,6 +2108,11 @@
           "reason": {
             "type": "string",
             "maxLength": 400
+          },
+          "snoozedUntil": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "用户本地日期 YYYY-MM-DD"
           }
         },
         "required": [
@@ -1863,6 +2253,41 @@
             "items": {
               "$ref": "#/components/schemas/Exercise"
             }
+          },
+          "decisionSlots": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "用户本地日期 YYYY-MM-DD"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "proposal",
+                    "trigger"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "description": "不透明 ID，推荐 ULID"
+                },
+                "closed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "closed"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -1924,6 +2349,41 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Exercise"
+            }
+          },
+          "decisionSlots": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "用户本地日期 YYYY-MM-DD"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "proposal",
+                    "trigger"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "description": "不透明 ID，推荐 ULID"
+                },
+                "closed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "closed"
+              ],
+              "additionalProperties": false
             }
           },
           "accountId": {
@@ -2993,7 +3453,7 @@
     "/v1/proposals/{id}/decision": {
       "post": {
         "operationId": "decideProposal",
-        "summary": "采用或拒绝提议",
+        "summary": "采用、拒绝或延期提议；须匹配状态版本",
         "x-scopes": [
           "user"
         ],
@@ -3030,8 +3490,14 @@
                     "type": "string",
                     "enum": [
                       "accept",
-                      "reject"
+                      "reject",
+                      "later"
                     ]
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "note": {
                     "type": "string",
@@ -3039,7 +3505,8 @@
                   }
                 },
                 "required": [
-                  "decision"
+                  "decision",
+                  "expectedRevision"
                 ]
               }
             }
@@ -3100,6 +3567,11 @@
                       "later"
                     ]
                   },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "reason": {
                     "description": "decision=later 时建议填写",
                     "type": "string",
@@ -3107,7 +3579,8 @@
                   }
                 },
                 "required": [
-                  "decision"
+                  "decision",
+                  "expectedRevision"
                 ]
               }
             }
@@ -3198,6 +3671,49 @@
                   "title",
                   "rationale"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/decisions/today": {
+      "post": {
+        "operationId": "claimDecision",
+        "summary": "占用本人当地日期的唯一主动建议位",
+        "x-scopes": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
               }
             }
           }

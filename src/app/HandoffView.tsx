@@ -1,5 +1,6 @@
+import {goalDraft,goalTargets} from './goal-sheet.ts';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { PROGRAM_TEMPLATES } from '@lowkkey/protocol';
+import { DEFAULT_RAMP, PROGRAM_TEMPLATES } from '@lowkkey/protocol';
 import type { EntryDraft } from '@lowkkey/protocol';
 import { openSession } from '@lowkkey/core';
 import { capturedClock } from '../client/offline.ts';
@@ -16,14 +17,14 @@ import { Motion, reducedMotion } from './motion.ts';
 import { observeViewport, prepareViewport } from './viewport.ts';
 
 type Chamber=ReturnType<typeof useHandoff>;
-const writes=new Set(['program-save','day-start','progress-confirm-add','capture-submit','toast-revert','entry-revert','submission-accept','submission-skip','held-skip','start-session','end-session','complete-set','trigger-accept','trigger-later','proposal-accept','proposal-reject','client-revoke']);
+const writes=new Set(['goal-save','decision-accept','decision-later','set-classify','program-save','day-start','progress-confirm-add','capture-submit','toast-revert','entry-revert','submission-accept','submission-skip','held-skip','start-session','end-session','complete-set','trigger-accept','trigger-later','proposal-accept','proposal-later','proposal-reject','client-revoke']);
 const focusable='button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]';
 
 export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const shell=useRef<HTMLDivElement>(null),host=useRef<HTMLDivElement>(null),draft=useRef(''),composing=useRef(false);
   const failedCapture=useRef('');
   const [filter,setFilter]=useState<'all'|'you'|'model'|'rule'>('all'),[answers,setAnswers]=useState<Record<string,string>>({});
-  const [reps,setReps]=useState(8),[rir,setRir]=useState<number|null>(null),[exerciseId,setExerciseId]=useState<string|null>(null);
+  const [reps,setReps]=useState<number|null>(null),[rir,setRir]=useState<number|null>(null),[exerciseId,setExerciseId]=useState<string|null>(null);
   const [formula,setFormula]=useState<string|null>(null),[sheet,setSheet]=useState<SheetState|null>(null),[manualLoad,setManualLoad]=useState(''),[manualUnit,setManualUnit]=useState<'kg'|'lb'|null>(null);
   const [review,setReview]=useState<{id:string;questions:NonNullable<Chamber['state']>['submissions'][number]['questions'];revision:number}|null>(null);
   const [reviewLoading,setReviewLoading]=useState(false),[activeAction,setActiveAction]=useState<string|null>(null),[notice,setNotice]=useState(''),[captureRetry,setCaptureRetry]=useState(false);
@@ -34,6 +35,19 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const press=useRef<{x:number;y:number}|null>(null);
   const drag=useRef<{node:HTMLElement;layer:HTMLElement;grip:HTMLElement;y:number;offset:number;last:number;id:number;samples:{y:number;time:number}[]}|null>(null),dragFrame=useRef(0);
   const state=chamber.state,submissionId=state?.submissions[0]?.id;
+  const [setRole,setSetRole]=useState<'work'|'warmup'>('work');
+  const suggestion=useRef<{key:string;value:number|null;unit:'kg'|'lb';ruleVersion:string;inputs:string[]}|null>(null),claiming=useRef(false),lastClaim=useRef(-1);
+  const currentSession=state?openSession(state.entries):null,currentItem=state?.program.days.find(day=>day.id===currentSession?.dayId)?.items.find(item=>item.exerciseId===exerciseId)??state?.program.days.find(day=>day.id===currentSession?.dayId)?.items[0];
+  const previousReps=state?.entries.filter(entry=>entry.kind==='set'&&entry.exerciseId===currentItem?.exerciseId&&!state.entries.some(r=>r.kind==='revert'&&r.targetId===entry.id)).at(-1);
+  const actualReps=reps??(previousReps?.kind==='set'?previousReps.reps:currentItem?.repMin??1);
+  if(state&&currentItem){const ex=state.exercises.find(ex=>ex.id===currentItem.exerciseId)!,derived=state.derived[`next.${ex.id}`],key=`${currentSession?.id}:${ex.id}:${currentSession?.sets.filter(set=>set.exerciseId===ex.id).length}`;
+    if(!suggestion.current||suggestion.current.key!==key&&!manualLoad&&!host.current?.querySelector('[data-action="load-input"]:focus'))suggestion.current={key,value:derived?.value??currentItem.startLoad,unit:ex.unit,ruleVersion:derived?.ruleVersion??'1.1.0',inputs:derived?.inputs??[]};
+  }
+  useEffect(()=>{
+    if(!state||screen!=='Main'||currentSession||state.decisionSlots?.[state.today]||claiming.current||lastClaim.current===state.revision||chamber.busy)return;
+    if(!state.proposals.some(p=>p.status==='open'&&(!p.snoozedUntil||p.snoozedUntil<=state.today))&&!state.triggers.some(t=>t.status==='will_fire'&&(!t.snoozedUntil||t.snoozedUntil<=state.today)))return;
+    claiming.current=true;lastClaim.current=state.revision;void chamber.claimDecision().catch(()=>{}).finally(()=>{claiming.current=false;});
+  },[state,screen,currentSession,chamber]);
   const live=useRef({sheet,formula,screen});live.current={sheet,formula,screen};
   const baseScreen=screen==='Capture'?lastBase.current:screen;
   const modalType=sheet?'decision':formula?'formula':screen==='Capture'?'capture':null;
@@ -65,8 +79,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   function decorate(node:HTMLElement){
     for(const control of node.querySelectorAll<HTMLElement>('[data-action],[data-held-option]')){
       const action=control.dataset.action;
+      if(control instanceof HTMLInputElement&&action==='load-input')control.readOnly=activeAction==='complete-set';
       if(control instanceof HTMLAnchorElement&&!control.hasAttribute('href')){control.setAttribute('role','button');control.tabIndex=0;}
-      if(activeAction&&(writes.has(action??'')||control.dataset.heldOption||action==='capture-or-voice'||activeAction==='complete-set'&&['rir','reps-plus','reps-minus','load-unit','next-exercise'].includes(action??''))){
+      if(activeAction&&(writes.has(action??'')||control.dataset.heldOption||action==='capture-or-voice'||activeAction==='complete-set'&&['set-role','rir','reps-plus','reps-minus','load-unit','next-exercise'].includes(action??''))){
         control.setAttribute('aria-disabled','true');if(control instanceof HTMLButtonElement)control.disabled=true;
         if(action===activeAction){control.setAttribute('aria-busy',String(chamber.busy));if(control.childElementCount===0)control.textContent=chamber.retry?'等待重试':'正在保存…';}
       }
@@ -75,7 +90,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   useLayoutEffect(()=>{
     if(!state||!host.current)return;
     installPrototypeStyle();
-    const context={state,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps,rir,exerciseId,manualLoad,manualUnit};
+    const context={state,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,manualUnit,setRole,suggestion:suggestion.current};
     const target=prototypeScreen(baseScreen);prepareHandoff(target,baseScreen,state.today);bindHandoff(target,context);
     prepareViewport(target,baseScreen);
     if(copyFallback&&baseScreen==='Connect'){
@@ -174,15 +189,15 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     if(event==='start'&&!day)return;
     const sessionId=event==='start'?crypto.randomUUID():current?.id;if(!sessionId)return;
     const entry:EntryDraft={kind:'session',event,sessionId,dayId:event==='start'?day!.id:null,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
-    await chamber.writeEntries([entry]);setExerciseId(null);setManualLoad('');setManualUnit(null);go(event==='start'?'Session':'Debrief');
+    await chamber.writeEntries([entry]);setReps(null);suggestion.current=null;setExerciseId(null);setManualLoad('');setManualUnit(null);go(event==='start'?'Session':'Debrief');
   }
   async function completeSet(exercise:string,load:number,unit:'kg'|'lb'){
     if(!state)return;const session=openSession(state.entries),ex=state.exercises.find(e=>e.id===exercise);if(!session||!ex)return;
-    const clock=capturedClock(),entry:EntryDraft={kind:'set',sessionId:session.id,exerciseId:exercise,setIndex:session.sets.filter(e=>e.exerciseId===exercise).length+1,load,unit,loadKind:ex.type==='assisted'?'assist':'external',reps,rir,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
+    const clock=capturedClock(),entry:EntryDraft={kind:'set',sessionId:session.id,exerciseId:exercise,setIndex:session.sets.filter(e=>e.exerciseId===exercise).length+1,load,unit,loadKind:ex.type==='assisted'?'assist':'external',reps:actualReps,rir,setRole,recommendation:suggestion.current?{load:suggestion.current.value,unit:suggestion.current.unit,ruleVersion:suggestion.current.ruleVersion,inputs:suggestion.current.inputs}:undefined,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
     const result=await chamber.writeEntries([entry],true);
     const unitQuestion=result.held.find(item=>item.gate==='G4'&&item.drafts[0]?.kind==='set'&&item.drafts[0].unit===unit&&item.options.some(option=>option.id==='as_is'));
     if(unitQuestion&&manualUnit!==null)await chamber.resolve(unitQuestion,{optionId:'as_is'});
-    setRir(null);setManualLoad('');setManualUnit(null);
+    setRir(null);setReps(null);suggestion.current=null;setManualLoad('');setManualUnit(null);
   }
   const click=(event:React.MouseEvent<HTMLDivElement>)=>{
     const target=event.target as Element;if(!state)return;
@@ -204,12 +219,21 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       if(button.dataset.heldOption){const held=state.held.find(h=>h.id===id);if(held)run('held-resolve',async()=>{await chamber.resolve(held,{optionId:button.dataset.heldOption!});dismiss();});return;}
       if(action){event.preventDefault();
         if(action==='sheet-cancel'||action==='modal-close')dismiss();
+        else if(action==='goal-setup')openSheet({kind:'goal',draft:goalDraft(state.program)});
+        else if(action==='goal-mode'&&sheet?.kind==='goal')setSheet({...sheet,draft:{...sheet.draft,mode:button.dataset.mode as typeof sheet.draft.mode,rateMin:'',rateMax:'',threshold:'',kcal:''}});
+        else if(action==='goal-comparison'&&sheet?.kind==='goal')setSheet({...sheet,draft:{...sheet.draft,comparison:sheet.draft.comparison==='above'?'below':'above'}});
+        else if(action==='goal-save'&&sheet?.kind==='goal')run(action,async()=>{try{await chamber.writeProgram({...state.program,targets:goalTargets(sheet.draft,state.program)});dismiss();}catch(error){chamber.setError(error instanceof Error&&error.message.includes('[')?'请检查目标范围和数字。':error instanceof Error?error.message:'请检查目标设置。');throw error;}});
+        else if(action==='program-cycle'&&sheet?.kind==='program')setSheet({...sheet,cycle:!sheet.cycle});
+        else if(action==='set-role')setSetRole(value=>value==='work'?'warmup':'work');
+        else if(action==='decision-view'&&id)openSheet({kind:'decision',id,type:button.dataset.kind as 'proposal'|'trigger',revision:state.revision});
+        else if((action==='decision-accept'||action==='decision-later')&&sheet?.kind==='decision')run(action,async()=>{const decision=action==='decision-accept'?'accept':'later';try{if(sheet.type==='proposal')await chamber.decideProposal(sheet.id,decision,sheet.revision);else await chamber.decideTrigger(sheet.id,decision,sheet.revision);dismiss();}catch(error){dismiss();throw error;}});
+        else if(action==='set-classify'&&id)run(action,async()=>{const clock=capturedClock();await chamber.writeEntries([{kind:'set_annotation',targetId:id,setRole:button.dataset.role as 'work'|'warmup'|'unknown',date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}}]);});
         else if(action==='program-template'&&id)setSheet({kind:'program',templateId:id});
         else if(action==='program-back')setSheet({kind:'program',templateId:null});
         else if(action==='program-save'&&sheet?.kind==='program'){
           const template=PROGRAM_TEMPLATES.find(item=>item.id===sheet.templateId);
-          if(template)run(action,async()=>{await chamber.writeProgram({...structuredClone(template.program),cycleStart:state.today});dismiss();});
-        }else if(action==='sheet-day'&&id&&sheet&&sheet.kind!=='program')setSheet({...sheet,selectedDayId:id});
+          if(template)run(action,async()=>{await chamber.writeProgram({...structuredClone(template.program),targets:state.program.targets,cycleStart:sheet.cycle?state.today:null,ramp:sheet.cycle?structuredClone(DEFAULT_RAMP):[]});dismiss();});
+        }else if(action==='sheet-day'&&id&&sheet&&(sheet.kind==='day'||sheet.kind==='add'))setSheet({...sheet,selectedDayId:id});
         else if(action==='day-start'&&sheet?.kind==='day'&&sheet.selectedDayId)run(action,()=>writeSession('start',sheet.selectedDayId!));
         else if(action==='progress-confirm-add'&&sheet?.kind==='add'&&sheet.selectedDayId){
           const day=state.program.days.find(item=>item.id===sheet.selectedDayId),source=PROGRAM_TEMPLATES.flatMap(item=>item.program.days.flatMap(item=>item.items)).find(item=>item.exerciseId===sheet.exerciseId);
@@ -229,14 +253,15 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='complete-set'&&button.dataset.exerciseId&&button.dataset.load&&button.dataset.unit)run(action,()=>completeSet(button.dataset.exerciseId!,Number(button.dataset.load),button.dataset.unit as 'kg'|'lb'));
         else if(action==='next-exercise'){
           const session=openSession(state.entries),items=state.program.days.find(d=>d.id===session?.dayId)?.items??[],index=items.findIndex(item=>item.exerciseId===(exerciseId??items[0]?.exerciseId));
-          if(items.length){setExerciseId(items[(index+1)%items.length].exerciseId);setManualLoad('');setManualUnit(null);}
+          if(items.length){setExerciseId(items[(index+1)%items.length].exerciseId);setReps(null);setRir(null);suggestion.current=null;setManualLoad('');setManualUnit(null);}
         }else if(action==='load-unit')setManualUnit(unit=>unit===null?button.dataset.unitDefault as 'kg'|'lb':unit==='kg'?'lb':'kg');
-        else if(action==='reps-minus')setReps(n=>Math.max(1,n-1));
-        else if(action==='reps-plus')setReps(n=>Math.min(100,n+1));
+        else if(action==='reps-minus')setReps(n=>Math.max(1,(n??actualReps)-1));
+        else if(action==='reps-plus')setReps(n=>Math.min(100,(n??actualReps)+1));
         else if(action==='rir')setRir(Number(button.dataset.value));
         else if(action==='trigger-accept'&&id)run(action,()=>chamber.decideTrigger(id,'accept'));
         else if(action==='trigger-later'&&id)run(action,()=>chamber.decideTrigger(id,'later'));
         else if(action==='proposal-accept'&&id)run(action,()=>chamber.decideProposal(id,'accept'));
+        else if(action==='proposal-later'&&id)run(action,()=>chamber.decideProposal(id,'later'));
         else if(action==='proposal-reject'&&id)run(action,()=>chamber.decideProposal(id,'reject'));
         else if(action==='copy-endpoint')void (async()=>{
           try{await navigator.clipboard.writeText(`${location.origin}/mcp`);setCopyFallback(false);setNotice('连接地址已复制');}
@@ -293,7 +318,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const close=event.type==='pointerup'&&(distance>80||distance>24&&velocity>.5);
     if(close)dismiss();else sheetMotion.current.sheet(active.layer,true,undefined,base.current);
   };
-  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]')){draft.current=target.value;const submit=host.current?.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit){submit.textContent=target.value.trim()?'提交':'语音';submit.setAttribute('aria-label',target.value.trim()?'提交记录':'语音使用说明');}}else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.value);}};
+  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]')){draft.current=target.value;const submit=host.current?.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit){if(target.value.trim())submit.textContent='提交';else {const original=prototypeScreen('Main').querySelector('[aria-label="语音"]');if(original)submit.replaceChildren(...Array.from(original.childNodes));}submit.setAttribute('aria-label',target.value.trim()?'提交记录':'语音使用说明');}}else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.value);else if(target.dataset.goalField&&sheet?.kind==='goal')setSheet({...sheet,draft:{...sheet.draft,[target.dataset.goalField]:target.value}});}};
   const feedback=chamber.error||notice;
   return <div className="prototype-shell" ref={shell} onClick={click} onKeyDown={keydown} onInput={onInput} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd}>
     <div ref={host}/>

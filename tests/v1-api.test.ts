@@ -119,3 +119,39 @@ describe('v1 REST and atomic model review',()=>{
     expect(message).not.toContain(other.body.committed[0].id);
   });
 });
+
+describe('user-owned macro decisions',()=>{
+  it('reserves one slot across devices, snoozes, and rejects stale or duplicate decisions',async()=>{
+    const user='macro',proposal=(title:string)=>({kind:'program_change',title,rationale:'调整后的安排由用户确认',patch:{cycleStart:'2030-04-01'},ruleRefs:['V6']});
+    const first=await call('/v1/proposals',user,'POST',proposal('第一个建议'));expect(first.status).toBe(200);
+    await call('/v1/proposals',user,'POST',proposal('第二个建议'));
+    const [a,b]=await Promise.all([call('/v1/decisions/today',user,'POST',{}),call('/v1/decisions/today',user,'POST',{})]);
+    expect(a.status).toBe(200);expect(b.status).toBe(200);
+    let state=(await call('/v1/state',user)).body;expect(state.decisionSlots[state.today].id).toBe(first.body.id);
+    const stale=state.revision;await call('/v1/preferences/timezone',user,'PUT',{timeZone:'UTC'});
+    expect((await call(`/v1/proposals/${first.body.id}/decision`,user,'POST',{decision:'accept',expectedRevision:stale})).status).toBe(409);
+    state=(await call('/v1/state',user)).body;
+    const key=crypto.randomUUID(),body={decision:'later',expectedRevision:state.revision};
+    const later=await call(`/v1/proposals/${first.body.id}/decision`,user,'POST',body,key);expect(later.status).toBe(200);
+    expect((await call(`/v1/proposals/${first.body.id}/decision`,user,'POST',body,key)).body).toEqual(later.body);
+    await call('/v1/decisions/today',user,'POST',{});state=(await call('/v1/state',user)).body;
+    expect(state.program.cycleStart).toBeNull();expect(state.decisionSlots[state.today]).toMatchObject({id:first.body.id,closed:true});
+    expect((await call(`/v1/proposals/${first.body.id}/decision`,'other-macro','POST',{decision:'accept',expectedRevision:0})).status).not.toBe(200);
+    const accepted=await call(`/v1/proposals/${first.body.id}/decision`,user,'POST',{decision:'accept',expectedRevision:state.revision});expect(accepted.status).toBe(200);
+    const after=(await call('/v1/state',user)).body;
+    expect((await call(`/v1/proposals/${first.body.id}/decision`,user,'POST',{decision:'accept',expectedRevision:after.revision})).status).toBe(409);
+  });
+  it('rejects unrecognized model patch fields even when their value is null',async()=>{
+    const proposal={kind:'program_change',title:'Invalid',rationale:'',patch:{targets:{unexpected:null}},ruleRefs:[]};
+    expect((await call('/v1/proposals','patch','POST',proposal)).status).toBe(403);
+    expect((await call('/v1/state','patch')).body.proposals).toHaveLength(0);
+  });
+  it('keeps set corrections append-only and scoped to the owner',async()=>{
+    const user='role';const result=await call('/v1/entries',user,'POST',{entries:[{kind:'set',sessionId:'role-session',exerciseId:'bench_press',setIndex:1,load:100,unit:'lb',loadKind:'external',reps:8,rir:2,date:clock.capturedLocalDate,dateOrigin:'explicit',source:{actor:'user',channel:'ui'}}]});
+    expect(result.status).toBe(200);const original=result.body.committed[0];
+    const correction={entries:[{kind:'set_annotation',targetId:original.id,setRole:'warmup',date:clock.capturedLocalDate,dateOrigin:'explicit',source:{actor:'user',channel:'ui'}}]};
+    expect((await call('/v1/entries','other-role','POST',correction)).status).toBe(404);
+    expect((await call('/v1/entries',user,'POST',correction)).status).toBe(200);
+    const state=(await call('/v1/state',user)).body;expect(state.entries.find((e:{id:string})=>e.id===original.id)).toEqual(original);expect(state.entries).toHaveLength(2);
+  });
+});

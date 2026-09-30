@@ -86,12 +86,14 @@ export const ResolveHeldRequest = z.union([
 export type ResolveHeldRequest = z.infer<typeof ResolveHeldRequest>;
 
 export const ProposalDecisionRequest = z.object({
-  decision: z.enum(['accept', 'reject']),
+  decision: z.enum(['accept', 'reject','later']),
+  expectedRevision:z.number().int().nonnegative(),
   note: z.string().max(400).optional(),
 });
 
 export const TriggerDecisionRequest = z.object({
   decision: z.enum(['accept', 'later']),
+  expectedRevision:z.number().int().nonnegative(),
   reason: z.string().max(400).optional().describe('decision=later 时建议填写'),
 });
 
@@ -123,9 +125,10 @@ export const ROUTES = {
   reviewBatch: { method:'POST',path:'/v1/submissions/{id}/review',scope:'user',summary:'预览逐级闸门问题，不写入账本',request:BatchReviewRequest,response:BatchReviewResponse },
   revert: { method: 'POST', path: '/v1/entries/{id}/revert', scope: 'user', summary: '撤销一条记录（追加一条 revert）', request: RevertRequest, response: Entry },
   resolveHeld: { method: 'POST', path: '/v1/held/{id}/resolve', scope: 'user', summary: '回答一个确认问题', request: ResolveHeldRequest, response: WriteResult },
-  decideProposal: { method: 'POST', path: '/v1/proposals/{id}/decision', scope: 'user', summary: '采用或拒绝提议', request: ProposalDecisionRequest, response: Proposal },
+  decideProposal: { method: 'POST', path: '/v1/proposals/{id}/decision', scope: 'user', summary: '采用、拒绝或延期提议；须匹配状态版本', request: ProposalDecisionRequest, response: Proposal },
   decideTrigger: { method: 'POST', path: '/v1/triggers/{id}/decision', scope: 'user', summary: '采用或推迟触发器', request: TriggerDecisionRequest, response: Trigger },
   propose: { method: 'POST', path: '/v1/proposals', scope: ['user', 'propose'], summary: '提出计划修改（进收件箱）', request: ProposeChangeRequest, response: Proposal },
+  claimDecision:{method:'POST',path:'/v1/decisions/today',scope:'user',summary:'占用本人当地日期的唯一主动建议位',request:z.strictObject({}),response:Snapshot},
   getProgram: { method: 'GET', path: '/v1/program', scope: ['user', 'read'], summary: '读取训练计划', response: Program },
   putProgram: { method: 'PUT', path: '/v1/program', scope: 'user', summary: '替换训练计划（仅用户）', request: Program, response: Program },
   getTimeZone:{method:'GET',path:'/v1/preferences/timezone',scope:'user',summary:'读取用户专属时区',response:TimeZoneRequest},

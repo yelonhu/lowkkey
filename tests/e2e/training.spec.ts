@@ -12,16 +12,16 @@ test('training uses the plan, V5 next set, and a real debrief',async({page})=>{
     await page.locator('.screen[data-screen="Main"]').waitFor();
     await page.locator('[data-action="start-session"]').click();
     const session=page.locator('.screen[data-screen="Session"]');await expect(session).toBeVisible();
-    await expect(session).toContainText('185');
+    await expect(session.locator('[data-action="load-input"]')).toHaveAttribute('placeholder','185');
     await session.getByRole('radio',{name:'2'}).click();
     await session.getByRole('button',{name:'完成本组'}).click();
-    await expect(session).toContainText('上一组 185 × 8');
+    await expect(session).toContainText('上一组 185 × 5');
     const derived=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
     expect(derived.derived['next.romanian_deadlift'].rule).toBe('V5');
-    await expect(session).toContainText(String(derived.derived['next.romanian_deadlift'].value));
+    await expect(session.locator('[data-action="load-input"]')).toHaveAttribute('placeholder',String(derived.derived['next.romanian_deadlift'].value));
     await session.locator('[data-action="end-session"]').click();
     const debrief=page.locator('.screen[data-screen="Debrief"]');await expect(debrief).toBeVisible();
-    await expect(debrief).toContainText('185 lb × 8');
+    await expect(debrief).toContainText('185 lb × 5');
     await expect(debrief).not.toContainText('训练总结待接入');
   }finally{
     await page.evaluate(async({program})=>{await fetch('/v1/program',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(program)});},{program:original.program});

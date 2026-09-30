@@ -79,3 +79,7 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .formula-scrim>[data-scrim]{position:absolute;inset:0;background:rgba(20,20,21,.24)}
 .formula-drawer{position:relative;width:100%}
 @media(prefers-reduced-motion:reduce){.prototype-host.phone>.screen{scale:1!important}}
+
+/* Native number steppers must not clip the editable training weight on WebKit. */
+.prototype-host input[data-action="load-input"]{appearance:textfield;-moz-appearance:textfield}
+.prototype-host input[data-action="load-input"]::-webkit-inner-spin-button,.prototype-host input[data-action="load-input"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}

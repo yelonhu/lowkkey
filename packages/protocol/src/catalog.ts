@@ -1,5 +1,5 @@
 import type { Exercise, Program } from './entities.ts';
-import { DEFAULT_RAMP } from './rules.ts';
+
 
 /**
  * 通用动作库。不含任何个人数据；用户可在计划里引用，也可新增自定义动作。
@@ -37,12 +37,12 @@ export const PROGRAM_TEMPLATES: { id: string; name: string; summary: string; pro
   {
     id: 'upper_lower',
     name: '上肢 / 下肢',
-    summary: '每周 4 练，适合恢复能力一般、时间有限',
+    summary: '每周 4 练，上下肢交替',
     program: {
       cycleStart: null,
-      ramp: DEFAULT_RAMP,
+      ramp: [],
       constraints: [],
-      targets: { bodyweightKg: null, rateKgPerWeek: { min: 0.25, max: 0.35 }, weeklySets: { min: 10, max: 20 }, calorieTrigger: { thresholdKgPerWeek: 0.8, kcalDelta: -300, everyDays: 14 } },
+      targets: { bodyweightKg: null, rateKgPerWeek: null, weeklySets: null, calorieTrigger: null },
       days: [
         { id: 'upper_a', name: '上肢 A', weekday: 1, items: [
           { exerciseId: 'bench_press', sets: 4, repMin: 5, repMax: 8, startLoad: null },
@@ -75,12 +75,12 @@ export const PROGRAM_TEMPLATES: { id: string; name: string; summary: string; pro
   {
     id: 'push_pull_legs',
     name: '推 / 拉 / 腿',
-    summary: '每周 3–6 练，按部位分化',
+    summary: '每周 3 练，推、拉、腿各一天',
     program: {
       cycleStart: null,
-      ramp: DEFAULT_RAMP,
+      ramp: [],
       constraints: [],
-      targets: { bodyweightKg: null, rateKgPerWeek: { min: 0.25, max: 0.35 }, weeklySets: { min: 10, max: 20 }, calorieTrigger: { thresholdKgPerWeek: 0.8, kcalDelta: -300, everyDays: 14 } },
+      targets: { bodyweightKg: null, rateKgPerWeek: null, weeklySets: null, calorieTrigger: null },
       days: [
         { id: 'push', name: '推', weekday: 1, items: [
           { exerciseId: 'bench_press', sets: 4, repMin: 5, repMax: 8, startLoad: null },
@@ -107,8 +107,8 @@ export const PROGRAM_TEMPLATES: { id: string; name: string; summary: string; pro
 
 export const EMPTY_PROGRAM: Program = {
   cycleStart: null,
-  ramp: DEFAULT_RAMP,
+  ramp: [],
   days: [],
   constraints: [],
-  targets: { bodyweightKg: null, rateKgPerWeek: { min: 0.25, max: 0.35 }, weeklySets: { min: 10, max: 20 }, calorieTrigger: null },
+  targets: { bodyweightKg: null, rateKgPerWeek: null, weeklySets: null, calorieTrigger: null },
 };

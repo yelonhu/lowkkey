@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EXERCISE_LIBRARY, MCP_TOOLS, PROGRAM_TEMPLATES, Snapshot as SnapshotSchema, type EntryDraft, type Snapshot } from '@lowkkey/protocol';
 import {
   ForbiddenError,
+  active,claimDailyDecision,decideProposal,propose,projectDate,rampFor,weeklyVolume,putProgram,
   addDays,
   capture,
   decideTrigger,
@@ -69,22 +70,23 @@ describe('verifiers', () => {
   });
 
   it('V4 热身', () => {
-    expect(warmupFlags([60, 80, 100, 100])).toEqual([true, true, false, false]);
+    expect(warmupFlags([{setRole:'warmup'},{setRole:'work'},{}, {setRole:'work'}])).toEqual([true, false, false, false]);
   });
 
   it('V5 组内调节', () => {
     const bench = ex('bench_press');
-    expect(nextSet(bench, { load: 135, reps: 8, rir: 2 }, 5, 8).load).toBe(145);
-    expect(nextSet(bench, { load: 135, reps: 8, rir: 1 }, 5, 8).load).toBe(140);
+    expect(nextSet(bench, { load: 135, reps: 8, rir: 2 }, 5, 8).load).toBe(140);
+    expect(nextSet(bench, { load: 135, reps: 8, rir: 1 }, 5, 8).load).toBe(135);
     expect(nextSet(bench, { load: 135, reps: 6, rir: 0 }, 5, 8).load).toBe(135);
     expect(nextSet(bench, { load: 135, reps: 4, rir: 0 }, 5, 8).load).toBe(130);
-    expect(nextSet(ex('pull_up'), { load: 20, reps: 8, rir: 2 }, 5, 8).load).toBeCloseTo(15.4, 5); // 辅助减少
+    expect(nextSet(ex('pull_up'), { load: 20, reps: 8, rir: 2 }, 5, 8).load).toBeCloseTo(20, 5); // 辅助减少
   });
 
   it('V6 双进阶：下肢杠铃 +10 lb', () => {
     let s = fresh();
-    const ctx = user('2030-03-10');
-    for (let i = 0; i < 3; i++) s = logSet(s, { sessionId: 's1', exerciseId: 'back_squat', load: 185, unit: 'lb', reps: 8, rir: 2 }, ctx).snap;
+    const ctx = user('2030-03-10');const started=startSession(s,'lower_a',ctx);s=started.snap;
+    for (let i = 0; i < 4; i++) s = logSet(s, { sessionId: started.sessionId, exerciseId: 'back_squat', load: 185, unit: 'lb', reps: 8, rir: 2 }, ctx).snap;
+    s=endSession(s,started.sessionId,ctx);
     const rx = prescribe({ exerciseId: 'back_squat', sets: 4, repMin: 6, repMax: 8, startLoad: null }, ex('back_squat'), s.entries, TODAY, s.program);
     expect(rx.load).toBe(195);
   });
@@ -230,7 +232,7 @@ describe('派生值与触发器', () => {
 
   it('V8–V10 保留规则、输入与计算日期',()=>{
     let s=withWeights(fresh(),[0,1,2,3,4,5,6].map(i=>[addDays('2030-03-08',i),70+i*0.2] as [string,number]));
-    s={...s,program:{...s.program,cycleStart:'2030-03-07',targets:{...s.program.targets,calorieTrigger:{thresholdKgPerWeek:0.5,kcalDelta:-200,everyDays:7}}}};
+    s={...s,program:{...s.program,cycleStart:'2030-03-07',targets:{...s.program.targets,goal:{mode:'gain',maintenanceKg:null,confirmedAt:user().now},rateKgPerWeek:{min:.1,max:.3},calorieTrigger:{thresholdKgPerWeek:0.5,kcalDelta:-200,everyDays:14,confirmedAt:user().now}}}};
     for(const [date,cm] of [['2030-03-08',80],['2030-03-14',80.5]] as const)s=log(s,[{kind:'waist',date,dateOrigin:'explicit',source:{actor:'user',channel:'ui'},cm}],user(date)).snap;
     s=log(s,[{kind:'weight',date:'2030-03-15',dateOrigin:'explicit',source:{actor:'user',channel:'ui'},raw:{value:71.5,unit:'kg'},kg:71.5,condition:'post_bm'}],user('2030-03-15')).snap;
     const d=derive(s,'2030-03-15');
@@ -241,9 +243,9 @@ describe('派生值与触发器', () => {
     expect(d['bw.postBmCount']?.inputs).toHaveLength(1);
   });
 
-  it('V8：斜率超过阈值 → 将触发；采用后写入指令', () => {
-    let s = withWeights(fresh(), [0, 1, 2, 3, 4, 5, 6].map((i) => [addDays('2030-03-08', i), 70 + i * 0.2] as [string, number]));
-    s = { ...s, program: { ...s.program, cycleStart: '2030-03-04' } };
+  it('V8：充分观察并确认目标后，采用才写入指令', () => {
+    let s = withWeights(fresh(), Array.from({length:14},(_,i)=>[addDays('2030-03-01',i),70+i*.2] as [string,number]));
+    s={...s,program:{...s.program,cycleStart:'2030-03-04',targets:{...s.program.targets,goal:{mode:'gain',maintenanceKg:null,confirmedAt:user().now},rateKgPerWeek:{min:.1,max:.3},calorieTrigger:{thresholdKgPerWeek:.8,kcalDelta:-300,everyDays:14,confirmedAt:user().now}}}};
     s = refreshTriggers(s, user());
     const t = s.triggers[0]!;
     expect(t.status).toBe('will_fire');
@@ -258,5 +260,61 @@ describe('protocol', () => {
     const names = MCP_TOOLS.map((t) => t.name);
     expect(names).toEqual(['get_state', 'get_history', 'run_verifiers', 'propose_entries', 'propose_change', 'list_inbox']);
     expect(names.some((n) => /revert|update|delete|decide|commit/.test(n))).toBe(false);
+  });
+});
+
+
+describe('natural training rules v1.1',()=>{
+  it('keeps templates neutral and supports descending projections',()=>{
+    const s=fresh();expect(s.program.ramp).toEqual([]);expect(s.program.targets.calorieTrigger).toBeNull();expect(s.program.targets.rateKgPerWeek).toBeNull();
+    expect(projectDate(TODAY,80,-.5,79)).toBe(addDays(TODAY,14));expect(projectDate(TODAY,80,.5,79)).toBeNull();
+    expect(e1rm(100,1)).toBe(100);expect(rampFor([{week:1,setMultiplier:.5,targetRir:4,label:'减载'}],2)).toBeNull();
+  });
+  it('never excludes a lower work set, and corrections append and can be reverted',()=>{
+    const started=startSession(fresh(),'upper_a',user());let s=started.snap;
+    s=logSet(s,{sessionId:started.sessionId,exerciseId:'bench_press',load:135,unit:'lb',reps:8,rir:2},user()).snap;
+    s=logSet(s,{sessionId:started.sessionId,exerciseId:'bench_press',load:95,unit:'lb',reps:8,rir:2},user()).snap;
+    const id=s.entries.at(-1)!.id,original=JSON.stringify(s.entries.at(-1));
+    expect(weeklyVolume(s.entries,s.exercises,TODAY,s.program).find(r=>r.muscle==='chest')?.sets).toBe(2);
+    s=log(s,[{kind:'set_annotation',targetId:id,setRole:'warmup',date:TODAY,dateOrigin:'device',source:user().source}],user()).snap;
+    expect(JSON.stringify(s.entries.find(e=>e.id===id))).toBe(original);
+    expect(weeklyVolume(s.entries,s.exercises,TODAY,s.program).find(r=>r.muscle==='chest')?.sets).toBe(1);
+    s=revert(s,s.entries.at(-1)!.id,'标错了',user()).snap;
+    expect(active(s.entries).find(e=>e.id===id)).toMatchObject({setRole:'work'});
+  });
+  it('limits increments and holds unknown effort or assistance',()=>{
+    expect(nextSet(ex('lateral_raise'),{load:10,reps:15,rir:3},12,15).load).toBe(10);
+    expect(nextSet(ex('bench_press'),{load:135,reps:8,rir:null},5,8).load).toBe(135);
+    expect(nextSet(ex('pull_up'),{load:20,reps:8,rir:2},5,8,null).load).toBe(20);
+    expect(nextSet(ex('pull_up'),{load:20,reps:8,rir:2},5,8,70).load).toBe(17.7);
+  });
+  it('does not progress an incomplete session or one with missing RIR',()=>{
+    const started=startSession(fresh(),'upper_a',user());let s=started.snap;
+    s=logSet(s,{sessionId:started.sessionId,exerciseId:'bench_press',load:135,unit:'lb',reps:8,rir:null},user()).snap;
+    s=endSession(s,started.sessionId,user());
+    const rx=prescribe(s.program.days[0].items[0],ex('bench_press'),s.entries,TODAY,s.program);expect(rx.load).toBe(135);
+  });
+  it('first session is a starting point, and an equal estimate is not a record',()=>{
+    let s=fresh();for(let i=0;i<2;i++){const started=startSession(s,'upper_a',user());s=logSet(started.snap,{sessionId:started.sessionId,exerciseId:'bench_press',load:135,unit:'lb',reps:8,rir:2},user()).snap;s=endSession(s,started.sessionId,user());}
+    const records=Object.values(derive(s)).filter(d=>d.key.startsWith('session.pr.'));expect(records.every(d=>d.value!==1)).toBe(true);
+  });
+  it('stores one daily decision, defers without rejecting, and needs user acceptance',()=>{
+    let s=fresh();const first=propose(s,{kind:'program_change',title:'调整计划',rationale:'用户目标',patch:{cycleStart:TODAY},ruleRefs:['V6']},model());s=first.snap;
+    s=propose(s,{kind:'note',title:'另一个建议',rationale:'以后查看',patch:{},ruleRefs:[]},model()).snap;
+    s=claimDailyDecision(s);expect(s.decisionSlots?.[TODAY].id).toBe(first.proposal.id);
+    s=decideProposal(s,first.proposal.id,'later',undefined,user());expect(s.program.cycleStart).toBeNull();expect(s.proposals[0].status).toBe('open');
+    expect(claimDailyDecision(s).decisionSlots?.[TODAY].closed).toBe(true);
+    expect(()=>decideProposal(s,first.proposal.id,'accept',undefined,model())).toThrow(ForbiddenError);
+    expect(()=>propose(s,{kind:'program_change',title:'bad',rationale:'',patch:{targets:{unknown:null}},ruleRefs:[]},model())).toThrow();
+  });
+  it('expired dietary advice never writes a directive, and sparse observations do not qualify',()=>{
+    let s=withWeights(fresh(),Array.from({length:14},(_,i)=>[addDays(TODAY,i-13),70+i*.1] as [string,number]));
+    s=putProgram(s,{...s.program,targets:{...s.program.targets,goal:{mode:'gain',maintenanceKg:null},rateKgPerWeek:{min:.1,max:.2},calorieTrigger:{thresholdKgPerWeek:.4,kcalDelta:-150,everyDays:14}}},user());
+    s=refreshTriggers(s,user());const count=s.entries.length,t=s.triggers[0];
+    expect(t.status).toBe('will_fire');expect(refreshTriggers(s,user(addDays(TODAY,40))).entries).toHaveLength(count);
+    const later=decideTrigger(s,t.id,'later',undefined,user());expect(later.entries).toHaveLength(count);expect(later.triggers[0].status).toBe('will_fire');
+    const sparse={...s,entries:s.entries.slice(-3)};expect(refreshTriggers(sparse,user()).triggers[0].status).toBe('pending');
+    expect(()=>decideTrigger(s,t.id,'accept',undefined,model())).toThrow(ForbiddenError);
+    expect(decideTrigger(s,t.id,'accept',undefined,user()).entries).toHaveLength(count+1);
   });
 });

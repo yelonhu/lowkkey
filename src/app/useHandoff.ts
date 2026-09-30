@@ -127,8 +127,9 @@ export function useHandoff(enabled=true) {
     revert:async(entry:Entry)=>{const result=await action<Entry>(`/v1/entries/${entry.id}/revert`,{reason:''});setToast(null);return result;},
     writeEntries:(entries:EntryDraft[],inSession=false)=>action<WriteResult>('/v1/entries',{entries,inSession}),
     writeProgram:(program:Program)=>action<Program>('/v1/program',program,'PUT'),
-    decideProposal:(id:string,decision:'accept'|'reject')=>action(`/v1/proposals/${id}/decision`,{decision}),
-    decideTrigger:(id:string,decision:'accept'|'later')=>action(`/v1/triggers/${id}/decision`,{decision}),
+    decideProposal:(id:string,decision:'accept'|'reject'|'later',expectedRevision=state?.revision)=>action(`/v1/proposals/${id}/decision`,{decision,expectedRevision}),
+    claimDecision:async()=>{await request('/v1/decisions/today','POST',{});await refresh();},
+    decideTrigger:(id:string,decision:'accept'|'later',expectedRevision=state?.revision)=>action(`/v1/triggers/${id}/decision`,{decision,expectedRevision}),
     revokeClient:(id:string)=>action(`/v1/clients/${id}/revoke`,{}),
   };
 }

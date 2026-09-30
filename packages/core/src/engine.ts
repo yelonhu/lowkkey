@@ -2,6 +2,7 @@ import {
   EMPTY_PROGRAM,
   EXERCISE_LIBRARY,
   Entry as EntrySchema,
+  Program as ProgramSchema,
   GATE_THRESHOLDS,
   PROTOCOL_VERSION,
   type Entry,
@@ -15,13 +16,12 @@ import {
   type SetEntry,
   type Snapshot,
   type Source,
-  type Trigger,
   type WriteResult,
 } from '@lowkkey/protocol';
 import { active, bodyweightOn, dailyWeights, openSession, sessions } from './ledger.ts';
 import { parse, type ParsedItem } from './parser.ts';
-import { calorieCheck, e1rm, effectiveLoad } from './verifiers.ts';
-import { convert, diffDays, newId, round } from './util.ts';
+import { calorieCheck, e1rm, effectiveLoad, prescribe } from './verifiers.ts';
+import { addDays, convert, diffDays, newId, round } from './util.ts';
 
 /**
  * 规则引擎：输入快照，输出新快照与结果，不做 I/O。
@@ -60,6 +60,7 @@ export function describeDraft(snap: Snapshot, d: EntryDraft): string {
   switch (d.kind) {
     case 'weight':
       return `体重 ${round(d.kg, 2)} kg`;
+    case 'set_annotation':return `训练组标记为${d.setRole==='work'?'正式组':d.setRole==='warmup'?'热身组':'未分类'}`;
     case 'set':
       return `${exName(snap, d.exerciseId)} ${d.load} ${d.unit} × ${d.reps}`;
     case 'waist':
@@ -210,6 +211,8 @@ export function log(snap: Snapshot, drafts: EntryDraft[], ctx: EngineContext, op
   const prepared: EntryDraft[] = [];
   for (const raw of drafts) {
     let d = raw;
+    if(raw.kind==='set_annotation'&&!active(snap.entries).some(e=>e.kind==='set'&&e.id===raw.targetId))throw new NotFoundError('没有这条训练组');
+    if(d.kind==='session'&&d.event==='start')d={...d,prescription:snap.program.days.find(day=>day.id===(raw.kind==='session'?raw.dayId:null))?.items.map(item=>({...item,sets:prescribe(item,snap.exercises.find(ex=>ex.id===item.exerciseId)!,snap.entries,ctx.today,snap.program).sets}))??[]};
     if (d.kind === 'set' && (!d.setIndex || d.setIndex < 1)) d = { ...d, setIndex: nextSetIndex(snap.entries, d.sessionId, d.exerciseId, prepared) };
     prepared.push(d);
   }
@@ -323,7 +326,7 @@ export function startSession(snap: Snapshot, dayId: string | null, ctx: EngineCo
   const open = openSession(snap.entries);
   if (open) return { snap, sessionId: open.id };
   const sessionId = newId('s_');
-  const entry = materialize({ kind: 'session', event: 'start', sessionId, dayId, date: ctx.today, dateOrigin: 'device', source: ctx.source }, ctx);
+  const entry = materialize({ kind: 'session', event: 'start', sessionId, dayId,prescription:snap.program.days.find(day=>day.id===dayId)?.items.map(item=>({...item,sets:prescribe(item,snap.exercises.find(ex=>ex.id===item.exerciseId)!,snap.entries,ctx.today,snap.program).sets})), date: ctx.today, dateOrigin: 'device', source: ctx.source }, ctx);
   return { snap: { ...snap, entries: [...snap.entries, entry] }, sessionId };
 }
 
@@ -340,7 +343,7 @@ export function logSet(
   const ex = snap.exercises.find((x) => x.id === s.exerciseId);
   return log(
     snap,
-    [{ kind: 'set', ...s, setIndex: 0, loadKind: ex?.type === 'assisted' ? 'assist' : 'external', date: ctx.today, dateOrigin: 'device', source: ctx.source }],
+    [{ kind: 'set',setRole:'work', ...s, setIndex: 0, loadKind: ex?.type === 'assisted' ? 'assist' : 'external', date: ctx.today, dateOrigin: 'device', source: ctx.source }],
     ctx,
     { inSession: true },
   );
@@ -353,65 +356,74 @@ export function mergePatch<T>(target: T, patch: unknown): T {
   if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch as T;
   const out: Record<string, unknown> = target && typeof target === 'object' && !Array.isArray(target) ? { ...(target as Record<string, unknown>) } : {};
   for (const [k, v] of Object.entries(patch as Record<string, unknown>)) {
+    if(['__proto__','prototype','constructor'].includes(k))throw new Error('Invalid patch key');
     if (v === null) delete out[k];
     else out[k] = mergePatch(out[k], v);
   }
   return out as T;
 }
 
+export function validateProgram(snap:Snapshot,value:unknown):Program {
+  const program=ProgramSchema.parse(value);
+  for(const day of program.days)for(const item of day.items){if(!snap.exercises.some(ex=>ex.id===item.exerciseId))throw new NotFoundError('动作不存在');}
+  return program;
+}
 export function putProgram(snap: Snapshot, program: Program, ctx: EngineContext): Snapshot {
-  requireUser(ctx);
+  requireUser(ctx);program=validateProgram(snap,program);
+  if(program.targets.goal){program={...program,targets:{...program.targets,goal:{...program.targets.goal,confirmedAt:ctx.now},calorieTrigger:program.targets.calorieTrigger?{...program.targets.calorieTrigger,confirmedAt:ctx.now}:null}};}
   return { ...snap, program };
 }
-
+function checkedPatch(snap:Snapshot,patch:Record<string,unknown>):Program {
+  // Check before merge: deleting an unknown field must not hide it from validation.
+  const walk=(value:unknown)=>{if(value&&typeof value==='object')for(const [key,item] of Object.entries(value)){if(['__proto__','prototype','constructor'].includes(key))throw new ForbiddenError('不允许的计划字段');walk(item);}};walk(patch);
+  const fields:Record<string,string[]>={
+    '':Object.keys(ProgramSchema.shape),targets:['goal','bodyweightKg','rateKgPerWeek','weeklySets','calorieTrigger'],
+    'targets.goal':['mode','maintenanceKg'], 'targets.goal.maintenanceKg':['min','max'],'targets.rateKgPerWeek':['min','max'],'targets.weeklySets':['min','max'],
+    'targets.calorieTrigger':['thresholdKgPerWeek','kcalDelta','everyDays','comparison'],
+    'days.*':['id','name','weekday','items'],'days.*.items.*':['exerciseId','sets','repMin','repMax','startLoad','note'],
+    'ramp.*':['week','setMultiplier','targetRir','label'],'constraints.*':['kind','muscles','perWeek','label'],
+  };
+  const keys=(value:unknown,path='')=>{if(Array.isArray(value)){for(const item of value)keys(item,`${path}.*`);return;}if(value&&typeof value==='object')for(const [key,item] of Object.entries(value)){if(fields[path]&&!fields[path].includes(key))throw new ForbiddenError('不允许的计划字段');keys(item,path?`${path}.${key}`:key);}};keys(patch);
+  return validateProgram(snap,mergePatch(snap.program,patch));
+}
 export function propose(snap: Snapshot, p: Pick<Proposal, 'kind' | 'title' | 'rationale' | 'ruleRefs' | 'patch'>, ctx: EngineContext): { snap: Snapshot; proposal: Proposal } {
+  if(p.kind==='program_change')checkedPatch(snap,p.patch);
   const proposal: Proposal = { ...p, id: newId('p_'), createdAt: ctx.now, author: ctx.source, status: 'open' };
   return { snap: { ...snap, proposals: [...snap.proposals, proposal] }, proposal };
 }
-
-export function decideProposal(snap: Snapshot, id: string, decision: 'accept' | 'reject', note: string | undefined, ctx: EngineContext): Snapshot {
+function closeSlot(snap:Snapshot,id:string,today:string):Snapshot {
+  const slot=snap.decisionSlots?.[today];return slot?.id===id?{...snap,decisionSlots:{...snap.decisionSlots,[today]:{...slot,closed:true}}}:snap;
+}
+export function decideProposal(snap: Snapshot, id: string, decision: 'accept' | 'reject'|'later', note: string | undefined, ctx: EngineContext): Snapshot {
   requireUser(ctx);
   const p = snap.proposals.find((x) => x.id === id);
   if (!p || p.status !== 'open') throw new NotFoundError('没有这条待决提议');
-  const decided: Proposal = { ...p, status: decision === 'accept' ? 'accepted' : 'rejected', decidedAt: ctx.now, decisionNote: note };
-  const program = decision === 'accept' && p.kind === 'program_change' ? mergePatch(snap.program, p.patch) : snap.program;
-  return { ...snap, program, proposals: snap.proposals.map((x) => (x.id === id ? decided : x)) };
+  const decided: Proposal = decision==='later'?{...p,snoozedUntil:addDays(ctx.today,1)}:{ ...p, status: decision === 'accept' ? 'accepted' : 'rejected', decidedAt: ctx.now, decisionNote: note };
+  const updated=decision==='accept'&&p.kind==='program_change'?putProgram(snap,checkedPatch(snap,p.patch),ctx):snap;
+  return closeSlot({ ...updated, proposals: updated.proposals.map((x) => (x.id === id ? decided : x)) },id,ctx.today);
 }
-
-/** 刷新触发器（V8）：保证当前判决日有一条记录；判决日已过且未决定时自动执行。 */
+/** Refresh is observation only. No passage of time can authorize a directive. */
 export function refreshTriggers(snap: Snapshot, ctx: EngineContext): Snapshot {
-  const check = calorieCheck(snap.entries, snap.program, ctx.today);
-  if (!check) return snap;
-  let triggers = snap.triggers.slice();
-  let entries = snap.entries;
-  // 过期未决的：到期自动执行或作废
-  triggers = triggers.map((t) => {
-    if ((t.status === 'pending' || t.status === 'will_fire') && t.dueDate < ctx.today) {
-      if (t.status === 'will_fire') {
-        const d = materialize({ kind: 'directive', directive: 'calorie_delta', kcal: t.action.kcal, effectiveFrom: t.dueDate, triggerId: t.id, date: t.dueDate, dateOrigin: 'device', source: { actor: 'rule', channel: 'ui', client: 'V8' } }, ctx);
-        entries = [...entries, d];
-        return { ...t, status: 'fired' as const };
-      }
-      return { ...t, status: 'not_met' as const };
-    }
-    return t;
-  });
-  const existing = triggers.find((t) => t.dueDate === check.dueDate);
-  const status: Trigger['status'] = check.willFire ? 'will_fire' : 'pending';
-  if (!existing) {
-    triggers.push({ id: newId('t_'), rule: 'V8', dueDate: check.dueDate, metric: 'slope7d', threshold: check.threshold, current: check.slope7d, action: { type: 'calorie_delta', kcal: check.kcal }, status });
-  } else if (existing.status === 'pending' || existing.status === 'will_fire') {
-    triggers = triggers.map((t) => (t.id === existing.id ? { ...t, current: check.slope7d, status } : t));
-  }
-  return { ...snap, entries, triggers };
+  const check=calorieCheck(snap.entries,snap.program,ctx.today);
+  const triggers=snap.triggers.map(t=>(t.status==='pending'||t.status==='will_fire')?{...t,current:check?.slope7d??null,status:check&&check.kcal===t.action.kcal&&check.threshold===t.threshold?(check.willFire?'will_fire' as const:'pending' as const):'not_met' as const}:t);
+  if(check&&!triggers.some(t=>t.dueDate===check.dueDate&&t.threshold===check.threshold&&t.action.kcal===check.kcal))triggers.push({id:newId('t_'),rule:'V8',dueDate:check.dueDate,metric:'slope7d',threshold:check.threshold,current:check.slope7d,action:{type:'calorie_delta',kcal:check.kcal},status:check.willFire?'will_fire':'pending'});
+  return {...snap,triggers};
 }
-
-/** 用户对触发器的决定：采用（立即生效）或以后（写原因，本期作废）。 */
 export function decideTrigger(snap: Snapshot, id: string, decision: 'accept' | 'later', reason: string | undefined, ctx: EngineContext): Snapshot {
   requireUser(ctx);
-  const t = snap.triggers.find((x) => x.id === id);
-  if (!t) throw new NotFoundError('没有这个触发器');
-  if (decision === 'later') return { ...snap, triggers: snap.triggers.map((x) => (x.id === id ? { ...x, status: 'vetoed' as const, reason } : x)) };
-  const d = materialize({ kind: 'directive', directive: 'calorie_delta', kcal: t.action.kcal, effectiveFrom: t.dueDate > ctx.today ? t.dueDate : ctx.today, triggerId: t.id, date: ctx.today, dateOrigin: 'device', source: ctx.source }, ctx);
-  return { ...snap, entries: [...snap.entries, d], triggers: snap.triggers.map((x) => (x.id === id ? { ...x, status: 'accepted_early' as const } : x)) };
+  const t=snap.triggers.find(t=>t.id===id);
+  if(!t||!['pending','will_fire'].includes(t.status))throw new NotFoundError('没有这条待决建议');
+  if(decision==='later')return closeSlot({...snap,triggers:snap.triggers.map(x=>x.id===id?{...x,snoozedUntil:addDays(ctx.today,1),reason}:x)},id,ctx.today);
+  const check=calorieCheck(snap.entries,snap.program,ctx.today);
+  if(!check?.willFire||check.kcal!==t.action.kcal||check.threshold!==t.threshold)throw new ForbiddenError('建议依据已变化，请重新查看');
+  const entry=materialize({kind:'directive',directive:'calorie_delta',kcal:t.action.kcal,effectiveFrom:t.dueDate>ctx.today?t.dueDate:ctx.today,triggerId:t.id,date:ctx.today,dateOrigin:'device',source:ctx.source},ctx);
+  return closeSlot({...snap,entries:[...snap.entries,entry],triggers:snap.triggers.map(x=>x.id===id?{...x,status:'accepted_early' as const}:x)},id,ctx.today);
+}
+/** Persist this only from the user's UI; a model reading state never consumes a slot. */
+export function claimDailyDecision(snap:Snapshot):Snapshot {
+  if(snap.decisionSlots?.[snap.today]||openSession(snap.entries))return snap;
+  const proposal=snap.proposals.find(p=>p.status==='open'&&(!p.snoozedUntil||p.snoozedUntil<=snap.today));
+  const trigger=snap.triggers.find(t=>t.status==='will_fire'&&(!t.snoozedUntil||t.snoozedUntil<=snap.today));
+  const item=proposal??trigger;if(!item)return snap;
+  return {...snap,decisionSlots:{...snap.decisionSlots,[snap.today]:{kind:proposal?'proposal':'trigger',id:item.id,closed:false}}};
 }

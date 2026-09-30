@@ -28,17 +28,17 @@ export type Exercise = z.infer<typeof Exercise>;
 
 /* ───────────────────────────── 训练计划 ───────────────────────────── */
 
-export const ProgramItem = z.object({
+export const ProgramItem = z.strictObject({
   exerciseId: Id,
   sets: z.number().int().min(1).max(10),
   repMin: z.number().int().min(1).max(50),
   repMax: z.number().int().min(1).max(50),
   startLoad: z.number().min(0).nullable().default(null).describe('首次处方重量；null = 第一次由你自选'),
   note: z.string().max(400).optional(),
-});
+}).refine(v=>v.repMin<=v.repMax,'次数下限不能高于上限');
 export type ProgramItem = z.infer<typeof ProgramItem>;
 
-export const ProgramDay = z.object({
+export const ProgramDay = z.strictObject({
   id: Id,
   name: z.string().min(1).max(20).describe('如「胸」「肩 + 手臂」'),
   weekday: z.number().int().min(0).max(6).nullable().default(null).describe('0 = 周日；仅作默认建议'),
@@ -46,7 +46,7 @@ export const ProgramDay = z.object({
 });
 export type ProgramDay = z.infer<typeof ProgramDay>;
 
-export const RampWeek = z.object({
+export const RampWeek = z.strictObject({
   week: z.number().int().min(1),
   setMultiplier: z.number().min(0.1).max(1.5),
   targetRir: z.number().int().min(0).max(5),
@@ -55,7 +55,7 @@ export const RampWeek = z.object({
 export type RampWeek = z.infer<typeof RampWeek>;
 
 /** 用户约束：优先级高于通用区间（不变量 I6）。 */
-export const Constraint = z.object({
+export const Constraint = z.strictObject({
   kind: z.literal('frequency_cap'),
   muscles: z.array(Muscle).min(1),
   perWeek: z.number().int().min(0).max(7),
@@ -63,30 +63,42 @@ export const Constraint = z.object({
 });
 export type Constraint = z.infer<typeof Constraint>;
 
-export const Targets = z.object({
+export const Goal = z.strictObject({
+  mode:z.enum(['gain','lose','maintain','record']),
+  confirmedAt:Instant.optional(),
+  maintenanceKg:z.strictObject({min:z.number().positive(),max:z.number().positive()}).refine(v=>v.min<=v.max,'范围下限不能高于上限').nullable().default(null),
+});
+export const Targets = z.strictObject({
+  goal:Goal.optional(),
   bodyweightKg: z.number().positive().nullable().default(null),
-  rateKgPerWeek: z.object({ min: z.number(), max: z.number() }).default({ min: 0.25, max: 0.35 }),
-  weeklySets: z.object({ min: z.number(), max: z.number() }).default({ min: 10, max: 20 }),
+  rateKgPerWeek: z.strictObject({ min: z.number(), max: z.number() }).refine(v=>v.min<=v.max,'范围下限不能高于上限').nullable().default(null),
+  weeklySets: z.strictObject({ min: z.number().nonnegative(), max: z.number().nonnegative() }).refine(v=>v.min<=v.max).nullable().default(null),
   calorieTrigger: z
-    .object({
-      thresholdKgPerWeek: z.number().positive(),
+    .strictObject({
+      thresholdKgPerWeek: z.number(),
+      comparison:z.enum(['above','below']).optional(),
+      confirmedAt:Instant.optional(),
       kcalDelta: z.number().int(),
       everyDays: z.number().int().min(7).max(56),
     })
     .nullable()
     .default(null),
+}).superRefine((v,ctx)=>{
+  if(v.goal?.mode==='gain'&&v.rateKgPerWeek&&v.rateKgPerWeek.min<0||v.goal?.mode==='lose'&&v.rateKgPerWeek&&v.rateKgPerWeek.max>0)ctx.addIssue({code:'custom',path:['rateKgPerWeek'],message:'目标方向与速度不一致'});
+  if(v.goal?.mode==='record'&&(v.bodyweightKg!=null||v.rateKgPerWeek!=null||v.calorieTrigger!=null))ctx.addIssue({code:'custom',path:['goal'],message:'只记录模式不设置体重或饮食目标'});
+  if(v.calorieTrigger&&v.goal&&(!v.rateKgPerWeek||v.calorieTrigger.everyDays<14))ctx.addIssue({code:'custom',path:['calorieTrigger'],message:'饮食建议需要目标速度及至少 14 天观察期'});
 });
 export type Targets = z.infer<typeof Targets>;
 
-export const Program = z.object({
+export const Program = z.strictObject({
   cycleStart: LocalDate.nullable().default(null),
   ramp: z.array(RampWeek).default([]),
   days: z.array(ProgramDay).default([]),
   constraints: z.array(Constraint).default([]),
   targets: Targets.default({
     bodyweightKg: null,
-    rateKgPerWeek: { min: 0.25, max: 0.35 },
-    weeklySets: { min: 10, max: 20 },
+    rateKgPerWeek: null,
+    weeklySets: null,
     calorieTrigger: null,
   }),
 });
@@ -128,7 +140,11 @@ export const SetEntry = z.object({
   reps: z.number().int().min(0).max(100),
   rir: z.number().int().min(0).max(10).nullable().default(null),
   straps: z.boolean().optional(),
+  setRole:z.enum(['work','warmup','unknown']).optional(),
+  recommendation:z.object({ruleVersion:z.string(),inputs:z.array(Id),load:z.number().nullable(),unit:Unit}).optional(),
 });
+
+export const SetAnnotationEntry=z.object({...EntryCommon,kind:z.literal('set_annotation'),targetId:Id,setRole:z.enum(['work','warmup','unknown'])});
 
 export const SessionEntry = z.object({
   ...EntryCommon,
@@ -136,6 +152,7 @@ export const SessionEntry = z.object({
   sessionId: Id,
   event: z.enum(['start', 'end']),
   dayId: Id.nullable().default(null),
+  prescription:z.array(ProgramItem).optional(),
 });
 
 export const WaistEntry = z.object({
@@ -170,6 +187,7 @@ export const RevertEntry = z.object({
 export const Entry = z.discriminatedUnion('kind', [
   WeightEntry,
   SetEntry,
+  SetAnnotationEntry,
   SessionEntry,
   WaistEntry,
   NoteEntry,
@@ -195,6 +213,7 @@ const confidence = { confidence: z.number().min(0).max(1).optional() };
 export const EntryDraft = z.discriminatedUnion('kind', [
   WeightEntry.omit(DRAFT_OMIT).extend(confidence),
   SetEntry.omit(DRAFT_OMIT).extend(confidence),
+  SetAnnotationEntry.omit(DRAFT_OMIT).extend(confidence),
   SessionEntry.omit(DRAFT_OMIT).extend(confidence),
   WaistEntry.omit(DRAFT_OMIT).extend(confidence),
   NoteEntry.omit(DRAFT_OMIT).extend(confidence),
@@ -248,6 +267,7 @@ export const Proposal = z.object({
   status: z.enum(['open', 'accepted', 'rejected', 'expired']).default('open'),
   decidedAt: Instant.optional(),
   decisionNote: z.string().max(400).optional(),
+  snoozedUntil:LocalDate.optional(),
 });
 export type Proposal = z.infer<typeof Proposal>;
 
@@ -261,6 +281,7 @@ export const Trigger = z.object({
   action: z.object({ type: z.literal('calorie_delta'), kcal: z.number().int() }),
   status: z.enum(['pending', 'will_fire', 'fired', 'accepted_early', 'vetoed', 'not_met']),
   reason: z.string().max(400).optional(),
+  snoozedUntil:LocalDate.optional(),
 });
 export type Trigger = z.infer<typeof Trigger>;
 
@@ -290,6 +311,7 @@ export const Snapshot = z.object({
   triggers: z.array(Trigger),
   program: Program,
   exercises: z.array(Exercise),
+  decisionSlots:z.record(LocalDate,z.object({kind:z.enum(['proposal','trigger']),id:Id,closed:z.boolean()})).optional(),
 });
 export type Snapshot = z.infer<typeof Snapshot>;
 

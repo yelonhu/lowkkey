@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** 协议版本。任何破坏性变更都要递增主版本，并在 docs/PROTOCOL.md 的变更记录里说明。 */
-export const PROTOCOL_VERSION = '1.0.0';
+export const PROTOCOL_VERSION = '2.0.0';
 
 /** 不透明 ID。推荐 ULID（可按时间排序），但消费方不得解析其内容。 */
 export const Id = z.string().min(1).max(64).describe('不透明 ID，推荐 ULID');

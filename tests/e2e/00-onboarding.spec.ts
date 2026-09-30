@@ -39,14 +39,15 @@ test('a new account chooses a template, starts an unscheduled day, and records i
   await session.getByRole('button',{name:'确认重量单位 lb'}).click();
   await session.getByRole('radio',{name:'2'}).click();
   await session.getByRole('button',{name:'完成本组'}).click();
-  await expect(session).toContainText('上一组 152.5 × 8');
+  await expect(session).toContainText('上一组 152.5 × 5');
+  await expect(session).toContainText('45 + 5 + 2.5');await expect(session).toContainText('2.5 lb 无法配出');await expect(session).not.toContainText('每侧 35 + 5');
   const during=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   expect(during.entries.some((entry:{kind:string;load?:number;sessionId?:string})=>entry.kind==='set'&&entry.load===152.5&&entry.sessionId)).toBe(true);
   expect(during.derived['next.bench_press'].rule).toBe('V5');
   expect(during.program.days.find((day:{id:string})=>day.id==='upper_a').weekday).toBe(1);
   await session.locator('[data-action="end-session"]').click();
   const debrief=page.locator('.screen[data-screen="Debrief"]');
-  await expect(debrief).toContainText('152.5 lb × 8');
+  await expect(debrief).toContainText('152.5 lb × 5');
   await debrief.getByText('返回今日').click();
   await expect(main).toBeVisible();
 
@@ -64,5 +65,5 @@ test('a new account chooses a template, starts an unscheduled day, and records i
   await expect(progress).not.toContainText('e1RM 200 lb');
   await page.goto('/#Ledger');
   await expect(page.locator('.screen[data-screen="Ledger"]')).toContainText('体重 70 kg');
-  await expect(page.locator('.screen[data-screen="Ledger"]')).toContainText('152.5 lb × 8');
+  await expect(page.locator('.screen[data-screen="Ledger"]')).toContainText('152.5 lb × 5');
 });

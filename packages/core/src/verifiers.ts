@@ -11,12 +11,11 @@ import {
   type ProgramItem,
   type RampWeek,
   type SetEntry,
-  type Targets,
   type Unit,
   type WaistEntry,
   type WeightEntry,
 } from '@lowkkey/protocol';
-import { bodyweightOn, dailyWeights, active } from './ledger.ts';
+import { bodyweightOn, dailyWeights, active, sessions } from './ledger.ts';
 import { addDays, convert, dayIndex, diffDays, fromDayIndex, ols, round, toKg, weekStart } from './util.ts';
 
 /* ═══════════════ V1 体重趋势 ═══════════════ */
@@ -26,7 +25,7 @@ export type Trend = { slopePerWeek: number; intercept: number; n: number; from: 
 /**
  * V1：对 (日序号, kg) 做最小二乘，斜率 × 7 = kg/周。
  * window 为天数（含当天）；省略则用全部读数。少于 3 个点返回 null。
- * 非标准条件（排便后）的读数同样参与，只标注不剔除。
+ * 称重条件作为背景记录，不据此剔除。
  */
 export function trend(entries: Entry[], asOf: LocalDate, windowDays?: number): Trend | null {
   const pts = dailyWeights(entries).filter((w) => w.date <= asOf && (windowDays == null || diffDays(asOf, w.date) < windowDays));
@@ -44,9 +43,9 @@ export function trendAt(t: Trend, d: LocalDate): number {
   return t.intercept + (t.slopePerWeek / 7) * dayIndex(d);
 }
 
-/** 按某个速度从 fromKg 走到 targetKg 的日期；速度 ≤ 0 或已达到返回 null。 */
+/** 按某个速度从 fromKg 走到 targetKg 的日期；速度为零、方向相反或已达到返回 null。 */
 export function projectDate(from: LocalDate, fromKg: number, ratePerWeek: number, targetKg: number): LocalDate | null {
-  if (ratePerWeek <= 0 || targetKg <= fromKg) return null;
+  if (ratePerWeek === 0 || (targetKg-fromKg)*ratePerWeek <= 0) return null;
   return fromDayIndex(dayIndex(from) + Math.ceil(((targetKg - fromKg) / ratePerWeek) * 7));
 }
 
@@ -55,7 +54,7 @@ export function projectDate(from: LocalDate, fromKg: number, ratePerWeek: number
 /** V2 Epley。reps < 1 或 > 20 返回 null。 */
 export function e1rm(load: number, reps: number): number | null {
   if (reps < 1 || reps > 20 || load <= 0) return null;
-  return load * (1 + reps / 30);
+  return reps===1?load:load * (1 + reps / 30);
 }
 
 /**
@@ -76,10 +75,9 @@ export function effectiveLoad(set: SetEntry, ex: Exercise, bodyweightKg: number 
 
 /* ═══════════════ V4 热身 ═══════════════ */
 
-/** V4：同场同动作中，负荷 < 最高组 85% 的组为热身。返回与输入等长的布尔数组。 */
-export function warmupFlags(loads: (number | null)[]): boolean[] {
-  const max = Math.max(...loads.map((l) => l ?? 0));
-  return loads.map((l) => l != null && max > 0 && l < 0.85 * max);
+/** V4：仅显式热身标记；负荷高低不能确定训练意图。 */
+export function warmupFlags(sets: Pick<SetEntry,'setRole'>[]): boolean[] {
+  return sets.map(set=>set.setRole==='warmup');
 }
 
 /* ═══════════════ 档位与杠片 ═══════════════ */
@@ -102,7 +100,7 @@ export function increment(ex: Exercise): number {
     case 'dumbbell':
       return u === 'lb' ? INCREMENTS.dumbbellLb : INCREMENTS.dumbbellKg;
     case 'assisted':
-      return INCREMENTS.assistKg;
+      return convert(INCREMENTS.assistKg,'kg',u);
     default:
       return u === 'kg' ? INCREMENTS.machineKg : INCREMENTS.machineLb;
   }
@@ -135,29 +133,22 @@ export type NextSet = { load: number; reason: string; steps: number };
 
 /**
  * V5：
- * - 次数 ≥ 上限 且 RIR ≥ 2 → +2 档
- * - 次数 ≥ 上限 且 RIR = 1 → +1 档
+ * - 次数 ≥ 上限 且 RIR ≥ 2 → 至多 +1 档（且不超过 10%）
+ * - RIR = 1 或未知 → 保持
  * - RIR = 0 且 次数 ≥ 下限 → 保持
  * - 次数 < 下限 → −1 档
  * - 其余（在区间内且 RIR ≥ 1，或 RIR 未知）→ 保持
  */
-export function nextSet(ex: Exercise, last: { load: number; reps: number; rir: number | null }, repMin: number, repMax: number): NextSet {
-  const { reps, rir } = last;
-  let steps = 0;
-  let reason = '在区间内，保持';
-  if (reps < repMin) {
-    steps = -1;
-    reason = `次数 ${reps} 低于下限 ${repMin}，降一档`;
-  } else if (reps >= repMax && rir != null && rir >= 2) {
-    steps = 2;
-    reason = `已到上限 ${repMax}，RIR ${rir} ≥ 2，加两档`;
-  } else if (reps >= repMax && rir === 1) {
-    steps = 1;
-    reason = `已到上限 ${repMax}，RIR 1，加一档`;
-  } else if (rir === 0) {
-    reason = `RIR 0，保持`;
-  }
-  return { load: stepLoad(ex, last.load, steps), reason, steps };
+/** At most one hardware step and 10% of effective load; this is a product guardrail. */
+export function guardedStep(ex:Exercise,load:number,steps:number,bodyweightKg:number|null=null):number {
+  const effective=ex.type==='assisted'?(bodyweightKg==null?null:convert(bodyweightKg,'kg',ex.unit)-load):load;
+  const next=stepLoad(ex,load,steps);
+  return effective==null||effective<=0||Math.abs(next-load)>effective*.1+1e-6?load:next;
+}
+export function nextSet(ex: Exercise, last: { load: number; reps: number; rir: number | null }, repMin: number, repMax: number,bodyweightKg:number|null=null): NextSet {
+  const desired=last.reps<repMin?-1:last.reps>=repMax&&last.rir!=null&&last.rir>=2?1:0;
+  const load=guardedStep(ex,last.load,desired,bodyweightKg),steps=load===last.load?0:desired;
+  return {load,steps,reason:steps>0?'达到次数上限，还能再做至少 2 次；加一档':steps<0?'低于次数下限；减一档':desired?'器械档位超过 10% 或有效负荷未知，保持':'保持本组重量'};
 }
 
 /* ═══════════════ V6 双进阶 + 周期 ═══════════════ */
@@ -169,7 +160,7 @@ export function cycleWeek(cycleStart: LocalDate | null, date: LocalDate): number
 }
 
 export function rampFor(ramp: RampWeek[], week: number | null): RampWeek | null {
-  if (week == null || ramp.length === 0) return null;
+  if (week == null || week>ramp.length || ramp.length === 0) return null;
   const idx = Math.min(week, ramp.length) - 1;
   return ramp[idx] ?? null;
 }
@@ -187,7 +178,7 @@ export type Prescription = {
 };
 
 /**
- * V6：上次该动作所有有效组都达到上限，且 RIR ≥ 1（或未记录）→ +1 档；否则保持上次最重有效组。
+ * V6：最近完成场次的全部规定正式组达到上限且明确 RIR ≥ 1 → 至多 +1 档；否则沿用最近重量。
  * 没有历史 → startLoad（可能为 null：由你自选）。组数按周期系数缩放：max(2, round(sets × 系数))。
  */
 export function prescribe(item: ProgramItem, ex: Exercise, entries: Entry[], asOf: LocalDate, program: Pick<Program, 'cycleStart' | 'ramp'>): Prescription {
@@ -196,58 +187,31 @@ export function prescribe(item: ProgramItem, ex: Exercise, entries: Entry[], asO
   const sets = r ? Math.max(2, Math.round(item.sets * r.setMultiplier)) : item.sets;
   const base = { exerciseId: ex.id, unit: ex.unit, sets, repMin: item.repMin, repMax: item.repMax, targetRir: r?.targetRir ?? null };
 
-  const hist = active(entries).filter((e): e is SetEntry => e.kind === 'set' && e.exerciseId === ex.id && e.date < asOf);
-  if (hist.length === 0) {
-    return { ...base, load: item.startLoad, reason: item.startLoad == null ? '第一次练，重量自选' : '计划起始重量', basedOn: [] };
-  }
-  const lastDate = hist.reduce((m, s) => (s.date > m ? s.date : m), hist[0]!.date);
-  const last = hist.filter((s) => s.date === lastDate);
-  const loads = last.map((s) => convert(s.load, s.unit, ex.unit));
-  const warm = ex.type === 'assisted' ? loads.map(() => false) : warmupFlags(loads);
-  const work = last.filter((_, i) => !warm[i]);
-  const workLoads = work.map((s) => convert(s.load, s.unit, ex.unit));
-  const top = ex.type === 'assisted' ? Math.min(...workLoads) : Math.max(...workLoads);
-  const allTop = work.every((s) => s.reps >= item.repMax && (s.rir == null || s.rir >= 1));
-  if (allTop) {
-    return { ...base, load: stepLoad(ex, top, 1), reason: `${lastDate} 全部有效组达到 ${item.repMax} 次，加一档`, basedOn: work.map((s) => s.id) };
-  }
-  return { ...base, load: round(top, 2), reason: `${lastDate} 未全部达到上限，保持`, basedOn: work.map((s) => s.id) };
+  const last=sessions(entries).filter(session=>session.endedAt&&session.date<=asOf&&session.sets.some(set=>set.exerciseId===ex.id)).sort((a,b)=>a.endedAt!.localeCompare(b.endedAt!)).at(-1);
+  const history=active(entries).filter((e):e is SetEntry=>e.kind==='set'&&e.exerciseId===ex.id&&e.date<=asOf);
+  const previous=last?.sets.filter(set=>set.exerciseId===ex.id&&set.setRole!=='warmup')??history.filter(set=>set.setRole!=='warmup').slice(-1);
+  if(!previous.length)return {...base,load:item.startLoad,reason:item.startLoad==null?'第一次练，重量自选':'计划起始重量',basedOn:[]};
+  const recent=previous.at(-1)!,load=convert(recent.load,recent.unit,ex.unit);
+  const required=last?.prescription?.find(it=>it.exerciseId===ex.id)?.sets;
+  const work=previous.filter(set=>set.setRole==='work');
+  const complete=!!last&&required!=null&&work.length>=required&&previous.every(set=>set.setRole==='work'&&set.reps>=item.repMax&&set.rir!=null&&set.rir>=1&&Math.abs(convert(set.load,set.unit,ex.unit)-load)<.01);
+  const next=complete?guardedStep(ex,load,1,bodyweightOn(entries,last!.date)?.kg??null):load;
+  return {...base,load:round(next,2),reason:next!==load?'上次完成全部正式组并达到上限，加一档':'沿用最近记录；资料不完整或未全部达到上限',basedOn:previous.map(set=>set.id)};
 }
 
 /* ═══════════════ V7 每周有效组 ═══════════════ */
 
-export type VolumeRow = { muscle: Muscle; sets: number; status: 'low' | 'ok' | 'high' | 'constrained'; constraint: Constraint | null; inputs:string[] };
-
-function classify(muscle: Muscle, sets: number, targets: Pick<Targets, 'weeklySets'>, constraints: Constraint[],inputs:string[]=[]): VolumeRow {
-  const c = constraints.find((k) => k.muscles.includes(muscle)) ?? null;
-  const status: VolumeRow['status'] = c && sets < targets.weeklySets.min ? 'constrained' : sets < targets.weeklySets.min ? 'low' : sets > targets.weeklySets.max ? 'high' : 'ok';
-  return { muscle, sets: round(sets, 1), status, constraint: c, inputs };
-}
-
-/** V7（实际）：本周（周一起）已完成的有效组（不含热身）。 */
-export function weeklyVolume(entries: Entry[], exercises: Exercise[], asOf: LocalDate, program: Pick<Program, 'targets' | 'constraints'>): VolumeRow[] {
-  const from = weekStart(asOf);
-  const to = addDays(from, 6);
-  const acc = new Map<Muscle, number>();
-  const ids = new Map<Muscle,string[]>();
-  const bySessionEx = new Map<string, SetEntry[]>();
-  for (const e of active(entries)) {
-    if (e.kind !== 'set' || e.date < from || e.date > to) continue;
-    const k = `${e.sessionId}|${e.exerciseId}`;
-    (bySessionEx.get(k) ?? bySessionEx.set(k, []).get(k)!).push(e);
+export type VolumeRow = { muscle: Muscle; sets: number; planned:number; unknown:number; status:'recorded'; constraint:Constraint|null; inputs:string[] };
+export function weeklyVolume(entries: Entry[], exercises: Exercise[], asOf: LocalDate, program: Pick<Program, 'targets' | 'constraints'|'days'>): VolumeRow[] {
+  const from=weekStart(asOf),rows=new Map<Muscle,VolumeRow>();
+  const row=(muscle:Muscle)=>{if(!rows.has(muscle))rows.set(muscle,{muscle,sets:0,planned:0,unknown:0,status:'recorded',constraint:program.constraints.find(c=>c.muscles.includes(muscle))??null,inputs:[]});return rows.get(muscle)!;};
+  for(const day of program.days)for(const item of day.items){const ex=exercises.find(ex=>ex.id===item.exerciseId);if(ex)for(const [m,w] of Object.entries(ex.muscles) as [Muscle,number][])row(m).planned+=item.sets*w;}
+  for(const set of active(entries)){
+    if(set.kind!=='set'||set.date<from||set.date>asOf||set.setRole==='warmup')continue;
+    const ex=exercises.find(ex=>ex.id===set.exerciseId);if(!ex)continue;
+    for(const [m,w] of Object.entries(ex.muscles) as [Muscle,number][]){const value=row(m);if(set.setRole==='work')value.sets+=w;else value.unknown+=w;value.inputs.push(set.id);}
   }
-  for (const group of bySessionEx.values()) {
-    const ex = exercises.find((x) => x.id === group[0]!.exerciseId);
-    if (!ex) continue;
-    const loads = group.map((s) => convert(s.load, s.unit, ex.unit));
-    const warm = ex.type === 'assisted' ? loads.map(() => false) : warmupFlags(loads);
-    const work = group.filter((_, i) => !warm[i]);
-    for (const [m, w] of Object.entries(ex.muscles) as [Muscle, number][]) {
-      acc.set(m, (acc.get(m) ?? 0) + work.length * w);
-      ids.set(m,[...(ids.get(m)??[]),...work.map(set=>set.id)]);
-    }
-  }
-  return [...acc.entries()].map(([m, s]) => classify(m, s, program.targets, program.constraints,ids.get(m)??[])).sort((a, b) => b.sets - a.sets);
+  return [...rows.values()].map(row=>({...row,sets:round(row.sets,1),planned:round(row.planned,1),unknown:round(row.unknown,1)}));
 }
 
 /* ═══════════════ V8 热量触发器 ═══════════════ */
@@ -263,15 +227,17 @@ export type CalorieCheck = {
 /** V8：判决日 = 周期起点（或首次称重）+ k × everyDays 中不早于今天的最近一天。 */
 export function calorieCheck(entries: Entry[], program: Program, today: LocalDate): CalorieCheck | null {
   const cfg = program.targets.calorieTrigger;
-  if (!cfg) return null;
-  const ws = dailyWeights(entries);
+  if (!cfg||!cfg.confirmedAt||!program.targets.goal?.confirmedAt||!program.targets.rateKgPerWeek||cfg.everyDays<14||program.targets.goal.mode==='record') return null;
+  const ws = dailyWeights(entries).filter(w=>w.date<=today);
   const origin = program.cycleStart ?? ws[0]?.date;
   if (!origin) return null;
   const k = Math.max(1, Math.ceil(diffDays(today, origin) / cfg.everyDays));
   const dueDate = addDays(origin, k * cfg.everyDays);
-  const t = trend(entries, today, 7);
+  const observed=ws.filter(w=>diffDays(today,w.date)<cfg.everyDays);
+  const enough=observed.length>=7&&diffDays(observed.at(-1)!.date,observed[0]!.date)>=Math.min(13,cfg.everyDays-1);
+  const t = enough?trend(entries,today,cfg.everyDays):null;
   const slope = t?.slopePerWeek ?? null;
-  return { dueDate, threshold: cfg.thresholdKgPerWeek, kcal: cfg.kcalDelta, slope7d: slope, willFire: slope != null && slope > cfg.thresholdKgPerWeek };
+  return { dueDate, threshold: cfg.thresholdKgPerWeek, kcal: cfg.kcalDelta, slope7d: slope, willFire: slope != null && (cfg.comparison==='below'?slope<cfg.thresholdKgPerWeek:slope>cfg.thresholdKgPerWeek) };
 }
 
 /* ═══════════════ V9 腰围 ═══════════════ */
@@ -286,7 +252,7 @@ export function waistRatio(entries: Entry[]): { ratio: number | null; ok: boolea
   const b1 = bodyweightOn(entries, last.date);
   if (!b0 || !b1 || b1.kg - b0.kg <= 0.2) return { ratio: null, ok: null, inputs: [first.id, last.id] };
   const ratio = (last.cm - first.cm) / (b1.kg - b0.kg);
-  return { ratio, ok: ratio <= 0.5, inputs: [first.id, last.id, b0.id, b1.id] };
+  return { ratio, ok: null, inputs: [first.id, last.id, b0.id, b1.id] };
 }
 
 /* ═══════════════ V10 称重条件 ═══════════════ */

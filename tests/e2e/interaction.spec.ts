@@ -159,7 +159,7 @@ test('training motion is interruptible and rapid set taps commit once through a 
   await page.getByRole('button',{name:'重试',exact:true}).click();await expect(complete).toBeEnabled();
   expect(attempts).toHaveLength(2);expect(attempts[1]).toEqual(attempts[0]);expect(JSON.parse(attempts[0].body).entries[0].reps).toBe(13);
   expect((await state(page)).revision).toBe(committed.revision);
-  await session.locator('[data-action="end-session"]').click();const debrief=page.locator('.screen[data-screen="Debrief"]');await expect(debrief).toContainText('147 lb × 13');
+  await session.locator('[data-action="end-session"]').click();const debrief=page.locator('.screen[data-screen="Debrief"]');const written=JSON.parse(attempts[0].body).entries[0];await expect(debrief).toContainText(`${written.load} ${written.unit} × ${written.reps}`);
   await debrief.getByText('返回今日').click();
   expect((await animations()).some(a=>a.duration===480&&a.frames.some(frame=>'clipPath' in frame))).toBe(true);
   await page.getByRole('link',{name:'体征',exact:true}).click();await expect(page.locator('.motion-outgoing,.sheet-layer')).toHaveCount(0);
