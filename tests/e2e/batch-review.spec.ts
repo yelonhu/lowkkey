@@ -33,6 +33,11 @@ test('a model batch stays pending until the user writes all five rows',async({pa
   await rpc(1,'initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'browser-test',version:'1'}});
   const proposed=await rpc(2,'tools/call',{name:'propose_entries',arguments:{idempotencyKey:randomUUID(),rawText,capturedAt:new Date().toISOString(),capturedLocalDate:localDate,timeZone:'America/Chicago',entries}});
   expect(proposed.result.structuredContent.result.drafts).toHaveLength(5);
+  const second=await rpc(20,'tools/call',{name:'propose_entries',arguments:{idempotencyKey:randomUUID(),rawText:'另一个独立批次',capturedAt:new Date().toISOString(),capturedLocalDate:localDate,timeZone:'America/Chicago',entries:[{...entries[0],text:'准确选择第二个批次'}]}});
+  const secondId=second.result.structuredContent.result.id;
+  await page.goto('/#Ledger');await page.locator(`[data-action="view-submission"][data-id="${secondId}"]`).click();
+  await expect(page.getByRole('dialog',{name:'确认'})).toContainText('准确选择第二个批次');
+  await page.reload();await expect(page.getByRole('dialog',{name:'确认'})).toContainText('准确选择第二个批次');
   await page.goto('/#Main');await page.locator('.screen[data-screen="Main"]').waitFor();
   const pending=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   expect(pending.entries).toHaveLength(before.entries.length);
@@ -54,6 +59,8 @@ test('a model batch stays pending until the user writes all five rows',async({pa
   await expect(dialog).toHaveCount(0);await expect(page.locator('.screen[data-screen="Main"]')).toBeVisible();
   const after=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   expect(after.entries.filter((entry:{source:{rawText?:string}})=>entry.source.rawText===rawText)).toHaveLength(5);
+  expect(after.submissions.some((s:{id:string})=>s.id===secondId)).toBe(true);
+  const skipped=await page.request.post(`${origin}/v1/submissions/${secondId}/decision`,{headers:{Origin:origin,'Idempotency-Key':randomUUID()},data:{decision:'skip',expectedRevision:after.revision}});expect(skipped.ok()).toBe(true);
   await page.goto('/#Connect');
   const connection=page.locator('.screen[data-screen="Connect"] [data-action="client-revoke"]').filter({hasText:'Browser Batch Test'});
   await expect(connection).toBeVisible();

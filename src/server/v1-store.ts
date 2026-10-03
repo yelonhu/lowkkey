@@ -1,5 +1,5 @@
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
-import { PROTOCOL_VERSION, Entry as EntrySchema, EntryDraft as DraftSchema, Program as ProgramSchema, Snapshot as SnapshotSchema, VerifierId, type Entry, type EntryDraft, type Snapshot, type Source, type WriteResult } from '@lowkkey/protocol';
+import { PROTOCOL_VERSION, Entry as EntrySchema, EntryDraft as DraftSchema, Program as ProgramSchema, Snapshot as SnapshotSchema, VerifierId, type Exercise, type Entry, type EntryDraft, type Snapshot, type Source, type WriteResult } from '@lowkkey/protocol';
 import { capture, claimDailyDecision, decideProposal, decideTrigger, derive, emptySnapshot, log, propose, putProgram, refreshTriggers, resolveHeld, revert } from '@lowkkey/core';
 import { parse } from '@lowkkey/core';
 import { StoreError } from './account.ts';
@@ -9,7 +9,8 @@ type EntryRow = { entry_json: string };
 type OldRow = { id:string; kind:string; local_date:string; payload_json:string; raw_text:string|null; source_actor:string; source_channel:string; capture_id:string|null; reverts_id:string|null; created_at:string };
 type OperationRow = { request_hash:string; response_json:string };
 type SubmissionRow = { id:string; owner_id:string; client_id:string; raw_text:string; drafts_json:string; captured_at:string; time_zone:string; base_revision:number; status:'pending'|'accepted'|'skipped'; result_json:string|null; created_at:string };
-export type Submission = { id:string; clientId:string; rawText:string; drafts:EntryDraft[]; status:SubmissionRow['status']; capturedAt:string; timeZone:string; createdAt:string; questions:{id:string;gate:string;question:string;context?:string;options:{id:string;label:string}[]}[] };
+export type Submission = { id:string; clientId:string; rawText:string; drafts:ProposedDraft[]; status:SubmissionRow['status']; capturedAt:string; timeZone:string; createdAt:string; questions:{id:string;gate:string;question:string;context?:string;options:{id:string;label:string}[]}[] };
+type ProposedDraft=EntryDraft&{corrects?:string};
 type ReviewQuestion=Submission['questions'][number];
 export type V1State = Snapshot & { accountId:string; revision:number; eventCursor:number; derived:ReturnType<typeof derive>; submissions:Submission[]; clients:ClientPublic[] };
 export type ClientPublic = { id:string; name:string; scopes:string[]; status:'active'|'revoked'; createdAt:string; lastUsedAt:string|null };
@@ -145,8 +146,9 @@ export async function writeProgram(db:D1Database,ownerId:string,key:string,value
     return {snap:next,result:next.program,events:[{type:'program.updated',program:next.program}]};
   });
 }
-export async function createProposal(db:D1Database,ownerId:string,clientId:string,key:string,value:{kind:'program_change'|'note';title:string;rationale:string;ruleRefs:string[];patch:Record<string,unknown>},source:Source) {
-  return mutate(db,ownerId,clientId,'proposal.create',key,value,snap=>{
+export async function createProposal(db:D1Database,ownerId:string,clientId:string,key:string,value:{kind:'program_change'|'note';title:string;rationale:string;ruleRefs:string[];patch:Record<string,unknown>;exercises?:Exercise[];expectedRevision?:number},source:Source) {
+  return mutate(db,ownerId,clientId,'proposal.create',key,value,(snap,_now,currentRevision)=>{
+    if(value.expectedRevision!==undefined&&value.expectedRevision!==currentRevision)throw new StoreError('conflict',409);
     const out=propose(snap,{...value,ruleRefs:VerifierId.array().parse(value.ruleRefs)},actor(source,new Date().toISOString(),snap.timezone));
     return {snap:out.snap,result:out.proposal,events:[{type:'proposal.created',proposal:out.proposal}]};
   });
@@ -172,17 +174,20 @@ export async function triggerDecision(db:D1Database,ownerId:string,key:string,id
 async function listSubmissions(db:D1Database,ownerId:string,snap:Snapshot):Promise<Submission[]> {
   const rows=await db.prepare("SELECT * FROM v1_submissions WHERE owner_id=? AND status='pending' ORDER BY created_at,id").bind(ownerId).all<SubmissionRow>();
   return rows.results.map(row=>{
-    const drafts=JSON.parse(row.drafts_json) as EntryDraft[];
-    const preview=evaluateSubmission(snap,row,drafts,{},row.captured_at);
+    const drafts=JSON.parse(row.drafts_json) as ProposedDraft[];
+    let preview:{questions:ReviewQuestion[]};
+    try{preview=evaluateSubmission(snap,row,drafts,{},row.captured_at);}catch(cause){if(!(cause instanceof StoreError&&cause.status===409))throw cause;preview={questions:[{id:'stale',gate:'review',question:'原记录已变化，请跳过并重新提交更正。',options:[]}]};}
     return {id:row.id,clientId:row.client_id,rawText:row.raw_text,drafts,status:row.status,capturedAt:row.captured_at,timeZone:row.time_zone,createdAt:row.created_at,
       questions:preview.questions};
   });
 }
-function evaluateSubmission(snap:Snapshot,row:Pick<SubmissionRow,'captured_at'|'time_zone'|'client_id'|'raw_text'>,drafts:EntryDraft[],answers:Record<string,string>,now:string){
+function evaluateSubmission(snap:Snapshot,row:Pick<SubmissionRow,'captured_at'|'time_zone'|'client_id'|'raw_text'>,drafts:ProposedDraft[],answers:Record<string,string>,now:string){
   const at=localDate(row.captured_at,row.time_zone);
-  const out=log({...snap,today:at},drafts,{now,today:at,source:{actor:'model',channel:'mcp',client:row.client_id,rawText:row.raw_text}});
+  const corrections:Entry[]=[];let prepared=snap;
+  for(const draft of drafts){if(!draft.corrects)continue;const target=prepared.entries.find(e=>e.id===draft.corrects);if(!target||target.kind!==draft.kind||prepared.entries.some(e=>e.kind==='revert'&&e.targetId===target.id))throw new StoreError('conflict',409);const correction=revert(prepared,target.id,'用户确认 AI 更正提案',actor({actor:'user',channel:'ui',client:'web'},now,snap.timezone));prepared=correction.snap;corrections.push(correction.entry);}
+  const out=log({...prepared,today:at},drafts,{now,today:at,source:{actor:'model',channel:'mcp',client:row.client_id,rawText:row.raw_text}});
   let next=out.snap;
-  const result:WriteResult={...out.result,committed:[...out.result.committed],held:[]};
+  const result:WriteResult={...out.result,committed:[...corrections,...out.result.committed],held:[]};
   const questions:ReviewQuestion[]=[];
   const visit=(held:typeof out.result.held[number],id:string,depth:number)=>{
     if(depth>12)throw new StoreError('invalid_state',409);
@@ -200,27 +205,25 @@ function evaluateSubmission(snap:Snapshot,row:Pick<SubmissionRow,'captured_at'|'
 export async function reviewSubmission(db:D1Database,ownerId:string,id:string,answers:Record<string,string>={}){
   const row=await db.prepare("SELECT * FROM v1_submissions WHERE id=? AND owner_id=? AND status='pending'").bind(id,ownerId).first<SubmissionRow>();
   if(!row)throw new StoreError('not_found',404);
-  const now=new Date().toISOString(),snap=await storedState(db,ownerId,now);
-  const preview=evaluateSubmission(snap,row,JSON.parse(row.drafts_json) as EntryDraft[],answers,now);
-  return {questions:preview.questions,ready:preview.questions.length===0,revision:await revision(db,ownerId)};
+  const now=new Date().toISOString(),snap=await state(db,ownerId,now);
+  if(!snap.submissions.some(sub=>sub.id===id))throw new StoreError('conflict',409);
+  const preview=evaluateSubmission(snap,row,JSON.parse(row.drafts_json) as ProposedDraft[],answers,now);
+  return {questions:preview.questions,ready:preview.questions.length===0,revision:snap.revision};
 }
-export async function submitModelEntries(db:D1Database,ownerId:string,clientId:string,key:string,rawText:string,entries:EntryDraft[],clock:{capturedAt:string;capturedLocalDate:string;timeZone:string}):Promise<Submission> {
+export async function submitModelEntries(db:D1Database,ownerId:string,clientId:string,key:string,rawText:string,entries:ProposedDraft[],clock:{capturedAt:string;capturedLocalDate:string;timeZone:string}):Promise<Submission> {
   if(localDate(clock.capturedAt,clock.timeZone)!==clock.capturedLocalDate)throw new StoreError('bad_request',400);
   return mutate(db,ownerId,clientId,'entries.propose',key,{rawText,entries,clock},async(snap,now)=>{
     const anchored={...snap,today:clock.capturedLocalDate};
     const parsed=parse(rawText,{today:clock.capturedLocalDate,exercises:snap.exercises});
     const safe=entries.map(item=>{
-      if(!['weight','set','waist','note'].includes(item.kind) || item.confidence===undefined)throw new StoreError('bad_request',400);
+      if(!['weight','set','set_annotation','waist','note'].includes(item.kind) || item.confidence===undefined)throw new StoreError('bad_request',400);
       const dateOrigin=item.date!==clock.capturedLocalDate && !(parsed.date===item.date&&parsed.dateOrigin==='explicit')?'inferred':item.dateOrigin==='explicit'&&parsed.date===item.date?'explicit':'device';
-      return DraftSchema.parse({...item,dateOrigin,source:{actor:'model',channel:'mcp',client:clientId,rawText}});
+      return {...DraftSchema.parse({...item,dateOrigin,source:{actor:'model',channel:'mcp',client:clientId,rawText}}),...(item.corrects?{corrects:item.corrects}:{})};
     });
-    const preview=log(anchored,safe,{now,today:clock.capturedLocalDate,source:{actor:'model',channel:'mcp',client:clientId,rawText}});
+    const preview=evaluateSubmission(anchored,{captured_at:clock.capturedAt,time_zone:clock.timeZone,client_id:clientId,raw_text:rawText},safe,{},now);
     if(preview.result.unparsed.length)throw new StoreError('bad_request',400);
     const id=crypto.randomUUID();
-    const questions=preview.result.held.map((h,index)=>({
-      id:`q${index}`,gate:h.gate,question:h.question,context:h.context,
-      options:h.options.map(o=>({id:o.id,label:o.label})),
-    }));
+    const questions=preview.questions;
     const row={id,clientId,rawText,drafts:safe,status:'pending' as const,capturedAt:clock.capturedAt,timeZone:clock.timeZone,createdAt:now,questions};
     const baseRevision=await revision(db,ownerId);
     const extra=[db.prepare("INSERT INTO v1_submissions(id,owner_id,client_id,raw_text,drafts_json,captured_at,time_zone,status,created_at,base_revision) VALUES (?,?,?,?,?,?,?,'pending',?,?)").bind(id,ownerId,clientId,rawText,JSON.stringify(safe),clock.capturedAt,clock.timeZone,now,baseRevision+1)];
@@ -235,7 +238,7 @@ export async function decideSubmission(db:D1Database,ownerId:string,key:string,i
     if(expectedRevision!==await revision(db,ownerId))throw new StoreError('conflict',409);
     let next=snap,result:WriteResult={committed:[],held:[],unparsed:[]};
     if(decision==='accept') {
-      const drafts=JSON.parse(row.drafts_json) as EntryDraft[];
+      const drafts=JSON.parse(row.drafts_json) as ProposedDraft[];
       const review=evaluateSubmission(snap,row,drafts,answers,now);
       if(review.questions.length)throw new StoreError('invalid_state',409);
       next=review.snap;result=review.result;
@@ -252,11 +255,11 @@ export async function listClients(db:D1Database,ownerId:string):Promise<ClientPu
 export async function registerOAuthClient(db:D1Database,ownerId:string,oauthClientId:string,name:string,scopes:string[],id:string) {
   if(!scopes.length||!scopes.every(s=>['read','submit','propose'].includes(s)))throw new StoreError('bad_request',400);
   const now=new Date().toISOString();
-  await db.prepare('INSERT INTO v1_clients(id,owner_id,name,scopes_json,status,created_at,oauth_client_id) VALUES (?,?,?,?,?,?,?)').bind(id,ownerId,name,JSON.stringify(scopes),'active',now,oauthClientId).run();
+  await mutate(db,ownerId,'oauth','client.register',id,{oauthClientId,name,scopes},snap=>({snap,result:id,extra:[db.prepare('INSERT INTO v1_clients(id,owner_id,name,scopes_json,status,created_at,oauth_client_id) VALUES (?,?,?,?,?,?,?)').bind(id,ownerId,name,JSON.stringify(scopes),'active',now,oauthClientId)],events:[{type:'client.authorized',clientId:id}]}));
   return id;
 }
 export async function oauthClient(db:D1Database,ownerId:string,id:string) {
-  return db.prepare("SELECT id,scopes_json,status FROM v1_clients WHERE owner_id=? AND id=? AND oauth_client_id IS NOT NULL").bind(ownerId,id).first<{id:string;scopes_json:string;status:'active'|'revoked'}>();
+  return db.prepare("SELECT id,scopes_json,status,grant_id FROM v1_clients WHERE owner_id=? AND id=? AND oauth_client_id IS NOT NULL").bind(ownerId,id).first<{id:string;scopes_json:string;status:'active'|'revoked';grant_id:string|null}>();
 }
 export async function revokeClient(db:D1Database,ownerId:string,key:string,id:string) {
   return mutate(db,ownerId,'web','client.revoke',key,{id},async(snap,now)=>{

@@ -386,9 +386,11 @@ function checkedPatch(snap:Snapshot,patch:Record<string,unknown>):Program {
   const keys=(value:unknown,path='')=>{if(Array.isArray(value)){for(const item of value)keys(item,`${path}.*`);return;}if(value&&typeof value==='object')for(const [key,item] of Object.entries(value)){if(fields[path]&&!fields[path].includes(key))throw new ForbiddenError('不允许的计划字段');keys(item,path?`${path}.${key}`:key);}};keys(patch);
   return validateProgram(snap,mergePatch(snap.program,patch));
 }
-export function propose(snap: Snapshot, p: Pick<Proposal, 'kind' | 'title' | 'rationale' | 'ruleRefs' | 'patch'>, ctx: EngineContext): { snap: Snapshot; proposal: Proposal } {
-  if(p.kind==='program_change')checkedPatch(snap,p.patch);
-  const proposal: Proposal = { ...p, id: newId('p_'), createdAt: ctx.now, author: ctx.source, status: 'open' };
+export function propose(snap: Snapshot, p: Pick<Proposal, 'kind' | 'title' | 'rationale' | 'ruleRefs' | 'patch' | 'exercises'>, ctx: EngineContext): { snap: Snapshot; proposal: Proposal } {
+  const additions=p.exercises??[];
+  if(new Set(additions.map(e=>e.id)).size!==additions.length||additions.some(e=>snap.exercises.some(old=>old.id===e.id)))throw new ForbiddenError('动作 ID 已存在，请使用新 ID');
+  if(p.kind==='program_change')checkedPatch({...snap,exercises:[...snap.exercises,...additions]},p.patch);
+  const proposal: Proposal = { ...p, baseProgram:snap.program, id: newId('p_'), createdAt: ctx.now, author: ctx.source, status: 'open' };
   return { snap: { ...snap, proposals: [...snap.proposals, proposal] }, proposal };
 }
 function closeSlot(snap:Snapshot,id:string,today:string):Snapshot {
@@ -399,7 +401,9 @@ export function decideProposal(snap: Snapshot, id: string, decision: 'accept' | 
   const p = snap.proposals.find((x) => x.id === id);
   if (!p || p.status !== 'open') throw new NotFoundError('没有这条待决提议');
   const decided: Proposal = decision==='later'?{...p,snoozedUntil:addDays(ctx.today,1)}:{ ...p, status: decision === 'accept' ? 'accepted' : 'rejected', decidedAt: ctx.now, decisionNote: note };
-  const updated=decision==='accept'&&p.kind==='program_change'?putProgram(snap,checkedPatch(snap,p.patch),ctx):snap;
+  const extended={...snap,exercises:[...snap.exercises,...(p.exercises??[])]};
+  if(decision==='accept'&&(p.exercises??[]).some(e=>snap.exercises.some(old=>old.id===e.id)))throw new ForbiddenError('动作 ID 已存在，请重新提交');
+  const updated=decision==='accept'&&p.kind==='program_change'?putProgram(extended,checkedPatch(extended,p.patch),ctx):snap;
   return closeSlot({ ...updated, proposals: updated.proposals.map((x) => (x.id === id ? decided : x)) },id,ctx.today);
 }
 /** Refresh is observation only. No passage of time can authorize a directive. */

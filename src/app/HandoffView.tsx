@@ -4,7 +4,7 @@ import { openSession } from '@lowkkey/core';
 import { capturedClock } from '../client/offline.ts';
 import { bindHandoff, prepareHandoff } from './handoff-bindings.ts';
 import { installPrototypeStyle, prototypeScreen } from './prototype-template.ts';
-import { navigate, screens } from './navigation.ts';
+import { navigate, screens, reviewFromHash, navigateReview } from './navigation.ts';
 import type { Screen } from './navigation.ts';
 import { bindDecisionSheet } from './sheet-bindings.ts';
 import type { SheetState } from './sheet-bindings.ts';
@@ -26,12 +26,18 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const [formula,setFormula]=useState<string|null>(null),[sheet,setSheet]=useState<SheetState|null>(null),[manualLoad,setManualLoad]=useState(''),[manualUnit,setManualUnit]=useState<'kg'|'lb'|null>(null);
   const [review,setReview]=useState<{id:string;questions:NonNullable<Chamber['state']>['submissions'][number]['questions'];revision:number}|null>(null);
   const [reviewLoading,setReviewLoading]=useState(false),[activeAction,setActiveAction]=useState<string|null>(null),[notice,setNotice]=useState(''),[captureRetry,setCaptureRetry]=useState(false);
+  const shownReview=useRef<{id:string;revision:number}|null>(null);
+  const [reviewOutcome,setReviewOutcome]=useState<string|null>(null);
   const reviewSequence=useRef(0),running=useRef(false),lastBase=useRef<Screen>('Main'),base=useRef<HTMLElement|null>(null),overlay=useRef<HTMLElement|null>(null),overlayType=useRef<string|null>(null);
   const scrollPositions=useRef(new WeakMap<HTMLElement,{node:Element;top:number;left:number}[]>());
   const cache=useRef(new Map<Screen,HTMLElement>()),pageMotion=useRef(new Motion()),sheetMotion=useRef(new Motion()),returnFocus=useRef<HTMLElement|SVGElement|null>(null);
   const press=useRef<{x:number;y:number}|null>(null);
   const drag=useRef<{node:HTMLElement;layer:HTMLElement;grip:HTMLElement;y:number;offset:number;last:number;id:number;samples:{y:number;time:number}[]}|null>(null),dragFrame=useRef(0);
-  const state=chamber.state,submissionId=state?.submissions[0]?.id;
+  const [reviewTarget,setReviewTarget]=useState(reviewFromHash);
+  useEffect(()=>{const update=()=>setReviewTarget(reviewFromHash());window.addEventListener('hashchange',update);window.addEventListener('popstate',update);return()=>{window.removeEventListener('hashchange',update);window.removeEventListener('popstate',update);};},[]);
+  const state=chamber.state,submissionId=reviewTarget?(reviewTarget.kind==='submission'?reviewTarget.id:undefined):state?.submissions[0]?.id;
+  useEffect(()=>{if(state&&reviewTarget&&(reviewTarget.kind==='proposal'||reviewTarget.kind==='trigger'))setSheet({kind:'decision',id:reviewTarget.id,type:reviewTarget.kind,revision:state.revision});},[reviewTarget]);
+  useEffect(()=>{setReviewOutcome(null);if(!reviewTarget||!state)return;const controller=new AbortController();void fetch(`/v1/reviews/${reviewTarget.kind}/${encodeURIComponent(reviewTarget.id)}`,{signal:controller.signal}).then(async response=>{if(!response.ok)throw new Error();return response.json();}).then(value=>{const labels:Record<string,string>={accepted:'已确认入账',skipped:'已跳过',rejected:'未采用',applied:'已采用',dismissed:'已处理',resolved:'此事项已处理'};setReviewOutcome(labels[value.status]??null);}).catch(()=>{if(!controller.signal.aborted)setReviewOutcome('此事项暂时无法读取，请刷新后重试。');});return()=>controller.abort();},[reviewTarget,state?.revision]);
   const [extraSetKey,setExtraSetKey]=useState<string|null>(null);
   const [setRole,setSetRole]=useState<'work'|'warmup'>('work');
   const suggestion=useRef<{key:string;value:number|null;unit:'kg'|'lb';ruleVersion:string;inputs:string[]}|null>(null),claiming=useRef(false),lastClaim=useRef(-1);
@@ -68,7 +74,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   }
   function dismiss(){
     const current=live.current;
-    if(current.sheet||current.formula){if(history.state?.lowkkeyOverlay)history.back();else{setSheet(null);setFormula(null);}}
+    if(current.sheet||current.formula){if(history.state?.lowkkeyOverlay)history.back();else{setSheet(null);setFormula(null);if(reviewFromHash())navigate(current.screen,true);}}
     else if(current.screen==='Capture'){if(history.state?.lowkkeyFrom)history.back();else navigate(lastBase.current,true);}
   }
   function go(to:Screen){
@@ -89,7 +95,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   useLayoutEffect(()=>{
     if(!state||!host.current)return;
     installPrototypeStyle();
-    const context={state,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,manualUnit,setRole,allowExtra:extraSetKey===setKey,suggestion:suggestion.current};
+    if(screen!=='Capture')shownReview.current=null;
+    if(screen==='Capture'&&submissionId&&shownReview.current?.id!==submissionId)shownReview.current={id:submissionId,revision:state.revision};
+    const context={state,reviewOutcome,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewTarget,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,manualUnit,setRole,allowExtra:extraSetKey===setKey,suggestion:suggestion.current};
     const target=prototypeScreen(baseScreen);prepareHandoff(target,baseScreen,state.today);bindHandoff(target,context);
     prepareViewport(target,baseScreen);
     const input=target.querySelector<HTMLInputElement>('input[data-action="capture-input"]');if(input){input.value=draft.current;const submit=target.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit&&draft.current.trim()){submit.textContent='提交';submit.setAttribute('aria-label','提交记录');}}
@@ -159,7 +167,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   function run(action:string,task:()=>Promise<unknown>){
     if(running.current)return;running.current=true;setActiveAction(action);setNotice('');if(action!=='capture-submit')setCaptureRetry(false);
     void task().catch(cause=>{
-      if(cause instanceof RequestError&&cause.status===409){setAnswers({});setReview(null);setReviewLoading(false);reviewSequence.current++;}
+      if(cause instanceof RequestError&&cause.status===409){setAnswers({});setReview(null);shownReview.current=null;setReviewLoading(false);reviewSequence.current++;}
     }).finally(()=>{running.current=false;setActiveAction(null);});
   }
   async function submit(retry=false){
@@ -209,10 +217,11 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       }
       if(button.dataset.heldOption){const held=state.held.find(h=>h.id===id);if(held)run('held-resolve',async()=>{await chamber.resolve(held,{optionId:button.dataset.heldOption!});dismiss();});return;}
       if(action){event.preventDefault();
-        if(action==='sheet-cancel'||action==='modal-close')dismiss();
+        if(action==='account-settings')window.dispatchEvent(new Event('lowkkey-account'));
+        else if(action==='sheet-cancel'||action==='modal-close')dismiss();
         else if(action==='cycle-details'&&sheet?.kind==='program')setSheet({...sheet,showCycle:!sheet.showCycle});
         else if(action==='set-role')setSetRole(value=>value==='work'?'warmup':'work');
-        else if(action==='decision-view'&&id)openSheet({kind:'decision',id,type:button.dataset.kind as 'proposal'|'trigger',revision:state.revision});
+        else if(action==='decision-view'&&id)navigateReview({kind:button.dataset.kind as 'proposal'|'trigger',id});
         else if((action==='decision-accept'||action==='decision-later')&&sheet?.kind==='decision')run(action,async()=>{const decision=action==='decision-accept'?'accept':'later';try{if(sheet.type==='proposal')await chamber.decideProposal(sheet.id,decision,sheet.revision);else await chamber.decideTrigger(sheet.id,decision,sheet.revision);setNotice(decision==='accept'?'已保存':'已延期');dismiss();}catch(error){if(!(error instanceof RequestError&&error.status===409))chamber.setError('暂未确认，请重试。');throw error;}});
         else if(action==='decision-refresh'&&sheet?.kind==='decision')setSheet({...sheet,revision:state.revision});
         else if(action==='set-classify'&&id)run(action,async()=>{const clock=capturedClock();await chamber.writeEntries([{kind:'set_annotation',targetId:id,setRole:button.dataset.role as 'work'|'warmup'|'unknown',date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}}]);});
@@ -224,9 +233,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='capture-or-voice'){if(draft.current.trim())run('capture-submit',submit);else chamber.setError('这里暂不支持语音输入，可以先用文字记下。');}
         else if(action==='toast-revert'&&chamber.toast)run(action,()=>chamber.revert(chamber.toast!));
         else if(action==='entry-revert'){const entry=state.entries.find(e=>e.id===target.closest<HTMLElement>('[data-entry-id]')?.dataset.entryId);if(entry)run(action,()=>chamber.revert(entry));}
-        else if((action==='submission-accept'||action==='submission-skip')&&id)run(action,async()=>{await chamber.decideSubmission(id,action==='submission-accept'?'accept':'skip',action==='submission-accept'?answers:{},review?.id===id?review.revision:state.revision);setAnswers({});dismiss();});
+        else if((action==='submission-accept'||action==='submission-skip')&&id)run(action,async()=>{await chamber.decideSubmission(id,action==='submission-accept'?'accept':'skip',action==='submission-accept'?answers:{},review?.id===id?review.revision:shownReview.current?.id===id?shownReview.current.revision:state.revision);setAnswers({});dismiss();});
         else if(action==='held-skip'&&id){const held=state.held.find(h=>h.id===id);if(held)run(action,async()=>{await chamber.resolve(held,{skip:true});dismiss();});}
-        else if(action==='view-pending'||action==='view-submission')go('Capture');
+        else if(action==='view-pending'||action==='view-submission'){const selected=id??state.submissions[0]?.id??state.held[0]?.id;if(selected)navigateReview({kind:state.submissions.some(s=>s.id===selected)?'submission':'held',id:selected});else go('Capture');}
         else if(action==='start-session')run(action,()=>writeSession('start'));
         else if(action==='end-session')run(action,()=>writeSession('end'));
         else if(action==='complete-set'&&button.dataset.exerciseId&&button.dataset.load&&button.dataset.unit)run(action,()=>completeSet(button.dataset.exerciseId!,Number(button.dataset.load),button.dataset.unit as 'kg'|'lb'));

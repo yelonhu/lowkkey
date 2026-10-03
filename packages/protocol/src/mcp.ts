@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { EntryDraft } from './entities.ts';
+import { ModelEntryDraft, ProgramPatch, Exercise, Entry, Proposal, Derived, Held, Trigger } from './entities.ts';
 import { Id, LocalDate } from './primitives.ts';
 import { VerifierId } from './rules.ts';
+import { StateResponse,Submission,ReviewDetails } from './api.ts';
 import type { Scope } from './api.ts';
 
 /**
@@ -29,6 +30,8 @@ export const MCP_TOOLS = [
     input: z.object({
       from: LocalDate.optional().describe('可选起始日期'),
       to: LocalDate.optional().describe('可选结束日期'),
+      limit:z.number().int().min(1).max(100).default(50),
+      cursor:z.string().optional().describe('上一页返回的不透明记录游标'),
     }),
   },
   {
@@ -39,6 +42,7 @@ export const MCP_TOOLS = [
     input: z.object({
       exerciseId: Id,
       limit: z.number().int().min(1).max(50).default(10),
+      cursor:z.string().optional(),
     }),
   },
   {
@@ -64,7 +68,7 @@ export const MCP_TOOLS = [
       capturedAt: z.iso.datetime({offset:true}),
       capturedLocalDate: LocalDate,
       timeZone: z.string().min(1).max(80),
-      entries: z.array(EntryDraft).min(1).max(100),
+      entries: z.array(ModelEntryDraft).min(1).max(100),
     }),
   },
   {
@@ -79,7 +83,9 @@ export const MCP_TOOLS = [
       title: z.string().max(80),
       rationale: z.string().max(1000),
       ruleRefs: z.array(VerifierId).default([]),
-      patch: z.record(z.string(), z.unknown()),
+      patch: ProgramPatch,
+      exercises:z.array(Exercise).max(30).optional().describe('新增个人动作，与计划一起审阅；不得覆盖已有动作 ID。'),
+      expectedRevision:z.number().int().nonnegative().describe('get_state 返回的 revision，状态变化时重新读取后提交。'),
     }),
   },
   {
@@ -89,8 +95,21 @@ export const MCP_TOOLS = [
     description: '读取待用户处理的事项：需要确认、未决提议、待决触发器。',
     input: z.object({}),
   },
+  {name:'list_exercises',scope:'read',title:'查找动作',description:'查询本人可用动作及器械、单位、单只重量语义。未知动作可以随计划提案新增，不能猜已有动作 ID。',input:z.object({query:z.string().max(80).optional()})},
+  {name:'get_review',scope:'read',title:'查看提案及处理结果',description:'读取指定批次或计划提案的状态、详情及用户审阅链接。已提交不等于已入账。',input:z.object({kind:z.enum(['submission','proposal','held','trigger']),id:Id})},
 ] as const satisfies readonly McpTool[];
 
+
+export const MCP_OUTPUTS={
+  get_state:StateResponse.extend({nextCursor:z.string().nullable(),serverTime:z.iso.datetime({offset:true})}),
+  get_history:z.object({items:z.array(z.object({id:Id,sessionId:Id,date:LocalDate,startedAt:z.string().nullable(),endedAt:z.string().nullable(),sets:z.array(Entry)})),nextCursor:z.string().nullable()}),
+  run_verifiers:z.record(z.string(),Derived),
+  propose_entries:Submission.extend({reviewUrl:z.string()}),
+  propose_change:Proposal.extend({reviewUrl:z.string()}),
+  list_inbox:z.object({submissions:z.array(Submission.extend({reviewUrl:z.string()})),held:z.array(Held),proposals:z.array(Proposal.extend({reviewUrl:z.string()})),triggers:z.array(Trigger)}),
+  list_exercises:z.array(Exercise),get_review:ReviewDetails,
+};
+export function mcpOutput(name:keyof typeof MCP_OUTPUTS){return z.object({result:MCP_OUTPUTS[name]});}
 
 /** 生成 MCP `tools/list` 所需的 JSON Schema 描述。 */
 export function mcpToolList() {
@@ -98,7 +117,8 @@ export function mcpToolList() {
     name: t.name,
     title: t.title,
     description: t.description,
-    inputSchema: z.toJSONSchema(t.input, { io: 'input' }),
-    annotations: { readOnlyHint: t.scope === 'read', destructiveHint: false, idempotentHint: t.scope === 'read' },
+    inputSchema: z.toJSONSchema(t.input, { io: 'input',target:'draft-7' }),
+    annotations: { readOnlyHint: t.scope === 'read', destructiveHint: false, idempotentHint: true,openWorldHint:false },
+    outputSchema:z.toJSONSchema(mcpOutput(t.name),{io:'output',target:'draft-7'}),
   }));
 }

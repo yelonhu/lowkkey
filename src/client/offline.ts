@@ -16,7 +16,8 @@ async function operation<T>(mode: IDBTransactionMode, action: (store: IDBObjectS
     return await new Promise<T>((resolve, reject) => {
       const tx = db.transaction(STORE, mode);
       const request = action(tx.objectStore(STORE));
-      request.onsuccess = () => resolve(request.result);
+      tx.oncomplete = () => resolve(request.result);
+      tx.onabort = () => reject(tx.error ?? new Error('Storage aborted'));
       request.onerror = () => reject(request.error);
       tx.onerror = () => reject(tx.error);
     });

@@ -10,6 +10,7 @@ const commands = {
   'protocol:emit': [['packages/protocol/scripts/emit.ts']],
   test: [['node_modules/vitest/vitest.mjs', 'run']],
   build: [['node_modules/vite/bin/vite.js', 'build']],
+  'test:oauth': [['scripts/test-oauth.mjs']],
   'test:e2e': [['node_modules/playwright/cli.js', 'test']],
   'migrate:local': [['scripts/migrate.mjs']],
 };

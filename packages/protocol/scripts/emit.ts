@@ -70,10 +70,10 @@ writeFileSync(
   JSON.stringify(
     {
       openapi: '3.1.0',
-      info: { title: 'lowkkey API', version: P.PROTOCOL_VERSION, description: '见 INTERFACE.md。网页用户由 Cloudflare Access 认证；Remote MCP 单独使用 OAuth。scope 见各操作的 x-scopes。' },
+      info: { title: 'lowkkey API', version: P.PROTOCOL_VERSION, description: '见 INTERFACE.md。客户网页使用应用会话；Access 仅保留管理和兼容环境；Remote MCP 使用 OAuth。客户写入必须携带 X-Lowkkey-Account。scope 见各操作的 x-scopes。' },
       servers: [{ url: '/' }],
-      components: { schemas: components, securitySchemes: { accessAssertion: { type: 'apiKey', in: 'header', name: 'Cf-Access-Jwt-Assertion' }, accessCookie: { type: 'apiKey', in: 'cookie', name: 'CF_Authorization' } } },
-      security: [{ accessAssertion: [] }, { accessCookie: [] }],
+      components: { schemas: components, securitySchemes: { customerSession:{type:'apiKey',in:'cookie',name:'__Secure-better-auth.session_token'},accessAssertion: { type: 'apiKey', in: 'header', name: 'Cf-Access-Jwt-Assertion' }, accessCookie: { type: 'apiKey', in: 'cookie', name: 'CF_Authorization' } } },
+      security: [{customerSession:[]},{ accessAssertion: [] }, { accessCookie: [] }],
       paths,
     },
     null,

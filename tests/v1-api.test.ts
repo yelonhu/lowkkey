@@ -18,7 +18,7 @@ const clock={capturedAt:'2030-03-14T12:00:00.000Z',capturedLocalDate:'2030-03-14
 beforeAll(async()=>{
   runtime=new Miniflare({modules:true,script:'export default {fetch(){return new Response("ok")}}',compatibilityDate:'2026-07-30',cf:false,host:'127.0.0.1',d1Databases:{DB:'11111111-1111-4111-8111-111111111111'},d1Persist:`${directory}/d1`,outboundService:()=>{throw new Error('no outbound');}});
   db=await runtime.getD1Database('DB') as D1Database;
-  for(const name of ['0000_state.sql','0001_handoff_v1.sql','0002_oauth_batch.sql']){
+  for(const name of ['0000_state.sql','0001_handoff_v1.sql','0002_oauth_batch.sql','0003_customer_auth.sql']){
     const sql=await readFile(`db/migrations/${name}`,'utf8');
     await db.batch(sql.split('--> statement-breakpoint').map(part=>part.trim()).filter(Boolean).map(part=>db.prepare(part)));
   }
@@ -154,4 +154,40 @@ describe('user-owned macro decisions',()=>{
     expect((await call('/v1/entries',user,'POST',correction)).status).toBe(200);
     const state=(await call('/v1/state',user)).body;expect(state.entries.find((e:{id:string})=>e.id===original.id)).toEqual(original);expect(state.entries).toHaveLength(2);
   });
+});
+
+
+describe('AI plan and review contracts',()=>{
+  it('stages custom exercises atomically and preserves existing load semantics',async()=>{
+    const before=(await call('/v1/state','custom')).body;
+    const exercise={...before.exercises[0],id:'personal_press',name:'个人器械推胸',aliases:[]};
+    const days=[{id:'personal',name:'我的推胸日',weekday:2,items:[{exerciseId:exercise.id,sets:3,repMin:6,repMax:10}]}];
+    const proposal=await call('/v1/proposals','custom','POST',{kind:'program_change',title:'我的计划',rationale:'已在对话里商定',ruleRefs:[],patch:{days},exercises:[exercise],expectedRevision:before.revision});
+    expect(proposal.status,JSON.stringify(proposal.body)).toBe(200);
+    const pending=(await call('/v1/state','custom')).body;expect(pending.exercises.some((ex:{id:string})=>ex.id===exercise.id)).toBe(false);
+    const accepted=await call(`/v1/proposals/${proposal.body.id}/decision`,'custom','POST',{decision:'accept',expectedRevision:pending.revision});expect(accepted.status).toBe(200);
+    const after=(await call('/v1/state','custom')).body;expect(after.program.days[0].items[0].exerciseId).toBe(exercise.id);expect(after.exercises).toContainEqual(exercise);
+    expect((await call('/v1/proposals','custom','POST',{kind:'program_change',title:'旧状态',rationale:'',patch:{days:[]},expectedRevision:before.revision})).status).toBe(409);
+    expect((await call('/v1/proposals','custom','POST',{kind:'program_change',title:'覆盖动作',rationale:'',patch:{},exercises:[{...exercise,unit:'kg'}]})).status).not.toBe(200);
+    expect((await call(`/v1/reviews/proposal/${proposal.body.id}`,'stranger')).status).toBe(404);
+    expect((await call(`/v1/reviews/proposal/${proposal.body.id}`,'custom')).body.item.status).toBe('accepted');
+  });
+});
+
+it('AI corrections remain pending and append a revert only after user review',async()=>{
+  const original=await call('/v1/entries','correction','POST',{entries:[{kind:'note',date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'},text:'旧备注',confidence:1}]});
+  const before=(await call('/v1/state','correction')).body,target=original.body.committed[0];
+  const batch=await submitModelEntries(db,before.accountId,'model',crypto.randomUUID(),'更正备注',[{kind:'note',date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'model',channel:'mcp',client:'model'},text:'新备注',confidence:1,corrects:target.id}],clock);
+  const pending=(await call('/v1/state','correction')).body;expect(pending.entries).toHaveLength(1);
+  const result=await call(`/v1/submissions/${batch.id}/decision`,'correction','POST',{decision:'accept',expectedRevision:pending.revision});
+  expect(result.status,JSON.stringify(result.body)).toBe(200);expect(result.body.committed.map((e:{kind:string})=>e.kind)).toEqual(['revert','note']);
+  expect((await call('/v1/state','correction')).body.entries).toHaveLength(3);
+});
+
+it('resolved ambiguity links retain owner-scoped outcomes',async()=>{
+  await call('/v1/capture','resolved','POST',{text:'体重 60kg',...clock});
+  const capture=await call('/v1/capture','resolved','POST',{text:'体重 61kg',...clock}),id=capture.body.held[0].id;
+  expect((await call(`/v1/held/${id}/resolve`,'resolved','POST',{skip:true})).status).toBe(200);
+  expect((await call(`/v1/reviews/held/${id}`,'resolved')).body.status).toBe('resolved');
+  expect((await call(`/v1/reviews/held/${id}`,'elsewhere')).status).toBe(404);
 });

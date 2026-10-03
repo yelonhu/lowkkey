@@ -37,7 +37,7 @@ async function perform(task){
     const state=await client.state();
     if(task==='proposal'){
       const days=state.program.days.map(day=>({...day,items:day.items.map((item,index)=>day.id==='rehearsal_today'&&index===1?{...item,sets:3,note:'比原安排多一组，采用后生效。'}:item)}));
-      request={name:'propose_change',args:{idempotencyKey:randomUUID(),title:'胸与背：划船增加一组',rationale:'演练提案：从 2 组调整为 3 组。请比较修改前后，再决定是否采用。',patch:{days}}};
+      request={name:'propose_change',args:{idempotencyKey:randomUUID(),expectedRevision:state.revision,title:'胸与背：划船增加一组',rationale:'演练提案：从 2 组调整为 3 组。请比较修改前后，再决定是否采用。',patch:{days}}};
     }else{
       request={name:'propose_entries',args:{idempotencyKey:randomUUID(),rawText:'演练记录：体重与四个动作，等待你一次确认。',capturedAt:new Date().toISOString(),capturedLocalDate:state.today,timeZone:state.timezone,entries:fixtureRecords(state.today,'model')}};
     }

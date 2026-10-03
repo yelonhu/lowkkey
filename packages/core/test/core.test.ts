@@ -258,7 +258,7 @@ describe('派生值与触发器', () => {
 describe('protocol', () => {
   it('MCP 工具里没有撤销、修改、决定', () => {
     const names = MCP_TOOLS.map((t) => t.name);
-    expect(names).toEqual(['get_state', 'get_history', 'run_verifiers', 'propose_entries', 'propose_change', 'list_inbox']);
+    expect(names).toEqual(['get_state', 'get_history', 'run_verifiers', 'propose_entries', 'propose_change', 'list_inbox', 'list_exercises', 'get_review']);
     expect(names.some((n) => /revert|update|delete|decide|commit/.test(n))).toBe(false);
   });
 });

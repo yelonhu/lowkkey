@@ -1,27 +1,18 @@
+import { reviewDetail } from './review.ts';
 import { Hono } from 'hono';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
+import { customerAuth, customerSession, ownerForRequest } from './customer-auth.ts';
+import type { AuthBindings } from './customer-auth.ts';
 import { z, ZodError } from 'zod';
 import { accessVerifier } from './auth.ts';
-import type { Identity, IdentityVerifier } from './auth.ts';
+import type { IdentityVerifier } from './auth.ts';
 import { accountFor, StoreError } from './account.ts';
 import { CaptureRequest, EntryDraft, Program, ProposeChangeRequest, ProposalDecisionRequest, ResolveHeldRequest, Snapshot, TriggerDecisionRequest } from '@lowkkey/protocol';
 import * as v1 from './v1-store.ts';
 import { ForbiddenError, NotFoundError } from '@lowkkey/core';
 
-export type Bindings = { DB: D1Database; APP_ENV?: 'development' | 'test' | 'production'; APP_ORIGIN?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string };
-type Environment = { Bindings: Bindings; Variables: { ownerId: string; principal:{kind:'user'|'model';clientId:string;scopes:string[]} } };
-const verifiers = new Map<string,IdentityVerifier>();
-function productionVerifier(bindings: Bindings): IdentityVerifier {
-  if (!bindings.ACCESS_TEAM_DOMAIN || !bindings.ACCESS_AUD) throw new StoreError('AUTH_NOT_CONFIGURED',503);
-  const key = `${bindings.ACCESS_TEAM_DOMAIN}:${bindings.ACCESS_AUD}`;
-  let verifier = verifiers.get(key);
-  if (!verifier) { verifier = accessVerifier({ teamDomain:bindings.ACCESS_TEAM_DOMAIN, audience:bindings.ACCESS_AUD }); verifiers.set(key,verifier); }
-  return verifier;
-}
-function localIdentity(request: Request): Identity {
-  if (!/(?:^|;\s*)lowkkey_dev=1(?:;|$)/.test(request.headers.get('Cookie') ?? '')) throw new StoreError('AUTH_REQUIRED',401);
-  return { issuer:'lowkkey-local',subject:'owner',email:'owner@local.invalid' };
-}
+export type Bindings = AuthBindings & {OAUTH_PROVIDER?:OAuthHelpers};
+type Environment = { Bindings: Bindings; Variables: { requestId:string;ownerId: string; principal:{kind:'user'|'model';clientId:string;scopes:string[]} } };
 function assertOrigin(request: Request, bindings: Bindings) {
   if (bindings.APP_ENV === 'production' && !bindings.APP_ORIGIN) throw new StoreError('ORIGIN_NOT_CONFIGURED',503);
   const expected = new URL(bindings.APP_ORIGIN ?? 'http://127.0.0.1:5173').origin;
@@ -39,7 +30,15 @@ function userOnly(kind:'user'|'model') {if(kind!=='user')throw new StoreError('f
 function allowed(principal:{kind:'user'|'model';scopes:string[]},scope:string) {if(principal.kind!=='user'&&!principal.scopes.includes(scope))throw new StoreError('forbidden',403);}
 export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
   const app = new Hono<Environment>();
-  app.get('/healthz', context => context.json({ status:'ok' }));
+  app.use('*',async(c,next)=>{const id=crypto.randomUUID();c.set('requestId',id);c.header('X-Request-ID',id);await next();});
+  app.get('/healthz', context => context.json({ status:'ok',version:typeof __BUILD_SHA__==='undefined'?'development':__BUILD_SHA__ }));
+  app.get('/api/auth/config',c=>c.json({mode:c.env.AUTH_MODE??'access',aiConnection:c.env.AI_CONNECTION_ENABLED==='1'&&c.env.AUTH_MODE==='customer'&&c.env.APP_ORIGIN?.startsWith('https://'),local:c.env.AUTH_MODE!=='customer'&&['test','development'].includes(c.env.APP_ENV??''),google:!!c.env.GOOGLE_CLIENT_ID&&!!c.env.GOOGLE_CLIENT_SECRET,email:!!c.env.RESEND_API_KEY&&!!c.env.AUTH_EMAIL_FROM},{headers:{'Cache-Control':'no-store'}}));
+  app.on(['GET','POST'],'/api/auth/*',async c=>{
+    if(c.env.AUTH_MODE==='customer')return customerAuth(c.env).handler(c.req.raw);
+    if(c.req.path==='/api/auth/sign-out'&&c.req.method==='POST'){assertOrigin(c.req.raw,c.env);return c.json({success:true,redirect:c.env.APP_ENV==='production'?'/cdn-cgi/access/logout':null},200,{'Set-Cookie':'lowkkey_dev=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'});}
+    throw new StoreError('NOT_FOUND',404);
+  });
+
   app.post('/api/local/session', context => {
     if (!['development','test'].includes(context.env.APP_ENV ?? '')) throw new StoreError('NOT_FOUND',404);
     assertOrigin(context.req.raw,context.env);
@@ -47,15 +46,34 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
   });
   app.use('/v1/*',async(context,next)=>{
     {
-      let identity:Identity;
-      try { identity=options.verifyIdentity?await options.verifyIdentity(context.req.raw):['development','test'].includes(context.env.APP_ENV??'')?localIdentity(context.req.raw):await productionVerifier(context.env)(context.req.raw); }
-      catch { throw new StoreError('unauthorized',401); }
-      context.set('ownerId',await accountFor(context.env.DB,identity));
+      const ownerId=options.verifyIdentity?await accountFor(context.env.DB,await options.verifyIdentity(context.req.raw)):await ownerForRequest(context.req.raw,context.env);
+      context.set('ownerId',ownerId);
+      const expected=context.req.header('X-Lowkkey-Account');if(context.env.AUTH_MODE==='customer'&&!['GET','HEAD','OPTIONS'].includes(context.req.method)&&!expected)throw new StoreError('account_required',409);if(expected&&expected!==context.get('ownerId'))throw new StoreError('account_mismatch',409);
       context.set('principal',{kind:'user',clientId:'web',scopes:['user']});
       if(!['GET','HEAD','OPTIONS'].includes(context.req.method))assertOrigin(context.req.raw,context.env);
     }
     context.header('Cache-Control','no-store');context.header('X-Content-Type-Options','nosniff');
     await next();
+  });
+
+  app.get('/v1/account',async c=>{
+    const user=await c.env.DB.prepare('SELECT email FROM users WHERE id=?').bind(c.get('ownerId')).first<{email:string}>();
+    return c.json({accountId:c.get('ownerId'),email:user?.email,mode:c.env.AUTH_MODE??'access'});
+  });
+  app.post('/v1/account/claim-access',async c=>{
+    if(c.env.AUTH_MODE!=='customer'||!c.env.ACCESS_TEAM_DOMAIN||!c.env.ACCESS_AUD)throw new StoreError('NOT_FOUND',404);
+    const session=await customerSession(c.req.raw,c.env);
+    const identity=await accessVerifier({teamDomain:c.env.ACCESS_TEAM_DOMAIN,audience:c.env.ACCESS_AUD})(c.req.raw);
+    const old=await accountFor(c.env.DB,identity),current=c.get('ownerId');
+    if(old===current)return c.json({accountId:old});
+    const snapshot=await v1.state(c.env.DB,current);
+    if(snapshot.entries.length||snapshot.clients.length||snapshot.program.days.length||snapshot.proposals.length||snapshot.held.length||snapshot.program.targets.goal)throw new StoreError('conflict',409);
+    await c.env.DB.batch([
+      c.env.DB.prepare('INSERT INTO mutation_guards(owner_id,operation_id,condition_ok) VALUES (?,?,CASE WHEN (SELECT data_revision FROM users WHERE id=?)=? THEN 1 ELSE 0 END)').bind(current,'claim-access',current,snapshot.revision),
+      c.env.DB.prepare('UPDATE auth_owners SET owner_id=? WHERE user_id=? AND owner_id=?').bind(old,session.user.id,current),
+      c.env.DB.prepare('DELETE FROM mutation_guards WHERE owner_id=? AND operation_id=?').bind(current,'claim-access'),
+    ]);
+    return c.json({accountId:old});
   });
   app.get('/v1/state',async c=>{
     allowed(c.get('principal'),'read');
@@ -86,23 +104,24 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
   app.get('/v1/export',async c=>{userOnly(c.get('principal').kind);const state=await v1.state(c.env.DB,c.get('ownerId'));return c.json({format:'lowkkey.v1',accountId:state.accountId,exportedAt:new Date().toISOString(),snapshot:Snapshot.parse(state)});});
   app.post('/v1/import',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({format:z.literal('lowkkey.v1'),accountId:z.string(),exportedAt:z.iso.datetime({offset:true}).optional(),snapshot:z.unknown()}).parse(await jsonBody(c.req.raw,8_000_000));return c.json(await v1.importBackup(c.env.DB,c.get('ownerId'),key(c.req.raw),body));});
   app.get('/v1/clients',async c=>{userOnly(c.get('principal').kind);return c.json(await v1.listClients(c.env.DB,c.get('ownerId')));});
-  app.post('/v1/clients/:id/revoke',async c=>{userOnly(c.get('principal').kind);z.strictObject({}).parse(await jsonBody(c.req.raw));return c.json(await v1.revokeClient(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id')));});
+  app.post('/v1/clients/:id/revoke',async c=>{userOnly(c.get('principal').kind);z.strictObject({}).parse(await jsonBody(c.req.raw));const result=await v1.revokeClient(c.env.DB,c.get('ownerId'),key(c.req.raw),c.req.param('id'));const client=await v1.oauthClient(c.env.DB,c.get('ownerId'),c.req.param('id'));if(client?.grant_id&&c.env.OAUTH_PROVIDER)await c.env.OAUTH_PROVIDER.revokeGrant(client.grant_id,c.get('ownerId'));return c.json(result);});
+  app.get('/v1/reviews/:kind/:id',async c=>{allowed(c.get('principal'),'read');const kind=z.enum(['submission','proposal','held','trigger']).parse(c.req.param('kind'));return c.json(await reviewDetail(c.env.DB,c.get('ownerId'),kind,c.req.param('id'),new URL(c.req.url).origin));});
   app.get('/v1/events',async c=>{
     allowed(c.get('principal'),'read');
     const ownerId=c.get('ownerId'),db=c.env.DB,starting=Number(c.req.header('Last-Event-ID')??c.req.query('after')??'0');
     if(!Number.isSafeInteger(starting)||starting<0)throw new StoreError('bad_request',400);
-    const encoder=new TextEncoder();let cursor=starting, timer:ReturnType<typeof setInterval>|undefined,timeout:ReturnType<typeof setTimeout>|undefined;
+    const encoder=new TextEncoder();let closed=false,polling=false;let cursor=starting, timer:ReturnType<typeof setInterval>|undefined,timeout:ReturnType<typeof setTimeout>|undefined;
     const stream=new ReadableStream<Uint8Array>({start(controller){
-      const poll=async()=>{try{for(const row of await v1.eventsAfter(db,ownerId,cursor)){cursor=row.id;controller.enqueue(encoder.encode(`id: ${row.id}\ndata: ${JSON.stringify(row.event)}\n\n`));}}catch{controller.error(new Error('SSE_FAILED'));if(timer)clearInterval(timer);if(timeout)clearTimeout(timeout);}};
-      void poll();timer=setInterval(()=>void poll(),2000);timeout=setTimeout(()=>{if(timer)clearInterval(timer);controller.close();},25000);
-    },cancel(){if(timer)clearInterval(timer);if(timeout)clearTimeout(timeout);}});
+      const poll=async()=>{if(polling||closed)return;polling=true;try{for(const row of await v1.eventsAfter(db,ownerId,cursor)){if(closed)break;cursor=row.id;controller.enqueue(encoder.encode(`id: ${row.id}\ndata: ${JSON.stringify(row.event)}\n\n`));}}catch{closed=true;controller.error(new Error('SSE_FAILED'));if(timer)clearInterval(timer);if(timeout)clearTimeout(timeout);}finally{polling=false;}};
+      void poll();timer=setInterval(()=>void poll(),2000);timeout=setTimeout(()=>{closed=true;if(timer)clearInterval(timer);controller.close();},25000);
+    },cancel(){closed=true;if(timer)clearInterval(timer);if(timeout)clearTimeout(timeout);}});
     return new Response(stream,{headers:{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Accel-Buffering':'no'}});
   });
-  app.onError((error) => {
+  app.onError((error,c) => {
     const status = error instanceof StoreError ? error.status : error instanceof ZodError ? 400 : error instanceof NotFoundError ? 404 : error instanceof ForbiddenError ? 403 : 500;
     const code = error instanceof StoreError ? error.code : error instanceof ZodError ? 'bad_request' : error instanceof NotFoundError ? 'not_found' : error instanceof ForbiddenError ? 'forbidden' : 'internal';
-    if (status === 500) console.error(error);
-    return Response.json({ error:{ code,message:code } },{ status, headers:{ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff' } });
+    if (status === 500) console.error(JSON.stringify({event:'request.failed',requestId:c.get('requestId'),code}));
+    return Response.json({ error:{ code,message:code,requestId:c.get('requestId'),retryable:status>=500,fields:error instanceof ZodError?error.issues.map(i=>({path:i.path,message:i.message})):undefined } },{ status, headers:{ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff' } });
   });
   app.notFound(context => context.json({ error:{ code:'NOT_FOUND' } },404));
   return app;

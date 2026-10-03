@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
@@ -6,7 +7,7 @@ const redirect='http://127.0.0.1:45678/callback';
 const verifier=randomBytes(48).toString('base64url');
 const challenge=createHash('sha256').update(verifier).digest('base64url');
 const json=async(response)=>{const value=await response.json();assert.ok(response.ok,JSON.stringify(value));return value;};
-const registered=await json(await fetch(`${origin}/oauth/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_name:'Local MCP Test',redirect_uris:[redirect],grant_types:['authorization_code'],response_types:['code'],token_endpoint_auth_method:'none'})}));
+const registered=await json(await fetch(`${origin}/oauth/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_name:'Local MCP Test',redirect_uris:[redirect],grant_types:['authorization_code','refresh_token'],response_types:['code'],token_endpoint_auth_method:'none'})}));
 const query=new URLSearchParams({response_type:'code',client_id:registered.client_id,redirect_uri:redirect,scope:'read submit propose',code_challenge:challenge,code_challenge_method:'S256',state:'local-e2e',resource:`${origin}/mcp`});
 const consent=await fetch(`${origin}/authorize?${query}`,{headers:{Cookie:'lowkkey_dev=1'},redirect:'manual'});
 const html=await consent.text();
@@ -33,7 +34,9 @@ const call=async(method,params,id)=>{
 };
 await call('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'local-e2e',version:'1.0'}},1);
 const tools=await call('tools/list',{},2);
-assert.deepEqual(tools.tools.map(item=>item.name).sort(),['get_history','get_state','list_inbox','propose_change','propose_entries','run_verifiers'].sort());
+assert.deepEqual(tools.tools.map(item=>item.name).sort(),['get_history','get_state','list_inbox','list_exercises','get_review','propose_change','propose_entries','run_verifiers'].sort());
+const contract=JSON.parse(await readFile('docs/lowkkey-handoff/protocol/mcp-tools.json','utf8'));
+for(const declared of contract.tools){const running=tools.tools.find(tool=>tool.name===declared.name);assert.deepEqual(running.inputSchema.properties,declared.inputSchema.properties,`${declared.name} input contract`);assert.deepEqual(running.outputSchema.properties,declared.outputSchema.properties,`${declared.name} output contract`);assert.deepEqual(running.annotations,declared.annotations);}
 const state=await call('tools/call',{name:'get_state',arguments:{}},3);
 assert.ok(state.content?.length);
 for(const path of ['/v1/entries','/v1/entries/not-owned/revert','/v1/submissions/not-owned/decision']){
@@ -43,7 +46,7 @@ for(const path of ['/v1/entries','/v1/entries/not-owned/revert','/v1/submissions
 const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
 const part=name=>parts.find(item=>item.type===name).value;
 const localDate=`${part('year')}-${part('month')}-${part('day')}`;
-const proposal=await call('tools/call',{name:'propose_entries',arguments:{idempotencyKey:randomUUID(),rawText:'体重 60kg',capturedAt:new Date().toISOString(),capturedLocalDate:localDate,timeZone:'America/Chicago',entries:[{kind:'weight',date:localDate,dateOrigin:'device',source:{actor:'model',channel:'mcp',client:'test'},kg:60,raw:{value:60,unit:'kg'},condition:'unspecified',confidence:0.99}]}},4);
+const proposal=await call('tools/call',{name:'propose_entries',arguments:{idempotencyKey:randomUUID(),rawText:'体重 60kg',capturedAt:new Date().toISOString(),capturedLocalDate:localDate,timeZone:'America/Chicago',entries:[{kind:'weight',date:localDate,dateOrigin:'device',kg:60,raw:{value:60,unit:'kg'},condition:'unspecified',confidence:0.99}]}},4);
 assert.ok(proposal.content?.length);
 const own=async()=>json(await fetch(`${origin}/v1/state`,{headers:{Cookie:'lowkkey_dev=1'}}));
 const before=await own();
@@ -65,6 +68,10 @@ const decisionKey=randomUUID();
 const accepted=await json(await userPost(`/v1/submissions/${batchId}/decision`,decision,decisionKey));
 assert.equal(accepted.committed.length,5);
 assert.deepEqual(await json(await userPost(`/v1/submissions/${batchId}/decision`,decision,decisionKey)),accepted);
+const outcome=await call('tools/call',{name:'get_review',arguments:{kind:'submission',id:batchId}},7);
+assert.equal(outcome.structuredContent.result.status,'accepted');
+assert.ok(outcome.structuredContent.result.reviewUrl.includes(batchId));
+const resources=await call('resources/list',{},8);assert.ok(resources.resources.some(r=>r.uri==='ui://lowkkey/review.html'));
 const after=await own();
 const client=after.clients.find(item=>item.name==='Local MCP Test'&&item.status==='active');
 assert.ok(client);
@@ -72,4 +79,7 @@ assert.equal(after.entries.filter(entry=>entry.source.client===client.id&&entry.
 await json(await userPost(`/v1/clients/${client.id}/revoke`,{},randomUUID()));
 const denied=await fetch(`${origin}/mcp`,{method:'POST',headers,body:JSON.stringify({jsonrpc:'2.0',id:9,method:'tools/list',params:{}})});
 assert.equal(denied.status,401);
+assert.ok(token.refresh_token,'refresh token');
+const expiredRefresh=await fetch(`${origin}/oauth/token`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',client_id:registered.client_id,refresh_token:token.refresh_token,resource:`${origin}/mcp`})});
+assert.equal(expiredRefresh.ok,false,'revoked grant must not refresh');
 console.log('OAuth and MCP end-to-end passed');

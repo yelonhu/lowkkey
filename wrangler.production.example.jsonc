@@ -12,6 +12,9 @@
   },
   "vars": {
     "APP_ENV": "production",
+    "AUTH_MODE": "customer",
+    "AI_CONNECTION_ENABLED": "0",
+    "AUTH_EMAIL_FROM": "lowkkey <login@example.com>",
     "APP_ORIGIN": "https://lowkkey.example.com",
     "ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
     "ACCESS_AUD": "REPLACE_WITH_ACCESS_APPLICATION_AUD"

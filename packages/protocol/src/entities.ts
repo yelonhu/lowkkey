@@ -268,6 +268,8 @@ export const Proposal = z.object({
   decidedAt: Instant.optional(),
   decisionNote: z.string().max(400).optional(),
   snoozedUntil:LocalDate.optional(),
+  baseProgram:Program.optional(),
+  exercises:z.array(Exercise).max(30).optional(),
 });
 export type Proposal = z.infer<typeof Proposal>;
 
@@ -316,3 +318,10 @@ export const Snapshot = z.object({
 export type Snapshot = z.infer<typeof Snapshot>;
 
 export { GateId };
+
+/** Model submissions exclude directives, reverts and live-session controls. */
+export const ModelEntryDraft=z.discriminatedUnion('kind',[EntryDraft.options[0].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[1].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[2].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[4].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[5].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')})]);
+export const ProgramPatch=z.strictObject({
+  days:z.array(ProgramDay).max(14).optional(),cycleStart:LocalDate.nullable().optional(),ramp:z.array(RampWeek).max(52).optional(),constraints:z.array(Constraint).optional(),
+  targets:z.strictObject(Targets.shape).partial().extend({goal:Goal.omit({confirmedAt:true}).partial().optional(),calorieTrigger:Targets.shape.calorieTrigger.unwrap().unwrap().omit({confirmedAt:true}).partial().nullable().optional()}).optional(),
+});

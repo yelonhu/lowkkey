@@ -1,11 +1,12 @@
+import { MUSCLE_LABEL, Muscle } from '@lowkkey/protocol';
 import type { Entry, EntryDraft, SetEntry, WeightEntry } from '@lowkkey/protocol';
 import { active, convert, openSession, plates, sessions } from '@lowkkey/core';
 import type { V1State } from '../server/v1-store.ts';
 import { prototypeScreen } from './prototype-template.ts';
 import { clientName } from './sheet-bindings.ts';
-import type { Screen } from './navigation.ts';
+import type { ReviewTarget, Screen } from './navigation.ts';
 
-export type HandoffContext={state:V1State;screen:Screen;toast:Entry|null;queueCount:number;busy:boolean;error:string;filter:'all'|'you'|'model'|'rule';answers:Record<string,string>;reviewQuestions?:V1State['submissions'][number]['questions'];reviewLoading?:boolean;reps:number;rir:number|null;exerciseId:string|null;manualLoad:string;manualUnit:'kg'|'lb'|null;setRole?:'work'|'warmup';allowExtra?:boolean;suggestion?:{value:number|null;unit:'kg'|'lb';ruleVersion:string;inputs:string[]}|null};
+export type HandoffContext={state:V1State;screen:Screen;toast:Entry|null;queueCount:number;busy:boolean;error:string;filter:'all'|'you'|'model'|'rule';answers:Record<string,string>;reviewOutcome?:string|null;reviewTarget?:ReviewTarget|null;reviewQuestions?:V1State['submissions'][number]['questions'];reviewLoading?:boolean;reps:number;rir:number|null;exerciseId:string|null;manualLoad:string;manualUnit:'kg'|'lb'|null;setRole?:'work'|'warmup';allowExtra?:boolean;suggestion?:{value:number|null;unit:'kg'|'lb';ruleVersion:string;inputs:string[]}|null};
 const one=<T extends Element=HTMLElement>(root:ParentNode,selector:string)=>root.querySelector<T>(selector);
 const kids=(element:Element)=>Array.from(element.children) as HTMLElement[];
 const text=(element:Element|null|undefined,value:string)=>{if(element)element.textContent=value;};
@@ -84,9 +85,9 @@ function bindMain(root:HTMLElement,c:HandoffContext){
 }
 function bindCapture(root:HTMLElement,c:HandoffContext){
   const dialog=one<HTMLElement>(root,'[role="dialog"]');if(!dialog)return;const parts=kids(dialog),heading=parts[1],title=parts[2],explanation=parts[3],options=parts[4],footer=parts[5];
-  const sub=c.state.submissions[0],held=c.state.held.find(h=>!h.deferUntilSessionEnd||!openSession(c.state.entries));
+  const sub=c.reviewTarget?c.state.submissions.find(s=>c.reviewTarget?.kind==='submission'&&s.id===c.reviewTarget.id):c.state.submissions[0],held=c.state.held.find(h=>(!c.reviewTarget||c.reviewTarget.kind==='held'&&h.id===c.reviewTarget.id)&&(!h.deferUntilSessionEnd||!openSession(c.state.entries)));
   const rowTemplate=prototypeScreen('Capture').querySelector<HTMLElement>('[role="dialog"] > div:nth-child(5) > button');
-  if(!sub&&!held){text(title,'没有待确认项目。');text(explanation,'新的模型提案和规则疑问会出现在这里。');options.replaceChildren();legendText(kids(heading)[1],'待确认 0 项');text(kids(footer)[0],'返回今日');(kids(footer)[0] as HTMLAnchorElement).href='#Main';kids(footer)[1].remove();return;}
+  if(!sub&&!held){text(title,c.reviewOutcome??'没有待确认项目。');text(explanation,c.reviewTarget?'当前事项的处理状态以本人账户为准。':'新的模型提案和规则疑问会出现在这里。');options.replaceChildren();legendText(kids(heading)[1],'待确认 0 项');text(kids(footer)[0],'返回今日');(kids(footer)[0] as HTMLAnchorElement).href='#Main';kids(footer)[1].remove();return;}
   const left=kids(footer)[0] as HTMLAnchorElement,right=kids(footer)[1] as HTMLButtonElement;
   options.replaceChildren();
   if(sub){
@@ -210,7 +211,10 @@ function bindProgress(root:HTMLElement,c:HandoffContext){
     if(hasRatios&&axis&&axisLabel){axis.setAttribute('y2',String(ids.length*62-4));axisLabel.setAttribute('y',String(height-6));chart.append(axis,axisLabel);}
     chart.setAttribute('role','group');chart.setAttribute('aria-label','实际训练动作的估算负荷；比例为估算负荷与体重之比，仅用于同动作比较');
   }
-  const groups=main.querySelectorAll('section')[1];if(groups){const header=groups.firstElementChild;if(header){text(kids(header)[0],'本周训练部位');text(kids(header)[1],'本周已做 / 计划 · 按肌群权重计');}const spans=Array.from(groups.querySelectorAll<HTMLElement>('div[style*="flex-wrap"] > span'));['chest','back','biceps','shoulders','quads'].forEach((id,index)=>{const d=s.derived[`volume.${id}`];legendText(spans[index],`${['胸','背','手臂','肩','腿'][index]} · ${fmt(d?.value??0,1)}/${fmt(s.derived[`volume.planned.${id}`]?.value??0,1)} 组${s.derived[`volume.unknown.${id}`]?.value?` · ${fmt(s.derived[`volume.unknown.${id}`].value,1)} 待分类`:''}`);});for(const button of groups.querySelectorAll<HTMLButtonElement>('button')){const key=['chest','back','biceps','shoulders','quads'].map(id=>`volume.${id}`).find(key=>s.derived[key]?.value!=null);if(key){button.dataset.derivedKey=key;enable(button);}else button.disabled=true;}for(const node of Array.from(groups.querySelectorAll<HTMLElement>('*'))){if(!node.children.length&&node.textContent?.includes('待接入'))text(node,'来自本人训练记录');}}
+  const groups=main.querySelectorAll('section')[1];if(groups){const header=groups.firstElementChild;if(header){text(kids(header)[0],'本周训练部位');text(kids(header)[1],'本周已做 / 计划 · 按肌群权重计');}const holder=groups.querySelector<HTMLElement>('div[style*="flex-wrap"]'),template=holder?.firstElementChild?.cloneNode(true) as HTMLElement|undefined;
+    const muscles=Muscle.options.filter(id=>(s.derived[`volume.${id}`]?.value??0)>0||(s.derived[`volume.planned.${id}`]?.value??0)>0||(s.derived[`volume.unknown.${id}`]?.value??0)>0);
+    if(holder&&template){holder.replaceChildren();for(const id of muscles){const chip=template.cloneNode(true) as HTMLElement;chip.dataset.rowKey=id;legendText(chip,`${MUSCLE_LABEL[id]} · ${fmt(s.derived[`volume.${id}`]?.value??0,1)}/${fmt(s.derived[`volume.planned.${id}`]?.value??0,1)} 组${s.derived[`volume.unknown.${id}`]?.value?` · ${fmt(s.derived[`volume.unknown.${id}`].value,1)} 待分类`:''}`);holder.append(chip);}if(!muscles.length)holder.textContent='记录训练后，这里显示实际训练部位。';}
+    for(const button of groups.querySelectorAll<HTMLButtonElement>('button')){const key=muscles.length?`volume.${muscles[0]}`:null;if(key){button.dataset.derivedKey=key;enable(button);}else button.disabled=true;}for(const node of Array.from(groups.querySelectorAll<HTMLElement>('*'))){if(!node.children.length&&node.textContent?.includes('待接入'))text(node,'来自本人训练记录');}}
 }
 function bindLedger(root:HTMLElement,c:HandoffContext){
   const filters=one(root,'[data-bind="ledger-filters"]');
@@ -246,14 +250,14 @@ function bindConnect(root:HTMLElement,c:HandoffContext){
   // Reuse the original account list; architecture, tool names and endpoint are
   // developer documentation and do not belong in the customer interface.
   const accounts=sections[2];sections[1].remove();sections[3].remove();sections[4].remove();
-  text(accounts.firstElementChild,'授权管理');
-  const parent=accounts.children[1],template=parent.children[0];parent.replaceChildren();
+  text(accounts.firstElementChild,'授权管理');const settings=document.createElement('button');settings.textContent='我的账户';settings.dataset.action='account-settings';settings.className='account-button';
+  const parent=accounts.children[1],template=parent.children[0];parent.replaceChildren();accounts.append(settings);
   const permissions:Record<string,string>={read:'读取状态与记录',submit:'提交待审记录',propose:'提出计划调整'};
   for(const [index,client] of (s.clients.length?s.clients:[null]).entries()){
     const row=template.cloneNode(true) as HTMLElement,left=kids(row)[0],status=kids(row)[1],dot=one<HTMLElement>(status,'span');
     row.dataset.rowKey=client?.id??'empty-client';row.classList.add('connection-row');row.style.borderTop=index?'1px solid #EDEDEB':'none';
     text(kids(left)[0],client?.name??'尚未连接');
-    text(kids(left)[1],client?`${client.status==='active'?'已授权':'授权已撤销'} · ${client.scopes.map(scope=>permissions[scope]).filter(Boolean).join('、')}`:'连接功能准备中。你仍可以记录和查看训练。');
+    text(kids(left)[1],client?`${client.status==='active'?'已授权':'授权已撤销'} · ${client.scopes.map(scope=>permissions[scope]).filter(Boolean).join('、')}${client.lastUsedAt?` · 最近使用 ${new Intl.DateTimeFormat('zh-CN',{timeZone:s.timezone,month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(client.lastUsedAt))}`:''}`:'连接功能准备中。你仍可以记录和查看训练。');
     if(status.lastChild?.nodeType===Node.TEXT_NODE)status.lastChild.textContent=client?.status==='active'?'撤销授权':client?'已撤销':'';
     if(client?.status!=='active'){status.style.color='#6C6C71';if(dot)dot.style.background='#A1A1A5';}
     if(client?.status==='active'){row.dataset.action='client-revoke';row.dataset.id=client.id;row.setAttribute('role','button');row.tabIndex=0;row.setAttribute('aria-label',`撤销 ${client.name} 的授权`);}

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Derived, Entry, EntryDraft, Held, Program, Proposal, Snapshot, Trigger } from './entities.ts';
+import { Derived, Entry, EntryDraft, Held, Program, Proposal, Snapshot, Trigger, Exercise, ModelEntryDraft } from './entities.ts';
 import { Id, LocalDate } from './primitives.ts';
 
 /* ───────────────────────────── 权限 ───────────────────────────── */
@@ -18,7 +18,7 @@ export type Scope = z.infer<typeof Scope>;
 
 export const ApiError = z.object({
   error: z.object({
-    code: z.enum(['bad_request', 'unauthorized', 'forbidden', 'not_found', 'conflict', 'invalid_state', 'internal']),
+    code:z.string().describe('稳定错误码；conflict/account_mismatch 不可原样自动重试'),
     message: z.string(),
     details: z.unknown().optional(),
   }),
@@ -33,7 +33,7 @@ export const StateQuery = z.object({
 });
 
 export const SubmissionQuestion=z.object({id:z.string(),gate:z.string(),question:z.string(),context:z.string().optional(),options:z.array(z.object({id:z.string(),label:z.string()}))});
-export const Submission=z.object({id:Id,clientId:z.string(),rawText:z.string(),drafts:z.array(EntryDraft),status:z.enum(['pending','accepted','skipped']),capturedAt:z.iso.datetime({offset:true}),timeZone:z.string(),createdAt:z.iso.datetime({offset:true}),questions:z.array(SubmissionQuestion)});
+export const Submission=z.object({id:Id,clientId:z.string(),rawText:z.string(),drafts:z.array(z.union([ModelEntryDraft,EntryDraft])),status:z.enum(['pending','accepted','skipped']),capturedAt:z.iso.datetime({offset:true}),timeZone:z.string(),createdAt:z.iso.datetime({offset:true}),questions:z.array(SubmissionQuestion)});
 export const ClientPublic=z.object({id:Id,name:z.string(),scopes:z.array(z.enum(['read','submit','propose'])),status:z.enum(['active','revoked']),createdAt:z.iso.datetime({offset:true}),lastUsedAt:z.iso.datetime({offset:true}).nullable()});
 export const StateResponse = Snapshot.extend({
   accountId: Id,
@@ -64,6 +64,8 @@ export const WriteResult = z.object({
   unparsed: z.array(z.string()).default([]).describe('既不能规则解析、也无模型可用的片段'),
 });
 export type WriteResult = z.infer<typeof WriteResult>;
+export const ReviewDetails=z.object({kind:z.enum(['submission','proposal','held','trigger']),id:Id,status:z.string(),revision:z.number().int(),reviewUrl:z.string(),title:z.string().optional(),source:z.string().optional(),drafts:z.array(z.union([ModelEntryDraft,EntryDraft])).optional(),result:WriteResult.nullable().optional(),item:z.union([Proposal,Held,Trigger]).optional(),exercises:z.array(Exercise).optional(),program:Program.optional()});
+
 
 /** 界面直接写入（如完成一组）。同样过闸。 */
 export const LogRequest = z.object({
@@ -103,6 +105,8 @@ export const ProposeChangeRequest = z.object({
   rationale: z.string().max(1000),
   ruleRefs: z.array(z.string()).default([]),
   patch: z.record(z.string(), z.unknown()).default({}),
+  exercises:z.array(Exercise).max(30).optional(),
+  expectedRevision:z.number().int().nonnegative().optional(),
 });
 
 /* ───────────────────────────── 路由表 ───────────────────────────── */
@@ -133,6 +137,8 @@ export const ROUTES = {
   putProgram: { method: 'PUT', path: '/v1/program', scope: 'user', summary: '替换训练计划（仅用户）', request: Program, response: Program },
   getTimeZone:{method:'GET',path:'/v1/preferences/timezone',scope:'user',summary:'读取用户专属时区',response:TimeZoneRequest},
   putTimeZone:{method:'PUT',path:'/v1/preferences/timezone',scope:'user',summary:'设置用户专属 IANA 时区',request:TimeZoneRequest,response:TimeZoneRequest},
+  getReview:{method:'GET',path:'/v1/reviews/{kind}/{id}',scope:['user','read'],summary:'读取指定事项及处理结果',response:ReviewDetails},
+  getAccount:{method:'GET',path:'/v1/account',scope:'user',summary:'读取当前客户账户',response:z.object({accountId:Id,email:z.string(),mode:z.enum(['customer','access'])})},
   getClients:{method:'GET',path:'/v1/clients',scope:'user',summary:'查看本人 OAuth 客户端授权',response:z.array(ClientPublic)},
   revokeClient:{method:'POST',path:'/v1/clients/{id}/revoke',scope:'user',summary:'撤销本人 OAuth 客户端',request:z.object({}),response:z.object({id:Id,status:z.literal('revoked')})},
   exportAll: { method: 'GET', path: '/v1/export', scope: 'user', summary: '导出本人数据', response: Backup },
@@ -152,6 +158,7 @@ export const ServerEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('program.updated'), program: Program }),
   z.object({ type: z.literal('submission.created'), submissionId: Id }),
   z.object({ type: z.literal('submission.decided'), submissionId: Id, decision:z.enum(['accept','skip']) }),
+  z.object({ type:z.literal('client.authorized'),clientId:Id }),
   z.object({ type: z.literal('client.revoked'), clientId: Id }),
   z.object({ type: z.literal('backup.imported'), count:z.number().int() }),
 ]);

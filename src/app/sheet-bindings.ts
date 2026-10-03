@@ -34,12 +34,13 @@ export function bindDecisionSheet(root:HTMLElement,state:V1State,sheet:SheetStat
     if(action){element.dataset.action=action;if(id)element.dataset.id=id;}
     options.append(element);return element;
   };
+  const proposedExercises=sheet.kind==='decision'&&sheet.type==='proposal'?state.proposals.find(p=>p.id===sheet.id)?.exercises??[]:[];
   const showDays=(program:Program,prefix:string)=>{
     if(!program.days.length)row(prefix,'没有训练安排',`${prefix}:empty`);
     for(const day of program.days){
       row(`${prefix}${prefix?' · ':''}${day.name}`,day.weekday==null?'按需训练':days[day.weekday],`${prefix}:${day.id}`);
       for(const [index,item] of day.items.entries()){
-        const ex=state.exercises.find(ex=>ex.id===item.exerciseId);
+        const ex=[...state.exercises,...proposedExercises].find(ex=>ex.id===item.exerciseId);
         row(ex?.name??item.exerciseId,`${item.sets} 组 × ${item.repMin}–${item.repMax} 次${item.startLoad==null?'':` · 起始 ${item.startLoad} ${ex?.unit??''}`}${item.note?` · ${item.note}`:''}`,`${prefix}:${day.id}:${index}`);
       }
     }
@@ -53,6 +54,8 @@ export function bindDecisionSheet(root:HTMLElement,state:V1State,sheet:SheetStat
     title.textContent=proposal?.title??'调整每日饮食';detail.textContent=proposal?.rationale??'确认采用后才会生效。';
     const parsed=proposal?.kind==='program_change'?ProgramSchema.safeParse(mergePatch(state.program,proposal.patch)):null;
     if(proposal&&parsed?.success){
+      for(const ex of proposedExercises)row(`新增动作 · ${ex.name}`,`${ex.type} · ${ex.unit}${ex.perHand?' · 单只重量':''}${ex.type==='assisted'?' · 辅助配重':''}`,'exercise:'+ex.id);
+      if(proposal.baseProgram&&JSON.stringify(proposal.baseProgram)!==JSON.stringify(state.program))detail.textContent+=' 原计划已有更新，以下比较使用当前计划，请重新核对。';
       for(const key of Object.keys(proposal.patch)){
         if(key==='days'){
           const ids=[...new Set([...state.program.days,...parsed.data.days].map(day=>day.id))];
@@ -68,7 +71,7 @@ export function bindDecisionSheet(root:HTMLElement,state:V1State,sheet:SheetStat
     if(trigger){const delta=`${trigger.action.kcal>=0?'增加':'减少'} ${Math.abs(trigger.action.kcal)} kcal`;title.textContent=`每天${delta}`;detail.textContent=`体重变化 ${trigger.current==null?'尚待观察':`${trigger.current.toFixed(2)} kg/周`}，达到你设置的阈值 ${trigger.threshold} kg/周。采用后从 ${trigger.dueDate>state.today?trigger.dueDate:state.today} 生效。`;row('修改前后',`当前摄入 → 每天${delta}。未记录总热量，不推算摄入总量。`,'trigger');}
     text(left,'采用');text(right,'以后');left.dataset.action='decision-accept';right.dataset.action='decision-later';left.dataset.id=right.dataset.id=sheet.id;
     const unavailable=(!proposal&&!trigger)||proposal&&proposal.status!=='open'||trigger&&trigger.status!=='will_fire'||parsed&&!parsed.success;
-    if(unavailable){left.setAttribute('aria-disabled','true');left.tabIndex=-1;detail.textContent='这项建议当前无法采用，请查看最新状态，必要时在对话中重新提交。';right.textContent='关闭';right.dataset.action='sheet-cancel';}
+    if(unavailable){if(proposal&&proposal.status!=='open'){heading('处理结果',proposal.status==='accepted'?'已采用':'未采用');}left.setAttribute('aria-disabled','true');left.tabIndex=-1;detail.textContent=proposal?.status==='accepted'?'这项计划已由你确认。当前生效安排可在今日查看。':proposal?.status==='rejected'?'这项提案未采用，没有修改计划。':'这项建议当前无法采用，请查看最新状态，必要时在对话中重新提交。';right.textContent='关闭';right.dataset.action='sheet-cancel';}
     else if(sheet.revision!==state.revision){left.setAttribute('aria-disabled','true');left.tabIndex=-1;detail.textContent+=' 状态已变化，请核对更新后的内容，再重新确认。';right.textContent='已核对，重新确认';right.dataset.action='decision-refresh';}
     return;
   }

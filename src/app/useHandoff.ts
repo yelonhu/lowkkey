@@ -9,14 +9,16 @@ export class RequestError extends Error {
   constructor(readonly code:string, readonly status=0){super(code);}
   get retryable(){return this.status===0||this.status>=500||this.status===408||this.status===429;}
 }
-async function request<T>(path:string,method:'GET'|'POST'|'PUT'='GET',body?:unknown,id?:string):Promise<T> {
+const requests=new Set<AbortController>();
+async function request<T>(path:string,method:'GET'|'POST'|'PUT'='GET',body?:unknown,id?:string,accountId?:string):Promise<T> {
   const controller=new AbortController(),timeout=window.setTimeout(()=>controller.abort(),15000);
+  requests.add(controller);
   try {
-    const response=await fetch(path,{method,credentials:'same-origin',signal:controller.signal,headers:body===undefined?{}:{'Content-Type':'application/json','Idempotency-Key':id??crypto.randomUUID()},body:body===undefined?undefined:JSON.stringify(body)});
-    if(!response.ok){const value=await response.json().catch(()=>null) as {error?:{code?:string}}|null;throw new RequestError(value?.error?.code??`HTTP_${response.status}`,response.status);}
+    const response=await fetch(path,{method,credentials:'same-origin',signal:controller.signal,headers:{...(accountId?{'X-Lowkkey-Account':accountId}:{}),...(body===undefined?{}:{'Content-Type':'application/json','Idempotency-Key':id??crypto.randomUUID()})},body:body===undefined?undefined:JSON.stringify(body)});
+    if(!response.ok){const value=await response.json().catch(()=>null) as {error?:{code?:string}}|null;if(response.status===401||value?.error?.code==='account_mismatch')window.dispatchEvent(new Event('lowkkey-auth-lost'));throw new RequestError(value?.error?.code??`HTTP_${response.status}`,response.status);}
     return await response.json() as T;
-  } catch(cause){if(cause instanceof RequestError)throw cause;throw new RequestError(controller.signal.aborted?'timeout':'network');}
-  finally{window.clearTimeout(timeout);}
+  } catch(cause){if(cause instanceof RequestError)throw cause;if(controller.signal.reason==='session_changed')throw new RequestError('session_changed',401);throw new RequestError(controller.signal.aborted?'timeout':'network');}
+  finally{requests.delete(controller);window.clearTimeout(timeout);}
 }
 function message(cause:unknown){
   if(cause instanceof RequestError){
@@ -32,33 +34,40 @@ export function useHandoff(enabled=true) {
   const [retry,setRetry]=useState<(()=>void)|null>(null);
   const [confirmedCapture,setConfirmedCapture]=useState<QueuedCapture|null>(null);
   const account=useRef(''),current=useRef<V1State|null>(null),flushing=useRef<Promise<boolean>|null>(null),captureFlight=useRef(false),operation=useRef<Promise<unknown>|null>(null);
-  const sequence=useRef(0),applied=useRef(0);
+  const sequence=useRef(0),applied=useRef(0),generation=useRef(0);
+  const clearSession=useCallback(()=>{generation.current++;for(const controller of requests)controller.abort('session_changed');requests.clear();setBusy(false);setError('');account.current='';current.current=null;operation.current=null;setState(null);setAuth('required');setRetry(null);setToast(null);setQueueCount(0);setConfirmedCapture(null);},[]);
+  useEffect(()=>{const other=(event:StorageEvent)=>{if(event.key==='lowkkey-signout')clearSession();};window.addEventListener('lowkkey-auth-lost',clearSession);window.addEventListener('storage',other);return()=>{window.removeEventListener('lowkkey-auth-lost',clearSession);window.removeEventListener('storage',other);};},[clearSession]);
   const refresh=useCallback(async()=>{
-    const serial=++sequence.current;
+    const serial=++sequence.current,epoch=generation.current,owner=account.current;
     let next=await request<V1State>('/v1/state');
+    if(epoch!==generation.current)throw new RequestError('session_changed',401);
+    if(owner&&next.accountId!==owner){clearSession();throw new RequestError('session_changed',401);}
     const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if(next.revision===0&&next.timezone==='UTC'&&zone!=='UTC'){await request('/v1/preferences/timezone','PUT',{timeZone:zone});next=await request<V1State>('/v1/state');}
+    if(next.revision===0&&next.timezone==='UTC'&&zone!=='UTC'){await request('/v1/preferences/timezone','PUT',{timeZone:zone},undefined,next.accountId);next=await request<V1State>('/v1/state');}
+    if(epoch!==generation.current)throw new RequestError('session_changed',401);
     if(serial>=applied.current&&(!current.current||next.accountId!==current.current.accountId||next.revision>=current.current.revision)){
       applied.current=serial;account.current=next.accountId;current.current=next;setState(next);setAuth('ready');setQueueCount((await pending(next.accountId)).length);
     }
     return current.current??next;
-  },[]);
+  },[clearSession]);
   const flush=useCallback(():Promise<boolean>=>{
     if(flushing.current)return flushing.current;
     if(!account.current||!navigator.onLine)return Promise.resolve(false);
+    const owner=account.current;
     const work=(async()=>{
       try {
         // Re-read after each write: a capture can arrive while this loop awaits D1.
         for(;;){
-          const item=(await pending(account.current))[0];if(!item)break;
-          const result=await request<WriteResult>('/v1/capture','POST',{text:item.rawText,capturedAt:item.capturedAt,capturedLocalDate:item.capturedLocalDate,timeZone:item.timeZone,context:{inSession:item.inSession??false}},item.id);
-          await dequeue(item.id);
+          if(account.current!==owner)throw new RequestError('session_changed',401);
+          const item=(await pending(owner))[0];if(!item)break;
+          const result=await request<WriteResult>('/v1/capture','POST',{text:item.rawText,capturedAt:item.capturedAt,capturedLocalDate:item.capturedLocalDate,timeZone:item.timeZone,context:{inSession:item.inSession??false}},item.id,owner);
+          await dequeue(item.id);if(account.current!==owner)throw new RequestError('session_changed',401);
           setConfirmedCapture(item);
           setToast(result.committed.find(entry=>entry.kind!=='revert')??null);
           await refresh();
         }
         setError('');return true;
-      }catch(cause){if(navigator.onLine)setError(message(cause));return false;}
+      }catch(cause){if(account.current===owner&&navigator.onLine)setError(message(cause));return false;}
       finally{flushing.current=null;}
     })();flushing.current=work;return work;
   },[refresh]);
@@ -76,6 +85,7 @@ export function useHandoff(enabled=true) {
       events?.close();events=null;
       if(document.visibilityState==='hidden')return;
       events=new EventSource(`/v1/events?after=${current.current?.eventCursor??0}`);
+      events.onerror=()=>{void refresh().catch(()=>{});};
       events.onmessage=()=>{if(timer!==undefined)return;timer=window.setTimeout(()=>{timer=undefined;void refresh().catch(()=>{});},40);};
     };
     connect();document.addEventListener('visibilitychange',connect);
@@ -83,6 +93,7 @@ export function useHandoff(enabled=true) {
   },[enabled,auth,refresh]);
   useEffect(()=>{if(!toast)return;const timer=window.setTimeout(()=>setToast(null),8000);return()=>window.clearTimeout(timer);},[toast]);
   async function login(){setBusy(true);try{if(!import.meta.env.DEV){window.location.href='/cdn-cgi/access/login';return;}await request('/api/local/session','POST',{});await refresh();await flush();setError('');}catch(cause){setError(message(cause));}finally{setBusy(false);}}
+  async function logout(){try{const result=await request<{redirect?:string}>('/api/auth/sign-out','POST',{});if(result.redirect==='/cdn-cgi/access/logout')location.assign(result.redirect);}finally{clearSession();localStorage.setItem('lowkkey-signout',String(Date.now()));}}
   async function submit(text:string){
     if(!state||!text.trim()||captureFlight.current||operation.current)return false;
     captureFlight.current=true;setBusy(true);setError('');
@@ -96,21 +107,24 @@ export function useHandoff(enabled=true) {
   }
   function action<T>(path:string,body:unknown,method:'POST'|'PUT'='POST'):Promise<T> {
     if(operation.current)return operation.current as Promise<T>;
-    const id=crypto.randomUUID(),payload=structuredClone(body);
+    const id=crypto.randomUUID(),payload=structuredClone(body),owner=account.current,epoch=generation.current;
     let running=false,committed=false,result:T;
     const promise=new Promise<T>((resolve,reject)=>{
       const attempt=async()=>{
         if(running)return;running=true;setBusy(true);setRetry(null);setError('');
         try {
-          if(!committed){result=await request<T>(path,method,payload,id);committed=true;}
+          if(epoch!==generation.current||!owner||account.current!==owner)throw new RequestError('session_changed',401);
+          if(!committed){result=await request<T>(path,method,payload,id,owner);committed=true;}
+          if(epoch!==generation.current)throw new RequestError('session_changed',401);
           await refresh();operation.current=null;resolve(result);
         }catch(cause){
+          if(epoch!==generation.current){reject(new RequestError('session_changed',401));return;}
           setError(message(cause));
           // Retain the original promise, payload and key while the user retries.
           // Callers continue their existing success path only after confirmation.
           if(committed||cause instanceof RequestError&&cause.retryable)setRetry(()=>()=>void attempt());
           else {if(cause instanceof RequestError&&cause.status===409)await refresh().catch(()=>{});operation.current=null;reject(cause);}
-        }finally{running=false;setBusy(false);}
+        }finally{running=false;if(epoch===generation.current)setBusy(false);}
       };
       void attempt();
     });operation.current=promise;return promise;
@@ -120,14 +134,14 @@ export function useHandoff(enabled=true) {
     captureFlight.current=true;setBusy(true);
     try{return await flush();}finally{captureFlight.current=false;setBusy(false);}
   }
-  return {state,auth,busy,error,queueCount,toast,retry,confirmedCapture,retryCapture,setError,login,submit,refresh,
+  return {state,auth,busy,error,queueCount,toast,retry,confirmedCapture,retryCapture,setError,login,logout,submit,refresh,
     resolve:(held:Held,choice:{optionId:string}|{skip:true})=>action<WriteResult>(`/v1/held/${held.id}/resolve`,choice),
     decideSubmission:(id:string,decision:'accept'|'skip',answers:Record<string,string>,revision=state?.revision)=>action<WriteResult>(`/v1/submissions/${id}/decision`,{decision,answers,expectedRevision:revision}),
-    reviewSubmission:(id:string,answers:Record<string,string>)=>request<{questions:V1State['submissions'][number]['questions'];ready:boolean;revision:number}>(`/v1/submissions/${id}/review`,'POST',{answers}),
+    reviewSubmission:(id:string,answers:Record<string,string>)=>request<{questions:V1State['submissions'][number]['questions'];ready:boolean;revision:number}>(`/v1/submissions/${id}/review`,'POST',{answers},undefined,account.current),
     revert:async(entry:Entry)=>{const result=await action<Entry>(`/v1/entries/${entry.id}/revert`,{reason:''});setToast(null);return result;},
     writeEntries:(entries:EntryDraft[],inSession=false)=>action<WriteResult>('/v1/entries',{entries,inSession}),
     decideProposal:(id:string,decision:'accept'|'reject'|'later',expectedRevision=state?.revision)=>action(`/v1/proposals/${id}/decision`,{decision,expectedRevision}),
-    claimDecision:async()=>{await request('/v1/decisions/today','POST',{});await refresh();},
+    claimDecision:async()=>{await request('/v1/decisions/today','POST',{},undefined,account.current);await refresh();},
     decideTrigger:(id:string,decision:'accept'|'later',expectedRevision=state?.revision)=>action(`/v1/triggers/${id}/decision`,{decision,expectedRevision}),
     revokeClient:(id:string)=>action(`/v1/clients/${id}/revoke`,{}),
   };
