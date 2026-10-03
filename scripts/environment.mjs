@@ -3,7 +3,7 @@ import { mkdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 
 export const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
-export const nodeBin = path.join(root, '.toolchain/node-v24.21.0-darwin-arm64/bin');
+export const nodeBin = path.dirname(process.execPath);
 /** @returns {Record<string, string>} */
 export function environment(extra = {}) {
   const paths = ['.cache/npm', '.local/config', '.local/state', '.local/test-browser', '.data/dev', '.logs', '.tmp', '.artifacts'];
@@ -13,7 +13,7 @@ export function environment(extra = {}) {
   }
   const inherited = Object.fromEntries(['HOME', 'CODEX_HOME', 'USER', 'LOGNAME', 'LANG', 'TERM'].flatMap(key => process.env[key] ? [[key, process.env[key]]] : []));
   return {
-    ...inherited, PATH: `${nodeBin}:/usr/bin:/bin:/usr/sbin:/sbin`,
+    ...inherited, PATH: `${nodeBin}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
     // Chromium on macOS uses its own documented temporary-directory override.
     // Keep download staging inside the same project fence as final artifacts.
     MAC_CHROMIUM_TMPDIR: path.join(root, '.tmp'),

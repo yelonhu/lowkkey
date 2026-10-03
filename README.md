@@ -64,3 +64,7 @@ API、Playwright 与 OAuth/MCP 端到端测试需要可监听本机 loopback 的
 - Remote MCP 在 `/mcp` 使用 Streamable HTTP 与 OAuth 授权码流程，权限为 `read`、`submit`、`propose`。`propose_entries` 只提交待审草稿。
 - REST、实体和 MCP 工具契约见 [INTERFACE.md](docs/lowkkey-handoff/INTERFACE.md) 与 [protocol](docs/lowkkey-handoff/protocol)。
 - 生产配置模板与 Access 路由要求见 [DEPLOY.md](docs/lowkkey-handoff/DEPLOY.md)。实际公网部署及 Claude 官方客户端验收留待生产域名、D1、KV 和 Access 配置就绪后执行。
+
+## 客户登录与 AI 授权
+
+邀请制 Google / 邮箱验证码、OAuth/MCP、部署前置条件及回滚说明见 [账户与 AI 授权手册](docs/account-ai-rollout.md)。公网官方客户端与 iPhone 验收和隔离自动化测试分别记录。

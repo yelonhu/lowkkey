@@ -2,6 +2,11 @@
 set -eu
 project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 node_binary="$project_root/.toolchain/node-v24.21.0-darwin-arm64/bin/node"
+if [ "$(uname -s)" != Darwin ]; then
+  node_binary=$(command -v node)
+  unset NODE_OPTIONS NODE_PATH
+  exec "$node_binary" "$project_root/scripts/launcher.mjs" "$@"
+fi
 if [ ! -x "$node_binary" ]; then echo 'Run ./scripts/bootstrap first.' >&2; exit 1; fi
 unset NODE_OPTIONS NODE_PATH
 exec "$project_root/scripts/fence" local "$node_binary" "$project_root/scripts/launcher.mjs" "$@"

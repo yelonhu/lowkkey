@@ -51,7 +51,7 @@ Token 按 scope 发放：`user`（仅用户会话）、`read`、`submit`、`prop
 
 ## 3. 后端暴露：REST v1
 
-JSON，用户网页通过 Cloudflare Access 会话认证，路径前缀 `/v1`。Remote MCP 的 OAuth Bearer 令牌只用于 `/mcp`。完整结构见 `protocol/openapi.json`。
+JSON，客户网页通过应用会话认证（Access 模式仅用于管理与兼容环境），路径前缀 `/v1`。Remote MCP 的 OAuth Bearer 令牌只用于 `/mcp`。完整结构见 `protocol/openapi.json`。
 
 | 方法 | 路径 | scope | 作用 |
 |---|---|---|---|
@@ -227,3 +227,11 @@ SSE 事件：`entry.committed`、`entry.reverted`、`held.created`、`held.resol
 ### 协议 2.0.0 变更记录
 
 REST 继续使用 `/v1` 路径；快照与生成契约的协议版本升为 2.0.0，包版本不变。目标速度和周组数可以为空，宏观决策必须携带 `expectedRevision`，因此这是契约主版本更新。持久化旧记录读取时不改 ID、原始单位或事实；对外快照标注当前协议版本。客户端须使用本次生成的 Schema，处理空目标及 `set_annotation`。模型仍只读状态和提交提案。
+
+## 客户账户与 AI 提案契约（协议 3.0.0）
+
+客户模式采用应用会话；Access 保留为管理、隔离环境及显式旧账户迁移。完整配置、路由和验收边界见 `../account-ai-rollout.md`。客户写操作必须携带当前 `X-Lowkkey-Account`，防止离线队列在换号后错误发送。
+
+工具源码与运行时注册统一使用协议包。新增 `list_exercises`、`get_review`、精确审阅链接和 MCP Apps 只读卡片。`get_state` 的条目与 `get_history` 的场次分页；后者返回 `{items,nextCursor}`，因此提升主版本。模型草稿必须提供置信度。`propose_change` 使用明确的 ProgramPatch，支持与计划同时待审的自定义动作，记录 baseProgram 与提交时 revision。已有动作负荷语义不能覆盖。
+
+`propose_entries` 的 `corrects` 指向本人已有同类记录，用户确认时追加 revert 和替代记录，未确认不影响事实。`set_annotation` 可提议组别纠正。模型仍没有决定、撤销、直接改计划或直接入账权限。`GET /v1/reviews/{kind}/{id}` 返回当前处理结果，用户审阅链接带事项 ID；不会默认打开别的待审事项。

@@ -1,5 +1,7 @@
 # 生产接入
 
+客户登录与 AI 授权的新部署请先读 [账户与 AI 授权手册](../account-ai-rollout.md)。下文 workers.dev 部分记录既有 Access 测试环境；客户模式不沿用整站 Access 登录墙。
+
 ## GitHub 驱动的 workers.dev 测试环境
 
 测试 Worker 使用仓库根目录的 `wrangler.json`，部署名称为 `lowkkey-preview`。D1 与 KV 的绑定 ID、应用地址和 Access AUD 固定在这份配置中；Wrangler 登录凭据不属于仓库。`wrangler.local.json` 专供本地开发，由 Vite 在启动开发服务时显式选择。
@@ -25,9 +27,9 @@ npx wrangler d1 migrations apply lowkkey-preview --remote --config wrangler.json
 
 ## 自定义域名生产环境
 
-`wrangler.production.example.jsonc` 是生产配置模板。生产域名、D1、KV 和 Access 应用就绪后，将模板复制为受版本控制的生产配置，替换域名、资源 ID 和 Access AUD。业务事实只在 D1；OAuth 授权码、令牌与客户端注册信息在 KV。
+`wrangler.production.example.jsonc` 是生产配置模板。生产域名、D1、KV、Google OAuth 与邮件服务就绪后，将模板复制为受版本控制的生产配置，替换域名、资源 ID 和客户登录配置；Access 变量仅在迁移旧账户时需要。业务事实只在 D1；OAuth 授权码、令牌与客户端注册信息在 KV。
 
-Access 在网页与 `/authorize` 上要求用户登录，并将 `Cf-Access-Jwt-Assertion` 交给 Worker。OAuth 客户端不会持有 Access 会话，因此 `/.well-known/*`、`/oauth/*` 和 `/mcp` 需要在 Access 边缘策略中绕过登录；Worker 对 `/mcp` 验证 OAuth 令牌及 D1 中的所有者、权限和撤销状态。不要绕过 `/authorize` 或 `/v1/*`。
+客户模式由应用会话保护 `/authorize` 和 `/v1/*`。`/.well-known/*` 与 `/oauth/*` 按 OAuth 标准可达，`/mcp` 验证 OAuth 令牌与 D1 授权。Access 不应拦截客户登录和 AI 发现路径；迁移路径可以单独受 Access 保护。具体配置见账户手册。
 
 ```sh
 npx wrangler d1 migrations apply lowkkey-production --remote --config wrangler.production.jsonc
