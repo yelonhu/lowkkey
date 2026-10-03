@@ -38,9 +38,9 @@ test('Chinese composition and SSE preserve the live input, selection and draft',
 });
 
 test('sheets retain the real page, dismiss without writes, and restore focus and browser history',async({page})=>{
-  await enter(page);const before=await state(page),trigger=page.getByRole('button',{name:'选择或更换训练模板'}),main=await page.locator('[data-screen="Main"]').elementHandle();
+  await enter(page);const before=await state(page),trigger=page.getByRole('button',{name:'查看完整训练计划'}),main=await page.locator('[data-screen="Main"]').elementHandle();
   await trigger.focus();await trigger.press('Enter');
-  const dialog=page.getByRole('dialog',{name:'选择训练模板'});await expect(dialog).toBeVisible();
+  const dialog=page.getByRole('dialog',{name:'完整训练计划'});await expect(dialog).toBeVisible();
   expect(await page.locator('[data-screen="Main"]').evaluate((el,old)=>el===old,main)).toBe(true);
   await expect(page.locator('[data-screen="Main"]')).toHaveAttribute('inert','');
   expect(await page.evaluate(()=>document.body.style.overflow)).toBe('hidden');
@@ -54,18 +54,20 @@ test('sheets retain the real page, dismiss without writes, and restore focus and
   await expect.poll(()=>page.locator('.sheet-layer').count()).toBe(0);
 });
 
-test('a slow write accepts one tap and a lost response retries the exact committed operation',async({page})=>{
+test('a slow proposal confirmation commits once and retries the identical operation',async({page})=>{
   await enter(page);
-  const requests:{key:string;body:string}[]=[];
+  const id=await page.evaluate(async()=>{
+    const response=await fetch('/v1/proposals',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({kind:'program_change',title:'审阅重试验证',rationale:'确认后生效',patch:{constraints:[]}})});
+    if(!response.ok)throw new Error(await response.text());return (await response.json()).id;
+  });
+  await page.goto('/#Ledger');await page.getByText('审阅重试验证',{exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'查看建议'}),requests:{key:string;body:string}[]=[];
   let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
-  await page.route('**/v1/program',async route=>{
-    if(route.request().method()!=='PUT'){await route.continue();return;}
+  await page.route(`**/v1/proposals/${id}/decision`,async route=>{
     requests.push({key:route.request().headers()['idempotency-key'],body:route.request().postData()!});
     if(requests.length===1){await gate;await route.fetch();await route.abort('failed');}else await route.continue();
   });
-  await page.getByRole('button',{name:'选择或更换训练模板'}).click();
-  const dialog=page.getByRole('dialog',{name:'选择训练模板'});await dialog.getByRole('button',{name:/上肢 \/ 下肢/}).click();
-  const save=dialog.locator('[data-action="program-save"]');await save.click();
+  const save=dialog.locator('[data-action="decision-accept"]');await save.click();
   await expect(save).toHaveAttribute('aria-busy','true');await expect(save).toHaveAttribute('aria-disabled','true');
   await save.evaluate(el=>{(el as HTMLElement).click();(el as HTMLElement).click();});expect(requests).toHaveLength(1);release();
   await expect(page.getByRole('status')).toContainText('暂未确认');await expect(dialog).toBeVisible();
@@ -112,9 +114,9 @@ test('ledger refresh keeps row identity and scroll, including a round trip to an
   expect(await timeline.evaluate(el=>el.scrollTop)).toBe(position);
 });
 
-test('reduced motion, keyboard focus, compact viewport and copy feedback remain usable',async({page})=>{
+test('reduced motion, keyboard focus, compact viewport and account navigation remain usable',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});await enter(page);
-  await page.getByRole('button',{name:'选择或更换训练模板'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
+  await page.getByRole('button',{name:'查看完整训练计划'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
   expect(await dialog.evaluate(el=>el.getAnimations().filter(a=>a.playState==='running').length)).toBe(0);
   await page.keyboard.press('Tab');expect(await dialog.evaluate(el=>el.contains(document.activeElement))).toBe(true);
   await page.keyboard.press('Shift+Tab');expect(await dialog.evaluate(el=>el.contains(document.activeElement))).toBe(true);
@@ -122,8 +124,8 @@ test('reduced motion, keyboard focus, compact viewport and copy feedback remain 
   await page.setViewportSize({width:390,height:520});const input=page.getByLabel('今天发生了什么？');await input.fill('保留草稿');await input.focus();
   await expect.poll(async()=>{const bounds=await input.boundingBox();return bounds!.y+bounds!.height;}).toBeLessThanOrEqual(520);
   await page.getByRole('link',{name:'接入',exact:true}).click();
-  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}}));
-  await page.locator('[data-action="copy-endpoint"]').click();await expect(page.getByRole('status')).toHaveText('连接地址已复制');
+  await expect(page.locator('[data-screen="Connect"]')).toContainText('授权管理');
+  await expect(page.locator('[data-action="copy-endpoint"]')).toHaveCount(0);
 });
 
 test('training motion is interruptible and rapid set taps commit once through a lost response',async({page})=>{
@@ -159,12 +161,12 @@ test('training motion is interruptible and rapid set taps commit once through a 
   await page.getByRole('button',{name:'重试',exact:true}).click();await expect(complete).toBeEnabled();
   expect(attempts).toHaveLength(2);expect(attempts[1]).toEqual(attempts[0]);expect(JSON.parse(attempts[0].body).entries[0].reps).toBe(13);
   expect((await state(page)).revision).toBe(committed.revision);
-  await session.locator('[data-action="end-session"]').click();const debrief=page.locator('.screen[data-screen="Debrief"]');const written=JSON.parse(attempts[0].body).entries[0];await expect(debrief).toContainText(`${written.load} ${written.unit} × ${written.reps}`);
+  await session.locator('a[data-action="end-session"]').click();const debrief=page.locator('.screen[data-screen="Debrief"]');const written=JSON.parse(attempts[0].body).entries[0];await expect(debrief).toContainText(`${written.load} ${written.unit} × ${written.reps}`);
   await debrief.getByText('返回今日').click();
   expect((await animations()).some(a=>a.duration===480&&a.frames.some(frame=>'clipPath' in frame))).toBe(true);
   await page.getByRole('link',{name:'体征',exact:true}).click();await expect(page.locator('.motion-outgoing,.sheet-layer')).toHaveCount(0);
   await page.getByRole('link',{name:'今日',exact:true}).click();await page.emulateMedia({reducedMotion:'reduce'});
   await page.evaluate(()=>{Reflect.get(window,'interactionAnimations').length=0;});await page.locator('[data-action="start-session"]').click();await expect(session).toBeVisible();
   const reduced=await animations();expect(reduced.some(a=>a.duration===200)).toBe(true);expect(reduced.some(a=>a.frames.some(frame=>'clipPath' in frame||'transform' in frame))).toBe(false);
-  await session.locator('[data-action="end-session"]').click();await expect(debrief).toBeVisible();
+  await session.locator('a[data-action="end-session"]').click();await expect(debrief).toBeVisible();
 });

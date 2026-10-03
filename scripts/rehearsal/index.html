@@ -1,0 +1,12 @@
+<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>lowkkey · 独立演练预览</title>
+<style>body{margin:0;background:#e6e6e4;color:#202020;font:14px/1.6 system-ui}header{padding:12px 20px;background:white}h1{font-size:18px;margin:0}p{margin:6px 0}button{min-height:44px;margin:4px;padding:8px 14px;font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:wait}iframe{display:block;width:min(100%,440px);height:844px;border:0;margin:20px auto;background:#f1f1ef}#status{min-height:24px}@media(max-width:480px){iframe{margin:0 auto;height:calc(100dvh - 240px);min-height:420px}}</style>
+<header><h1>演练预览 · 测试数据</h1><p>未连接真实 Claude。这里通过本地测试客户端模拟 AI；下方是正式界面与真实确认流程。</p>
+<p>① 查看计划 → ② 提交调整并在页面采用 → ③ 提交记录并确认 → ④ 查看体征、进步和日志 → ⑤ 在日志撤销</p>
+<button data-task="proposal">模拟 AI 提交计划调整</button><button data-task="batch">模拟 AI 提交 5 条记录</button><button data-task="reset">重置演练</button>
+<div id="status" role="status">正在准备独立数据库…</div></header><iframe title="lowkkey 客户界面"></iframe>
+<script type="module">
+const buttons=[...document.querySelectorAll('button')],status=document.querySelector('#status'),frame=document.querySelector('iframe');
+async function refresh(){const response=await fetch('/status');const state=await response.json();if(!response.ok)throw new Error(state.error);if(!frame.src)frame.src=state.app+'/#Main';return state;}
+for(const button of buttons)button.onclick=async()=>{buttons.forEach(item=>item.disabled=true);status.textContent='处理中…';if(button.dataset.task==='reset')frame.src='about:blank';try{const response=await fetch('/action/'+button.dataset.task,{method:'POST'});const value=await response.json();if(!response.ok)throw new Error(value.error);status.textContent=value.message;if(button.dataset.task==='reset')frame.src=(await refresh()).app+'/#Main';}catch(error){status.textContent=error.message+'；可重试同一操作。';}finally{buttons.forEach(item=>item.disabled=false);}};
+refresh().then(()=>status.textContent='已准备好。下方如出现本地登录，点击「进入状态舱」。').catch(error=>status.textContent=error.message);
+</script></html>

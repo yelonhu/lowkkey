@@ -19,7 +19,7 @@ test('training uses the plan, V5 next set, and a real debrief',async({page})=>{
     const derived=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
     expect(derived.derived['next.romanian_deadlift'].rule).toBe('V5');
     await expect(session.locator('[data-action="load-input"]')).toHaveAttribute('placeholder',String(derived.derived['next.romanian_deadlift'].value));
-    await session.locator('[data-action="end-session"]').click();
+    await session.locator('a[data-action="end-session"]').click();
     const debrief=page.locator('.screen[data-screen="Debrief"]');await expect(debrief).toBeVisible();
     await expect(debrief).toContainText('185 lb × 5');
     await expect(debrief).not.toContainText('训练总结待接入');
@@ -50,7 +50,7 @@ test('a question captured during training waits for the completion sheet',async(
     expect(during.held.some((item:{deferUntilSessionEnd:boolean})=>item.deferUntilSessionEnd)).toBe(true);
     await expect(page.getByRole('dialog',{name:'确认'})).toHaveCount(0);
     await page.locator('[data-action="resume-session"]').click();
-    await page.locator('[data-action="end-session"]').click();
+    await page.locator('a[data-action="end-session"]').click();
     const debrief=page.locator('.screen[data-screen="Debrief"]');
     await expect(debrief).toContainText('需要确认');
     await debrief.locator('a[href="#Capture"]').click();

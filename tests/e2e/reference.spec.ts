@@ -18,15 +18,15 @@ test('ten source artboards keep their original container styles and render accou
     await page.evaluate(()=>document.fonts.ready);
     const original=await page.evaluate(({html,name})=>new DOMParser().parseFromString(html,'text/html').querySelector(`.screen[data-screen="${name}"]`)?.firstElementChild?.getAttribute('style'),{html:source,name:screen});
     expect(await board.locator(':scope > *').first().getAttribute('style')).toBe(original);
-    await expect(async()=>await board.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/v1-${screen}.png`})).toPass({timeout:5000});
+    await expect(async()=>await board.screenshot({animations:'disabled',path:`.artifacts/playwright/${testInfo.project.name}/v1-${screen}.png`})).toPass({timeout:5000});
   }
   expect(errors).toEqual([]);
   await page.goto('/#Connect');
   const connect=page.locator('.screen[data-screen="Connect"]');
-  await expect(connect).toContainText(`${new URL(page.url()).origin}/mcp`);
-  await expect(connect).toContainText('propose_entries');
-  await expect(connect).toContainText(account.clients.some((client:{status:string})=>client.status==='active')?'已接入':'尚未接入');
-  expect(await connect.getByText('已撤销').count()).toBe(account.clients.filter((client:{status:string})=>client.status==='revoked').length);
+  await expect(connect).not.toContainText('/mcp');
+  await expect(connect).not.toContainText('propose_entries');
+  await expect(connect).toContainText('授权管理');
+  expect(await connect.getByText('已撤销',{exact:true}).count()).toBe(account.clients.filter((client:{status:string})=>client.status==='revoked').length);
   await page.goto('/#Ledger');
   await expect(page.locator('.screen[data-screen="Ledger"]')).not.toContainText('130.1 lb');
   await page.goto('/#Body');
@@ -50,11 +50,11 @@ test('capture records the user value and the ledger supports append-only undo',a
   await expect(row).toContainText('已撤销');
 });
 
-test('photo and voice controls direct the user to an authorized external client',async({page})=>{
+test('photo and voice explain current availability without exposing protocol setup',async({page})=>{
   await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
   await page.getByRole('button',{name:'照片使用说明'}).click();
-  await expect(page.getByRole('status')).toContainText('外部客户端发送照片');
+  await expect(page.getByRole('status')).toContainText('暂不支持照片输入');
   await page.getByRole('button',{name:'语音使用说明'}).click();
-  await expect(page.getByRole('status')).toContainText('外部客户端发送语音');
+  await expect(page.getByRole('status')).toContainText('暂不支持语音输入');
 });

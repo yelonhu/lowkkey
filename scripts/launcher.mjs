@@ -4,6 +4,8 @@ import { environment, root } from './environment.mjs';
 process.chdir(root);
 const commands = {
   dev: [['scripts/serve.mjs']],
+  'preview:rehearsal': [['scripts/rehearsal.mjs']],
+  'preview:empty': [['scripts/empty-preview.mjs']],
   check: [['node_modules/typescript/bin/tsc', '--noEmit'], ['node_modules/eslint/bin/eslint.js', '.']],
   'protocol:emit': [['packages/protocol/scripts/emit.ts']],
   test: [['node_modules/vitest/vitest.mjs', 'run']],

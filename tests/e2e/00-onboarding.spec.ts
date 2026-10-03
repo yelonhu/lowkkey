@@ -1,33 +1,37 @@
 import { expect, test } from '@playwright/test';
 
-test('a new account chooses a template, starts an unscheduled day, and records its first set',async({page})=>{
+test('a new account reviews a proposed plan, optionally trains, and sees its records refresh',async({page})=>{
   await page.goto('/');
   const login=page.getByRole('button',{name:'进入状态舱'});
   await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   const main=page.locator('.screen[data-screen="Main"]');
   await expect(main).toBeVisible();
-  await expect(main.locator('a[data-action="plan-setup"]')).toHaveText('选择计划');
-  await main.locator('a[data-action="plan-setup"]').click();
-  const sheet=page.getByRole('dialog',{name:'选择训练模板'});
-  await expect(sheet).toContainText('上肢 / 下肢');
-  await expect(sheet).toContainText('推 / 拉 / 腿');
-  await sheet.getByRole('button',{name:/上肢 \/ 下肢/}).click();
-  await expect(sheet).toContainText('上肢 A');
-  await expect(sheet).toContainText('下肢 B');
-  await sheet.getByText('确认并保存').click();
-  await expect(main).toBeVisible();
-
+  await expect(main.getByRole('button',{name:'连接 AI',exact:true})).toHaveCount(0);
+  await expect(main).toContainText('计划确认后，训练安排会显示在这里。');
+  await expect(main).not.toContainText('选择计划');await expect(main).not.toContainText('设置目标');
+  await page.getByRole('link',{name:'接入',exact:true}).click();
+  await expect(page.locator('[data-screen="Connect"]')).toBeVisible();
+  await page.getByRole('link',{name:'今日',exact:true}).click();
+  // A proposal fixture uses the existing API in Playwright's isolated D1 only.
   const before=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
-  expect(before.program.days).toHaveLength(4);
-  const chosen=before.program.days.find((day:{id:string})=>day.id==='upper_a');
-  expect(chosen.weekday).toBe(1);
-  if(new Date(`${before.today}T12:00:00Z`).getUTCDay()!==1){
-    await main.locator('a[data-action="choose-day"]').click();
-    const daySheet=page.getByRole('dialog',{name:'选择训练日'});
-    await expect(daySheet.getByText('开始训练')).toHaveAttribute('aria-disabled','true');
-    await daySheet.getByRole('button',{name:/上肢 A/}).click();
-    await daySheet.getByText('开始训练').click();
-  }else await main.locator('a[data-action="start-session"]').click();
+  const scheduled=(new Date(`${before.today}T12:00:00Z`).getUTCDay()+1)%7;
+  await page.evaluate(async weekday=>{
+    const response=await fetch('/v1/proposals',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({kind:'program_change',title:'一起确定的上肢安排',rationale:'已在对话中讨论，等待用户确认。',patch:{days:[{id:'upper_a',name:'上肢 A',weekday,items:[{exerciseId:'bench_press',sets:3,repMin:5,repMax:8,startLoad:null}]}]}})});
+    if(!response.ok)throw new Error(await response.text());
+  },scheduled);
+  await page.goto('/#Ledger');await page.getByText('一起确定的上肢安排',{exact:true}).click();
+  const review=page.getByRole('dialog',{name:'查看建议'});await expect(review).toContainText('当前');await expect(review).toContainText('采用后 · 上肢 A');
+  expect((await page.evaluate(async()=>await (await fetch('/v1/state')).json())).program.days).toHaveLength(0);
+  await review.getByRole('button',{name:'采用',exact:true}).click();await expect(review).toHaveCount(0);
+  await page.getByRole('link',{name:'今日',exact:true}).click();
+  await expect(main).toContainText('今天没有预定训练');
+  await main.getByRole('button',{name:'查看完整训练计划'}).click();
+  const details=page.getByRole('dialog',{name:'完整训练计划'});await expect(details).toContainText('上肢 A');await expect(details).toContainText('3 组 × 5–8 次');await expect(details).not.toContainText('八周');
+  await page.keyboard.press('Escape');
+  await main.locator('[data-action="choose-day"]').click();
+  const daySheet=page.getByRole('dialog',{name:'选择训练日'});
+  await expect(daySheet.getByText('开始训练')).toHaveAttribute('aria-disabled','true');
+  await daySheet.getByRole('button',{name:/上肢 A/}).click();await daySheet.getByText('开始训练').click();
 
   const session=page.locator('.screen[data-screen="Session"]');
   await expect(session).toBeVisible();
@@ -44,8 +48,8 @@ test('a new account chooses a template, starts an unscheduled day, and records i
   const during=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   expect(during.entries.some((entry:{kind:string;load?:number;sessionId?:string})=>entry.kind==='set'&&entry.load===152.5&&entry.sessionId)).toBe(true);
   expect(during.derived['next.bench_press'].rule).toBe('V5');
-  expect(during.program.days.find((day:{id:string})=>day.id==='upper_a').weekday).toBe(1);
-  await session.locator('[data-action="end-session"]').click();
+  expect(during.program.days.find((day:{id:string})=>day.id==='upper_a').weekday).toBe(scheduled);
+  await session.locator('a[data-action="end-session"]').click();
   const debrief=page.locator('.screen[data-screen="Debrief"]');
   await expect(debrief).toContainText('152.5 lb × 5');
   await debrief.getByText('返回今日').click();

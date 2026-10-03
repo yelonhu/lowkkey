@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EntryDraft, Entry, Held, Program, WriteResult } from '@lowkkey/protocol';
+import type { EntryDraft, Entry, Held, WriteResult } from '@lowkkey/protocol';
 import { capturedClock, dequeue, enqueue, pending } from '../client/offline.ts';
 import type { QueuedCapture } from '../client/offline.ts';
 import type { V1State } from '../server/v1-store.ts';
@@ -126,7 +126,6 @@ export function useHandoff(enabled=true) {
     reviewSubmission:(id:string,answers:Record<string,string>)=>request<{questions:V1State['submissions'][number]['questions'];ready:boolean;revision:number}>(`/v1/submissions/${id}/review`,'POST',{answers}),
     revert:async(entry:Entry)=>{const result=await action<Entry>(`/v1/entries/${entry.id}/revert`,{reason:''});setToast(null);return result;},
     writeEntries:(entries:EntryDraft[],inSession=false)=>action<WriteResult>('/v1/entries',{entries,inSession}),
-    writeProgram:(program:Program)=>action<Program>('/v1/program',program,'PUT'),
     decideProposal:(id:string,decision:'accept'|'reject'|'later',expectedRevision=state?.revision)=>action(`/v1/proposals/${id}/decision`,{decision,expectedRevision}),
     claimDecision:async()=>{await request('/v1/decisions/today','POST',{});await refresh();},
     decideTrigger:(id:string,decision:'accept'|'later',expectedRevision=state?.revision)=>action(`/v1/triggers/${id}/decision`,{decision,expectedRevision}),

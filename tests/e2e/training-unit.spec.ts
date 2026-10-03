@@ -23,7 +23,7 @@ test('first-load unit confirmation preserves the raw unit and converts the next-
     expect(set.load).toBe(90);expect(set.unit).toBe('lb');
     expect(state.derived['next.hack_squat'].unit).toBe('kg');
     expect(state.derived['next.hack_squat'].formula).toContain('90 lb →');
-    await session.locator('[data-action="end-session"]').click();
+    await session.locator('a[data-action="end-session"]').click();
   }finally{
     await page.evaluate(async value=>{await fetch('/v1/program',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(value)});},original.program);
   }

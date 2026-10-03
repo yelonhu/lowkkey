@@ -12,6 +12,8 @@
   },
   "scripts": {
     "dev": "./scripts/run dev",
+    "preview:rehearsal": "./scripts/run preview:rehearsal",
+    "preview:empty": "./scripts/run preview:empty",
     "check": "./scripts/run check",
     "protocol:emit": "./scripts/run protocol:emit",
     "test": "./scripts/run test",

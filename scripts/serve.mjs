@@ -16,6 +16,7 @@ const runtime = localRuntime(directory);
 try { await applyMigrations(await runtime.getD1Database('DB')); } finally { await runtime.dispose(); }
 const server = await createServer({ mode: e2e ? 'test' : 'development', configFile: 'vite.config.ts' });
 await server.listen(); server.printUrls();
+process.send?.({type:"ready",isolated:e2e,port:server.config.server.port});
 let stopping = false;
 async function stop() { if (stopping) return; stopping = true; await server.close(); if (e2e) await rm(directory, { recursive: true, force: true }); process.exit(0); }
 process.on('SIGINT', stop); process.on('SIGTERM', stop);
