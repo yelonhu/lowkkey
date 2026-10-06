@@ -13,6 +13,7 @@ import {
   log,
   logSet,
   nextSet,
+  openSession,
   parse,
   plates,
   prescribe,
@@ -42,6 +43,16 @@ function withWeights(snap: Snapshot, series: [string, number][]): Snapshot {
 }
 
 describe('util', () => {
+  it('keeps the current session across capture-date boundaries and backfilled sets', () => {
+    const previous=startSession(fresh(),'upper_a',user('2030-03-15'));
+    let snap=endSession(previous.snap,previous.sessionId,user('2030-03-15'));
+    const clock={...user('2030-03-14'),now:'2030-03-16T00:30:00.000Z'};
+    const current=startSession(snap,'upper_a',clock);
+    snap=logSet(current.snap,{sessionId:'backfilled',exerciseId:'bench_press',load:100,unit:'lb',reps:8,rir:null},user('2030-03-16')).snap;
+    expect(openSession(snap.entries)?.id).toBe(current.sessionId);
+    snap=endSession(snap,current.sessionId,{...clock,now:'2030-03-16T01:30:00.000Z'});
+    expect(openSession(snap.entries)).toBeNull();
+  });
   it('日期运算', () => {
     expect(addDays('2030-02-28', 1)).toBe('2030-03-01');
     expect(weekday('2030-03-14')).toBe(4); // 周四

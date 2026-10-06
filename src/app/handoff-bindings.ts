@@ -270,7 +270,7 @@ function bindTransition(root:HTMLElement,c:HandoffContext){
   for(const node of Array.from(root.querySelectorAll<HTMLElement>('*'))){if(!node.children.length&&node.textContent?.includes('训练流程待接入'))text(node,'尚未开始训练');}
 }
 function bindDebrief(root:HTMLElement,c:HandoffContext){
-  const s=c.state,page=root.firstElementChild as HTMLElement,session=sessions(s.entries).filter(session=>session.endedAt).at(-1);if(!session){
+  const s=c.state,page=root.firstElementChild as HTMLElement,session=sessions(s.entries).filter(session=>session.endedAt).sort((a,b)=>a.endedAt!.localeCompare(b.endedAt!)).at(-1);if(!session){
     const [intro,hero,best]=kids(page);text(kids(intro)[0],'尚未完成训练');text(kids(intro)[1],'训练总结');text(kids(hero)[0],'本次训练');text(kids(kids(hero)[1])[0],'—');text(kids(kids(hero)[1])[1],'');text(kids(hero)[2],'完成训练后显示结果');kids(hero)[3]?.remove();for(const row of kids(best).slice(1))row.remove();one(page,'a[href="#Capture"]')?.remove();text(page.lastElementChild,'返回今日');
     return;
   }

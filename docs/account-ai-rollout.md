@@ -4,7 +4,7 @@
 
 开发分支：`codex/accounts-ai-authorization`。前台基线：`2b852c6`。原画板 `docs/lowkkey-handoff/frontend/lowkkey-frontend.html` 保持原样。包版本仍为 0.6.0；协议更新为 3.0.0。
 
-代码支持邀请制 Google / 邮箱验证码、设备会话、用户账户归属、OAuth/MCP 与对话卡片。**代码与隔离测试不代表 Google/Resend 配置、公网 Claude/ChatGPT 或 iPhone 真机已经验收。** 当前公网仍沿用 Access 配置；本分支没有自动发布。
+代码支持邀请制 Google / 邮箱验证码、设备会话、用户账户归属、OAuth/MCP 与对话卡片。**代码与隔离测试不代表 Google/Resend 配置、公网 Claude/ChatGPT 或 iPhone 真机已经验收。** 当前公网仍沿用 Access 配置；预览站发布与人工验收步骤见 `public-preview-checklist.md`。
 
 ### 数据和身份
 

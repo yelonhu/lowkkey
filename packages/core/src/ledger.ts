@@ -75,7 +75,9 @@ export function sessions(entries: Entry[]): Session[] {
 }
 
 export function openSession(entries: Entry[]): Session | null {
-  const list = sessions(entries);
+  // Capture dates may differ across devices/timezones. A backfilled set without
+  // a start event must never hide the session the user is currently running.
+  const list = sessions(entries).filter(s => s.startedAt).sort((a,b) => a.startedAt!.localeCompare(b.startedAt!));
   const last = list[list.length - 1];
   return last && last.startedAt && !last.endedAt ? last : null;
 }
