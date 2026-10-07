@@ -12,6 +12,14 @@
 - 键盘不再移动整张页面或减去顶部安全区；可视范围转换到窗口坐标后，只调整内部留白。聚焦时立即记录安全区，避免 WebKit 合并 resize 帧后丢掉键盘打开前的测量；旋转重新采样。
 - 诊断入口 `/?viewport=1#Main` 同时测量隐藏的 100dvh 与 fixed/inset 探针，以及窗口、页面、导航、正文、底部操作区、根滚动、原始/有效安全区。点击“复制布局诊断”即时采样，不收集账号、记录或令牌。独立诊断构建通过 `LOWKKEY_LAYOUT_DIAGNOSTICS=1` 默认显示入口（`?viewport=0` 可暂时隐藏）；普通构建仍需 `?viewport=1`，避免主屏幕启动时丢失查询参数导致无法取报告。
 
+### 独立预览交付
+
+- 地址：[iPhone 独立诊断预览](https://iphone-input-lowkkey-preview.yelon-hu.workers.dev/)。已在浏览器通过既有 Access 会话进入真实账户，布局报告版本为 `6a32a28ef920cd53ac995bd6628f5df6762725bc`。
+- Worker 版本：`4cb97f58-3ab1-4b88-98a7-fa2cbfb2e78b`。使用 `wrangler versions upload --preview-alias iphone-input` 上传；仅本版本的 `APP_ORIGIN` 指向别名域名。
+- 主站仍为 `550f34c7-5e6d-49a0-996e-95d0ed65d782`，未执行 `versions deploy`、未合并或推送 main。前端代码在 `codex/iphone-input-boundaries` 分支。
+- 独立地址仍受现有 Access 保护，未登录访问首页、健康检查和状态接口均跳转登录；没有放宽权限。它与主站使用同一个账户数据库，正常保存/撤销会影响真实记录。
+- 独立诊断构建命令使用 `LOWKKEY_LAYOUT_DIAGNOSTICS=1`，普通主站构建不设置。手机可直接把独立根地址添加到主屏幕，报告入口不会依赖 start_url 保留查询参数。保留原有主屏幕入口。
+
 ### 自动化结果
 
 2026-10-07：TypeScript、ESLint、正常生产构建通过；57 项规则/API/账户测试、90 项 Chromium/WebKit 测试及本地 OAuth/MCP 回归通过。覆盖 375–440px、横屏、大字号、无滚动辅助的完整按钮边界、键盘偏移、临时零安全区、旋转重测、失焦后滞留的视口高度、复制失败回退、灰/亮数字、单一键盘焦点线、RIR、SSE 与幂等重试。隔离测试截图已检查。
