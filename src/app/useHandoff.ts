@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EntryDraft, Entry, Held, WriteResult } from '@lowkkey/protocol';
+import type { EquipmentPreferences, EntryDraft, Entry, Held, WriteResult } from '@lowkkey/protocol';
 import { capturedClock, dequeue, enqueue, pending } from '../client/offline.ts';
 import type { QueuedCapture } from '../client/offline.ts';
 import type { V1State } from '../server/v1-store.ts';
@@ -143,6 +143,7 @@ export function useHandoff(enabled=true) {
     decideProposal:(id:string,decision:'accept'|'reject'|'later',expectedRevision=state?.revision)=>action(`/v1/proposals/${id}/decision`,{decision,expectedRevision}),
     claimDecision:async()=>{await request('/v1/decisions/today','POST',{},undefined,account.current);await refresh();},
     decideTrigger:(id:string,decision:'accept'|'later',expectedRevision=state?.revision)=>action(`/v1/triggers/${id}/decision`,{decision,expectedRevision}),
+    saveEquipment:(equipment:EquipmentPreferences,expectedRevision:number)=>action('/v1/preferences/equipment',{equipment,expectedRevision},'PUT'),
     revokeClient:(id:string)=>action(`/v1/clients/${id}/revoke`,{}),
   };
 }

@@ -95,7 +95,7 @@ export function derive(snap: Snapshot, asOf: LocalDate = snap.today): Record<str
   const session = openSession(entries);
   if (session) {
     const day = program.days.find((d) => d.id === session.dayId);
-    for (const item of day?.items ?? []) {
+    for (const item of session.prescription ?? day?.items ?? []) {
       const ex = exercises.find((x) => x.id === item.exerciseId);
       if (!ex) continue;
       const previous = session.sets.filter((s) => s.exerciseId === ex.id&&s.setRole!=='warmup').at(-1);
@@ -105,7 +105,8 @@ export function derive(snap: Snapshot, asOf: LocalDate = snap.today): Record<str
         put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', next.load, ex.unit, `${previous.load} ${previous.unit}${previous.unit===ex.unit?'':` → ${round(normalized,2)} ${ex.unit}`} × ${previous.reps}，RIR ${previous.rir ?? '未记'} → ${next.reason} → ${next.load} ${ex.unit}`, [previous.id]);
       } else {
         const rx = prescribe(item, ex, entries, asOf, program);
-        put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', rx.load, ex.unit, `本场首组使用处方：${rx.reason}`, rx.basedOn);
+        const start=entries.find(entry=>entry.kind==='session'&&entry.sessionId===session.id&&entry.event==='start');
+        put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', session.prescription?item.startLoad:rx.load, ex.unit, session.prescription?'本场首组使用开始时保存的动作处方':'本场首组使用处方：'+rx.reason, session.prescription&&start?[start.id]:rx.basedOn);
       }
     }
   }

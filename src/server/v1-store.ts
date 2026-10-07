@@ -1,5 +1,5 @@
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
-import { PROTOCOL_VERSION, Entry as EntrySchema, EntryDraft as DraftSchema, Program as ProgramSchema, Snapshot as SnapshotSchema, VerifierId, type Exercise, type Entry, type EntryDraft, type Snapshot, type Source, type WriteResult } from '@lowkkey/protocol';
+import { DEFAULT_EQUIPMENT, type EquipmentPreferences, PROTOCOL_VERSION, Entry as EntrySchema, EntryDraft as DraftSchema, Program as ProgramSchema, Snapshot as SnapshotSchema, VerifierId, type Exercise, type Entry, type EntryDraft, type Snapshot, type Source, type WriteResult } from '@lowkkey/protocol';
 import { capture, claimDailyDecision, decideProposal, decideTrigger, derive, emptySnapshot, log, propose, putProgram, refreshTriggers, resolveHeld, revert } from '@lowkkey/core';
 import { parse } from '@lowkkey/core';
 import { StoreError } from './account.ts';
@@ -44,7 +44,7 @@ async function storedState(db:D1Database,ownerId:string,at:string):Promise<Snaps
     db.prepare('SELECT * FROM entries WHERE owner_id=? ORDER BY created_at,id').bind(ownerId).all<OldRow>(),
   ]);
   const entries=[...old.results.map(legacyEntry),...fresh.results.map(r=>EntrySchema.parse(JSON.parse(r.entry_json)))].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));
-  return {...mutable,protocol:PROTOCOL_VERSION,entries,today:localDate(at,mutable.timezone)};
+  return {...mutable,equipment:mutable.equipment??structuredClone(DEFAULT_EQUIPMENT),protocol:PROTOCOL_VERSION,entries,today:localDate(at,mutable.timezone)};
 }
 async function revision(db:D1Database,ownerId:string):Promise<number> {
   const row=await db.prepare('SELECT data_revision FROM users WHERE id=?').bind(ownerId).first<{data_revision:number}>();
@@ -104,6 +104,12 @@ export async function state(db:D1Database,ownerId:string,at=new Date().toISOStri
   const [submissions,clients,currentRevision]=await Promise.all([listSubmissions(db,ownerId,snap),listClients(db,ownerId),revision(db,ownerId)]);
   if(beforeRevision!==currentRevision){if(attempt>=4)throw new StoreError('conflict',409);return state(db,ownerId,at,attempt+1);}
   return {...snap,accountId:ownerId,revision:currentRevision,eventCursor,derived:derive(snap),submissions,clients};
+}
+export async function setEquipment(db:D1Database,ownerId:string,key:string,input:{equipment:EquipmentPreferences;expectedRevision:number}) {
+  return mutate(db,ownerId,'web','equipment',key,input,(snap,_now,revision)=>{
+    if(revision!==input.expectedRevision)throw new StoreError('conflict',409);
+    return {snap:{...snap,equipment:input.equipment},result:input.equipment,events:[{type:'equipment.updated'}]};
+  });
 }
 export async function setTimeZone(db:D1Database,ownerId:string,key:string,timeZone:string) {
   localDate(new Date().toISOString(),timeZone);

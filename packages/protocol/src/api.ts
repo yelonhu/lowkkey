@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Derived, Entry, EntryDraft, Held, Program, Proposal, Snapshot, Trigger, Exercise, ModelEntryDraft } from './entities.ts';
+import { EquipmentPreferences, Derived, Entry, EntryDraft, Held, Program, Proposal, Snapshot, Trigger, Exercise, ModelEntryDraft } from './entities.ts';
 import { Id, LocalDate } from './primitives.ts';
 
 /* ───────────────────────────── 权限 ───────────────────────────── */
@@ -35,6 +35,7 @@ export const StateQuery = z.object({
 export const SubmissionQuestion=z.object({id:z.string(),gate:z.string(),question:z.string(),context:z.string().optional(),options:z.array(z.object({id:z.string(),label:z.string()}))});
 export const Submission=z.object({id:Id,clientId:z.string(),rawText:z.string(),drafts:z.array(z.union([ModelEntryDraft,EntryDraft])),status:z.enum(['pending','accepted','skipped']),capturedAt:z.iso.datetime({offset:true}),timeZone:z.string(),createdAt:z.iso.datetime({offset:true}),questions:z.array(SubmissionQuestion)});
 export const ClientPublic=z.object({id:Id,name:z.string(),scopes:z.array(z.enum(['read','submit','propose'])),status:z.enum(['active','revoked']),createdAt:z.iso.datetime({offset:true}),lastUsedAt:z.iso.datetime({offset:true}).nullable()});
+export const EquipmentRequest=z.strictObject({equipment:EquipmentPreferences,expectedRevision:z.number().int().nonnegative()});
 export const StateResponse = Snapshot.extend({
   accountId: Id,
   revision: z.number().int().nonnegative(),
@@ -135,6 +136,7 @@ export const ROUTES = {
   claimDecision:{method:'POST',path:'/v1/decisions/today',scope:'user',summary:'占用本人当地日期的唯一主动建议位',request:z.strictObject({}),response:Snapshot},
   getProgram: { method: 'GET', path: '/v1/program', scope: ['user', 'read'], summary: '读取训练计划', response: Program },
   putProgram: { method: 'PUT', path: '/v1/program', scope: 'user', summary: '替换训练计划（仅用户）', request: Program, response: Program },
+  putEquipment:{method:'PUT',path:'/v1/preferences/equipment',scope:'user',summary:'保存本人器械配置；不改变历史单位',request:EquipmentRequest,response:EquipmentPreferences},
   getTimeZone:{method:'GET',path:'/v1/preferences/timezone',scope:'user',summary:'读取用户专属时区',response:TimeZoneRequest},
   putTimeZone:{method:'PUT',path:'/v1/preferences/timezone',scope:'user',summary:'设置用户专属 IANA 时区',request:TimeZoneRequest,response:TimeZoneRequest},
   getReview:{method:'GET',path:'/v1/reviews/{kind}/{id}',scope:['user','read'],summary:'读取指定事项及处理结果',response:ReviewDetails},
@@ -148,6 +150,7 @@ export const ROUTES = {
 /* ───────────────────────────── 实时事件（SSE：GET /v1/events） ───────────────────────────── */
 
 export const ServerEvent = z.discriminatedUnion('type', [
+  z.object({type:z.literal('equipment.updated')}),
   z.object({ type: z.literal('entry.committed'), entry: Entry }),
   z.object({ type: z.literal('entry.reverted'), revert: Entry }),
   z.object({ type: z.literal('held.created'), held: Held }),

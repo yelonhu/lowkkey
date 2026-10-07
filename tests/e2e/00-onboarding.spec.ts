@@ -7,7 +7,7 @@ test('a new account reviews a proposed plan, optionally trains, and sees its rec
   const main=page.locator('.screen[data-screen="Main"]');
   await expect(main).toBeVisible();
   await expect(main.getByRole('button',{name:'连接 AI',exact:true})).toHaveCount(0);
-  await expect(main).toContainText('计划确认后，训练安排会显示在这里。');
+  await expect(main).toContainText('选一个动作，记下实际完成。');
   await expect(main).not.toContainText('选择计划');await expect(main).not.toContainText('设置目标');
   await page.getByRole('link',{name:'接入',exact:true}).click();
   await expect(page.locator('[data-screen="Connect"]')).toBeVisible();
@@ -20,18 +20,14 @@ test('a new account reviews a proposed plan, optionally trains, and sees its rec
     if(!response.ok)throw new Error(await response.text());
   },scheduled);
   await page.goto('/#Ledger');await page.getByText('一起确定的上肢安排',{exact:true}).click();
-  const review=page.getByRole('dialog',{name:'查看建议'});await expect(review).toContainText('当前');await expect(review).toContainText('采用后 · 上肢 A');
+  const review=page.getByRole('dialog',{name:'查看建议'});await expect(review).toContainText('当前');await expect(review).toContainText('采用后');await expect(review).toContainText('杠铃平板卧推');
   expect((await page.evaluate(async()=>await (await fetch('/v1/state')).json())).program.days).toHaveLength(0);
   await review.getByRole('button',{name:'采用',exact:true}).click();await expect(review).toHaveCount(0);
   await page.getByRole('link',{name:'今日',exact:true}).click();
   await expect(main).toContainText('今天没有预定训练');
-  await main.getByRole('button',{name:'查看完整训练计划'}).click();
-  const details=page.getByRole('dialog',{name:'完整训练计划'});await expect(details).toContainText('上肢 A');await expect(details).toContainText('3 组 × 5–8 次');await expect(details).not.toContainText('八周');
-  await page.keyboard.press('Escape');
-  await main.locator('[data-action="choose-day"]').click();
-  const daySheet=page.getByRole('dialog',{name:'选择训练日'});
-  await expect(daySheet.getByText('开始训练')).toHaveAttribute('aria-disabled','true');
-  await daySheet.getByRole('button',{name:/上肢 A/}).click();await daySheet.getByText('开始训练').click();
+  await main.getByRole('button',{name:'查看动作安排'}).click();
+  const details=page.getByRole('dialog',{name:'动作安排'});await expect(details).not.toContainText('上肢 A');await expect(details).toContainText('杠铃平板卧推');await expect(details).toContainText('3 组 × 5–8 次');await expect(details).not.toContainText('八周');
+  await details.locator('[data-action="begin-arrangement"]').click();
 
   const session=page.locator('.screen[data-screen="Session"]');
   await expect(session).toBeVisible();
@@ -44,7 +40,7 @@ test('a new account reviews a proposed plan, optionally trains, and sees its rec
   await session.getByRole('radio',{name:'2'}).click();
   await session.getByRole('button',{name:'记录 152.5 lb × 5'}).click();
   await expect(session).toContainText('上一组 152.5 × 5');
-  await expect(session).toContainText('45 + 5 + 2.5');await expect(session).toContainText('2.5 lb 无法配出');await expect(session).not.toContainText('每侧 35 + 5');
+  await expect(session).toContainText('45 + 5 + 2.5');await expect(session).toContainText('尚差 2.5 lb，无法精确配出');await expect(session).not.toContainText('每侧 35 + 5');
   const during=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   expect(during.entries.some((entry:{kind:string;load?:number;sessionId?:string})=>entry.kind==='set'&&entry.load===152.5&&entry.sessionId)).toBe(true);
   expect(during.derived['next.bench_press'].rule).toBe('V5');

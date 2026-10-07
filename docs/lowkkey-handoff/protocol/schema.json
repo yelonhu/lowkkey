@@ -2207,6 +2207,78 @@
       ],
       "additionalProperties": false
     },
+    "EquipmentPreferences": {
+      "type": "object",
+      "properties": {
+        "activeBarbellUnit": {
+          "type": "string",
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
+        "kg": {
+          "type": "object",
+          "properties": {
+            "barLoad": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "multipleOf": 0.01
+            },
+            "plateLoads": {
+              "minItems": 1,
+              "maxItems": 16,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 100,
+                "multipleOf": 0.01
+              }
+            }
+          },
+          "required": [
+            "barLoad",
+            "plateLoads"
+          ],
+          "additionalProperties": false
+        },
+        "lb": {
+          "type": "object",
+          "properties": {
+            "barLoad": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "multipleOf": 0.01
+            },
+            "plateLoads": {
+              "minItems": 1,
+              "maxItems": 16,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 100,
+                "multipleOf": 0.01
+              }
+            }
+          },
+          "required": [
+            "barLoad",
+            "plateLoads"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "activeBarbellUnit",
+        "kg",
+        "lb"
+      ],
+      "additionalProperties": false
+    },
     "Snapshot": {
       "type": "object",
       "properties": {
@@ -2254,6 +2326,9 @@
           "items": {
             "$ref": "#/$defs/Exercise"
           }
+        },
+        "equipment": {
+          "$ref": "#/$defs/EquipmentPreferences"
         },
         "decisionSlots": {
           "type": "object",
@@ -2351,6 +2426,9 @@
           "items": {
             "$ref": "#/$defs/Exercise"
           }
+        },
+        "equipment": {
+          "$ref": "#/$defs/EquipmentPreferences"
         },
         "decisionSlots": {
           "type": "object",
@@ -3056,6 +3134,19 @@
     },
     "ServerEvent": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "equipment.updated"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
         {
           "type": "object",
           "properties": {

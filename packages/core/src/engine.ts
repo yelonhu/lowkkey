@@ -212,7 +212,7 @@ export function log(snap: Snapshot, drafts: EntryDraft[], ctx: EngineContext, op
   for (const raw of drafts) {
     let d = raw;
     if(raw.kind==='set_annotation'&&!active(snap.entries).some(e=>e.kind==='set'&&e.id===raw.targetId))throw new NotFoundError('没有这条训练组');
-    if(d.kind==='session'&&d.event==='start')d={...d,prescription:snap.program.days.find(day=>day.id===(raw.kind==='session'?raw.dayId:null))?.items.map(item=>({...item,sets:prescribe(item,snap.exercises.find(ex=>ex.id===item.exerciseId)!,snap.entries,ctx.today,snap.program).sets}))??[]};
+    if(d.kind==='session'&&d.event==='start')d={...d,prescription:snap.program.days.find(day=>day.id===(raw.kind==='session'?raw.dayId:null))?.items.map(item=>{const rx=prescribe(item,snap.exercises.find(ex=>ex.id===item.exerciseId)!,snap.entries,ctx.today,snap.program);return {...item,sets:rx.sets,startLoad:rx.load};})??[]};
     if (d.kind === 'set' && (!d.setIndex || d.setIndex < 1)) d = { ...d, setIndex: nextSetIndex(snap.entries, d.sessionId, d.exerciseId, prepared) };
     prepared.push(d);
   }
@@ -326,7 +326,7 @@ export function startSession(snap: Snapshot, dayId: string | null, ctx: EngineCo
   const open = openSession(snap.entries);
   if (open) return { snap, sessionId: open.id };
   const sessionId = newId('s_');
-  const entry = materialize({ kind: 'session', event: 'start', sessionId, dayId,prescription:snap.program.days.find(day=>day.id===dayId)?.items.map(item=>({...item,sets:prescribe(item,snap.exercises.find(ex=>ex.id===item.exerciseId)!,snap.entries,ctx.today,snap.program).sets})), date: ctx.today, dateOrigin: 'device', source: ctx.source }, ctx);
+  const entry = materialize({ kind: 'session', event: 'start', sessionId, dayId,prescription:snap.program.days.find(day=>day.id===dayId)?.items.map(item=>{const rx=prescribe(item,snap.exercises.find(ex=>ex.id===item.exerciseId)!,snap.entries,ctx.today,snap.program);return {...item,sets:rx.sets,startLoad:rx.load};}), date: ctx.today, dateOrigin: 'device', source: ctx.source }, ctx);
   return { snap: { ...snap, entries: [...snap.entries, entry] }, sessionId };
 }
 

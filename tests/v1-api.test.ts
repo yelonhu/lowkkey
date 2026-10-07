@@ -191,3 +191,29 @@ it('resolved ambiguity links retain owner-scoped outcomes',async()=>{
   expect((await call(`/v1/reviews/held/${id}`,'resolved')).body.status).toBe('resolved');
   expect((await call(`/v1/reviews/held/${id}`,'elsewhere')).status).toBe(404);
 });
+
+
+describe('account equipment preferences',()=>{
+  it('persists across reads, isolates accounts, emits an event and replays once',async()=>{
+    const before=(await call('/v1/state','equipment')).body;
+    expect(before.equipment.lb.plateLoads).toEqual([45,25,10,5,2.5]);
+    const equipment={...before.equipment,activeBarbellUnit:'kg',kg:{barLoad:15,plateLoads:[20,10,5,.5]}};
+    const body={equipment,expectedRevision:before.revision},key=crypto.randomUUID();
+    const saved=await call('/v1/preferences/equipment','equipment','PUT',body,key);expect(saved.status).toBe(200);
+    expect((await call('/v1/preferences/equipment','equipment','PUT',body,key)).body).toEqual(saved.body);
+    const after=(await call('/v1/state','equipment')).body;
+    expect(after.equipment).toEqual(equipment);expect(after.revision).toBe(before.revision+1);expect(after.entries).toEqual(before.entries);expect(after.eventCursor).toBeGreaterThan(before.eventCursor);
+    expect((await call('/v1/state','equipment-other')).body.equipment.kg.barLoad).toBe(20);
+    expect((await call('/v1/export','equipment')).body.snapshot.equipment).toEqual(equipment);
+    expect((await call('/v1/preferences/equipment','equipment','PUT',{...body,equipment:before.equipment},key)).status).toBe(409);
+    expect((await call('/v1/preferences/equipment','equipment','PUT',body)).status).toBe(409);
+    expect((await call('/v1/preferences/equipment','equipment','PUT',{equipment:{...equipment,kg:{barLoad:20,plateLoads:[5,5]}},expectedRevision:after.revision})).status).toBe(400);
+    const response=await app.fetch(new Request(`http://127.0.0.1:5173/v1/events?after=${before.eventCursor}`,{headers:{'X-Test-User':'equipment'}}),env());
+    const reader=response.body!.getReader();const event=await reader.read();await reader.cancel();expect(new TextDecoder().decode(event.value)).toContain('equipment.updated');
+  });
+  it('rejects one concurrent stale configuration without partial writes',async()=>{
+    const before=(await call('/v1/state','equipment-race')).body;
+    const [a,b]=await Promise.all([15,25].map(barLoad=>call('/v1/preferences/equipment','equipment-race','PUT',{expectedRevision:before.revision,equipment:{...before.equipment,kg:{...before.equipment.kg,barLoad}}})));
+    expect([a.status,b.status].sort()).toEqual([200,409]);expect((await call('/v1/state','equipment-race')).body.revision).toBe(before.revision+1);
+  });
+});

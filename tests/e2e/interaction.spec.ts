@@ -38,9 +38,9 @@ test('Chinese composition and SSE preserve the live input, selection and draft',
 });
 
 test('sheets retain the real page, dismiss without writes, and restore focus and browser history',async({page})=>{
-  await enter(page);const before=await state(page),trigger=page.getByRole('button',{name:'查看完整训练计划'}),main=await page.locator('[data-screen="Main"]').elementHandle();
+  await enter(page);const before=await state(page),trigger=page.getByRole('button',{name:'查看动作安排'}),main=await page.locator('[data-screen="Main"]').elementHandle();
   await trigger.focus();await trigger.press('Enter');
-  const dialog=page.getByRole('dialog',{name:'完整训练计划'});await expect(dialog).toBeVisible();
+  const dialog=page.getByRole('dialog',{name:'动作安排'});await expect(dialog).toBeVisible();
   expect(await page.locator('[data-screen="Main"]').evaluate((el,old)=>el===old,main)).toBe(true);
   await expect(page.locator('[data-screen="Main"]')).toHaveAttribute('inert','');
   expect(await page.evaluate(()=>document.body.style.overflow)).toBe('hidden');
@@ -116,7 +116,7 @@ test('ledger refresh keeps row identity and scroll, including a round trip to an
 
 test('reduced motion, keyboard focus, compact viewport and account navigation remain usable',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});await enter(page);
-  await page.getByRole('button',{name:'查看完整训练计划'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
+  await page.getByRole('button',{name:'查看动作安排'}).click();const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
   expect(await dialog.evaluate(el=>el.getAnimations().filter(a=>a.playState==='running').length)).toBe(0);
   await page.keyboard.press('Tab');expect(await dialog.evaluate(el=>el.contains(document.activeElement))).toBe(true);
   await page.keyboard.press('Shift+Tab');expect(await dialog.evaluate(el=>el.contains(document.activeElement))).toBe(true);

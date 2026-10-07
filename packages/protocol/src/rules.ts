@@ -12,7 +12,7 @@ export const VERIFIERS: Record<VerifierId, { name: string; summary: string; vers
   V2: { name: 'e1rm', summary: 'Epley：有效负荷 × (1 + 次数/30)；>12 次标记偏差大，>20 次不计算', version: '1.1.0' },
   V3: { name: 'net_load', summary: '辅助动作有效负荷 = 当日体重 − 辅助（kg）', version: '1.1.0' },
   V4: { name: 'warmup_tag', summary: '仅明确标记的热身组不计入正式组；未知分类单独展示', version: '1.1.0' },
-  V5: { name: 'intra_session', summary: '组内调节：根据上一组次数与 RIR 给出下一组重量', version: '1.1.0' },
+  V5: { name: 'intra_session', summary: '组内调节：根据本场动作快照、上一组次数与 RIR 给出下一组重量', version: '1.2.0' },
   V6: { name: 'double_progression', summary: '双进阶 + 周期：下次处方重量与组数、目标 RIR', version: '1.1.0' },
   V7: { name: 'weekly_volume', summary: '每肌群每周有效组 = Σ 组 × 肌群权重；用户约束优先', version: '1.1.0' },
   V8: { name: 'calorie_trigger', summary: '用户确认的观察期与目标 → 待审建议；只有采用才追加指令', version: '1.1.0' },
@@ -56,8 +56,8 @@ export const INCREMENTS = {
 
 /** 杠铃片（单侧，从大到小）与空杆。 */
 export const PLATES = {
-  lb: [45, 35, 25, 10, 5, 2.5],
-  kg: [25, 20, 15, 10, 5, 2.5, 1.25],
+  lb: [45, 25, 10, 5, 2.5],
+  kg: [20, 15, 10, 5, 2.5, 0.5],
 } as const;
 export const BAR = { lb: 45, kg: 20 } as const;
 

@@ -113,18 +113,19 @@ export function stepLoad(ex: Exercise, load: number, steps: number): number {
   return Math.max(0, round(next, 2));
 }
 
-/** 杠片：每侧从大到小贪心。返回每侧片重列表与无法凑出的余数。 */
-export function plates(total: number, unit: Unit, bar: number = BAR[unit]): { perSide: number[]; bar: number; remainder: number } {
-  let side = (total - bar) / 2;
-  const perSide: number[] = [];
-  if (side < 0) return { perSide, bar, remainder: round(total - bar, 2) };
-  for (const p of PLATES[unit]) {
-    while (side + 1e-9 >= p) {
-      perSide.push(p);
-      side -= p;
-    }
-  }
-  return { perSide, bar, remainder: round(side * 2, 2) };
+/** 左右对称配片：优先精确匹配、再选较少片数，返回每侧片重及总重差额。 */
+export function plates(total: number, unit: Unit, bar: number = BAR[unit], available:readonly number[]=PLATES[unit]): { perSide: number[]; bar: number; remainder: number } {
+  const perSide:number[]=[],side=(total-bar)/2;
+  if(side<0)return {perSide,bar,remainder:round(total-bar,2)};
+  if(!Number.isFinite(side)||side>1000||!available.length)return {perSide,bar,remainder:round(total-bar,2)};
+  // Integer hundredths avoid fractional drift. Dynamic programming handles
+  // custom sets (e.g. 4 + 3) where greedy selection misses an exact solution.
+  const target=Math.floor(side*100+1e-7),coins=[...new Set(available.map(p=>Math.round(p*100)))].filter(p=>p>0).sort((a,b)=>b-a);
+  const counts=new Int32Array(target+1).fill(target+1),last=new Int32Array(target+1);counts[0]=0;
+  for(let amount=1;amount<=target;amount++)for(const coin of coins)if(coin<=amount&&counts[amount-coin]+1<counts[amount]){counts[amount]=counts[amount-coin]+1;last[amount]=coin;}
+  let matched=target;while(matched>0&&!last[matched])matched--;
+  for(let amount=matched;amount>0;amount-=last[amount])perSide.push(last[amount]/100);
+  return {perSide:perSide.sort((a,b)=>b-a),bar,remainder:round(total-bar-2*matched/100,2)};
 }
 
 /* ═══════════════ V5 组内调节 ═══════════════ */

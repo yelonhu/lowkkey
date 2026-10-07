@@ -17,6 +17,7 @@ const named: Record<string, z.ZodType> = {
   Proposal: E.Proposal,
   Trigger: E.Trigger,
   Derived: E.Derived,
+  EquipmentPreferences:E.EquipmentPreferences,
   Snapshot: E.Snapshot,
   StateResponse: A.StateResponse,
   WriteResult: A.WriteResult,

@@ -24,7 +24,7 @@ test('phone shells stay fixed while only designated content scrolls',async({page
 
 test('press feedback follows one control and cancels when the finger starts moving',async({page})=>{
   await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
-  const trigger=page.getByRole('button',{name:'查看完整训练计划'}),box=await trigger.boundingBox();
+  const trigger=page.getByRole('button',{name:'查看动作安排'}),box=await trigger.boundingBox();
   await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);await page.mouse.down();
   await expect(page.locator('[data-pressed]')).toHaveCount(1);
   await expect.poll(()=>trigger.evaluate(el=>getComputedStyle(el).scale)).toBe('0.97');
@@ -48,7 +48,7 @@ test('noneditable text cannot be selected while capture preserves native text ed
 
 test('sheet dismissal continues from the drag position and reopening survives old completion callbacks',async({page})=>{
   await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
-  const trigger=page.getByRole('button',{name:'查看完整训练计划'});await trigger.click();const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
+  const trigger=page.getByRole('button',{name:'查看动作安排'});await trigger.click();const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
   await page.evaluate(()=>document.fonts.ready);
   await dialog.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));const handle=await dialog.elementHandle();
   const grip=await dialog.locator('[data-sheet-handle]').boundingBox();
@@ -89,10 +89,10 @@ test('phone artboards use the viewport width and sheet depth restores after dism
     await expect.poll(async()=>(await board.boundingBox())!.width).toBe(width);
     expect(await board.evaluate(el=>getComputedStyle(el.querySelector('h1')!).fontSize)).toBe('27px');
   }
-  await page.getByRole('button',{name:'查看完整训练计划'}).click();
-  await expect.poll(()=>page.locator('[data-screen="Main"]').evaluate(el=>getComputedStyle(el).scale)).toBe('0.96');
+  await page.getByRole('button',{name:'查看动作安排'}).click();
+  await expect.poll(()=>page.locator('[data-screen="Main"] > div').evaluate(el=>getComputedStyle(el).scale)).toBe('0.96');
   await page.keyboard.press('Escape');
-  await expect.poll(()=>page.locator('[data-screen="Main"]').evaluate(el=>getComputedStyle(el).scale)).toBe('1');
+  await expect.poll(()=>page.locator('[data-screen="Main"] > div').evaluate(el=>getComputedStyle(el).scale)).toBe('1');
 });
 
 

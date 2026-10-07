@@ -303,6 +303,18 @@ export type Derived = z.infer<typeof Derived>;
 
 /* ───────────────────────────── 快照 ───────────────────────────── */
 
+export const BarbellEquipment = z.strictObject({
+  barLoad:z.number().positive().max(100).multipleOf(0.01),
+  plateLoads:z.array(z.number().positive().max(100).multipleOf(0.01)).min(1).max(16).refine(values=>new Set(values).size===values.length,'杠片规格不能重复'),
+});
+export const EquipmentPreferences = z.strictObject({
+  activeBarbellUnit:z.enum(['kg','lb']),
+  kg:BarbellEquipment,
+  lb:BarbellEquipment,
+});
+export type EquipmentPreferences = z.infer<typeof EquipmentPreferences>;
+export const DEFAULT_EQUIPMENT:EquipmentPreferences={activeBarbellUnit:'lb',kg:{barLoad:20,plateLoads:[20,15,10,5,2.5,0.5]},lb:{barLoad:45,plateLoads:[45,25,10,5,2.5]}};
+
 export const Snapshot = z.object({
   protocol: z.string(),
   today: LocalDate,
@@ -313,6 +325,7 @@ export const Snapshot = z.object({
   triggers: z.array(Trigger),
   program: Program,
   exercises: z.array(Exercise),
+  equipment:EquipmentPreferences.optional(),
   decisionSlots:z.record(LocalDate,z.object({kind:z.enum(['proposal','trigger']),id:Id,closed:z.boolean()})).optional(),
 });
 export type Snapshot = z.infer<typeof Snapshot>;

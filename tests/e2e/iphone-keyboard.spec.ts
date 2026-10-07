@@ -29,7 +29,7 @@ test('training remains reachable in a keyboard-sized viewport and restores its d
       expect(await page.evaluate(()=>window.scrollY)).toBe(0);
       await expect(input).toHaveValue('127.25');
     }
-    const reps=await board.locator('[style*="min-width: 44px"]').innerText();
+    const reps=await board.getByRole('spinbutton',{name:'本组次数'}).inputValue();
     const save=board.getByRole('button',{name:`记录 127.25 lb × ${reps}`});
     await save.scrollIntoViewIfNeeded();
     await expect.poll(async()=>{const box=await save.boundingBox();return box!.y+box!.height;}).toBeLessThanOrEqual(420);

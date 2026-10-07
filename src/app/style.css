@@ -111,7 +111,26 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 
 /* The safe-area canvas never participates in page or sheet motion. */
 .prototype-host.phone>.motion-outgoing{background:transparent!important}
-.prototype-host [data-session-weight]{display:flex!important;justify-content:center;align-items:baseline!important;gap:10px;width:100%;padding-inline:20px;box-sizing:border-box}
-.prototype-host [data-session-weight] input{width:min(250px,calc(100% - 62px))!important;flex:0 1 250px;line-height:1.2}
+.prototype-host [data-session-weight]{display:grid!important;grid-template-columns:52px minmax(0,1fr) 52px;align-items:baseline!important;gap:8px;width:100%;padding-inline:20px;box-sizing:border-box}
+.prototype-host [data-session-weight]::before{content:""}
+.prototype-host [data-session-weight] input{width:100%!important;text-align:center!important;line-height:1.2;font-size:clamp(28px,calc((min(100vw,600px) - 160px) * 1.5 / var(--load-length,3)),90px)!important}
 .prototype-host [data-action="rir"][aria-checked="true"]{background:#F2F2F0!important;color:#141415!important;box-shadow:inset 0 0 0 2px #F2F2F0}
 .prototype-host [data-action="rir"]{transition:background-color 120ms var(--motion-curve),color 120ms var(--motion-curve),scale 120ms var(--motion-curve)}
+
+.prototype-host .reps-input{width:72px;border:0;border-radius:0;background:transparent;color:inherit;text-align:center;font:inherit;appearance:textfield!important}
+.prototype-host .reps-input::placeholder{font-size:18px;color:#7F7F84}
+.prototype-host .reps-input::-webkit-inner-spin-button,.prototype-host .reps-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.prototype-host .equipment-field{display:grid;gap:8px;font-size:14px;color:#545458}
+.prototype-host .equipment-field input,.prototype-host .exercise-search{width:100%;font:inherit;font-size:16px;min-height:44px;border:1px solid #E3E3E0;border-radius:12px;padding:10px 12px;background:#fff;color:#141415}
+.prototype-host .plan-detail-row[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #2C4A66}
+.prototype-host .free-training-button{display:block;border:0;background:transparent;color:#545458;font:inherit;min-height:44px;margin:8px auto}
+.prototype-host [data-action="equipment-open"]{max-width:100%;line-height:1.6;overflow-wrap:anywhere;min-height:44px;padding-inline:12px;box-sizing:border-box}
+
+.prototype-host [data-session-header]{display:grid!important;grid-template-columns:64px minmax(0,1fr) 64px;min-height:72px;height:auto!important;padding-block:8px!important;box-sizing:border-box}
+.prototype-host [data-session-header]>a:last-child{justify-content:flex-end}
+.prototype-host [data-session-header]>[data-action="exercise-list"]{min-width:0;overflow-wrap:anywhere}
+.prototype-host [data-session-progress]>[role="button"]{display:inline-flex;align-items:center}
+.prototype-host [data-session-progress]>span:last-child{white-space:nowrap;margin-left:auto}
+.prototype-host [data-session-controls]>div:first-child{display:grid!important;grid-template-columns:44px minmax(0,1fr) 44px}
+.prototype-host [data-session-controls]>div:first-child>div{justify-content:center;gap:16px!important}
+.prototype-host [data-session-controls]>div:first-child>span:last-child{text-align:right}

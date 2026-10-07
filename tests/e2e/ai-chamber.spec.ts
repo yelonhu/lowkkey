@@ -27,7 +27,7 @@ test('optional training uses an explicit exercise list, next exercise and explic
   await enter(page);const before=await snapshot(page),weekday=new Date(`${before.today}T12:00:00Z`).getUTCDay();
   try{
     await program(page,{...before.program,days:[{id:'optional',name:'胸 / 背 · 自己的安排',weekday,items:[{exerciseId:'bench_press',sets:1,repMin:5,repMax:8,startLoad:95},{exerciseId:'seated_row',sets:1,repMin:8,repMax:12,startLoad:30}]}]});
-    await page.reload();await expect(page.locator('[data-bind="main-plan"]')).toContainText('胸 / 背 · 自己的安排');
+    await page.reload();await expect(page.locator('[data-bind="main-plan"]')).toContainText('杠铃平板卧推');
     await page.locator('[data-action="start-session"]').click();const session=page.locator('[data-screen="Session"]');
     // Editing the weekly plan on another device must not rewrite this session.
     await program(page,{...before.program,days:[]});
@@ -52,8 +52,8 @@ test('custom long plans remain readable, cycles stay collapsed and stale review 
   await enter(page);const before=await snapshot(page);
   try{
     await program(page,{...before.program,cycleStart:before.today,ramp:[{week:1,label:'个人恢复阶段',setMultiplier:.8,targetRir:3}],days:Array.from({length:4},(_,index)=>({id:`custom_${index}`,name:['胸','背','肩','腿'][index]+' · 这是用户在对话里确定的长名称',weekday:index,items:[{exerciseId:'bench_press',sets:3,repMin:5,repMax:8,startLoad:null},{exerciseId:'seated_row',sets:3,repMin:8,repMax:12,startLoad:30,note:'由用户与 AI 确定的动作备注'}]}))});
-    await page.reload();await page.getByRole('button',{name:'查看完整训练计划'}).click();const sheet=page.getByRole('dialog');
-    await expect(sheet).toContainText('由用户与 AI 确定的动作备注');await expect(sheet).not.toContainText('个人恢复阶段');await sheet.getByRole('button',{name:/周期安排/}).click();await expect(sheet).toContainText('个人恢复阶段');
+    await page.reload();await page.getByRole('button',{name:'查看动作安排'}).click();const sheet=page.getByRole('dialog');
+    await expect(sheet).toContainText('由用户与 AI 确定的动作备注');await expect(sheet).not.toContainText('个人恢复阶段');await expect(sheet.getByRole('button',{name:/周期安排/})).toHaveCount(0);
     for(const width of [375,390,393,402,430,440]){await page.setViewportSize({width,height:844});expect(await sheet.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);expect(await sheet.locator('.plan-detail-row').evaluateAll(rows=>rows.every(row=>row.scrollHeight<=row.clientHeight+1))).toBe(true);}
     await page.keyboard.press('Escape');
     const id=await page.evaluate(async()=>{const r=await fetch('/v1/proposals',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({kind:'program_change',title:'等待重新确认的调整',rationale:'确认后生效',patch:{constraints:[]}})});if(!r.ok)throw new Error(await r.text());return (await r.json()).id;});

@@ -39,8 +39,8 @@ const contract=JSON.parse(await readFile('docs/lowkkey-handoff/protocol/mcp-tool
 for(const declared of contract.tools){const running=tools.tools.find(tool=>tool.name===declared.name);assert.deepEqual(running.inputSchema.properties,declared.inputSchema.properties,`${declared.name} input contract`);assert.deepEqual(running.outputSchema.properties,declared.outputSchema.properties,`${declared.name} output contract`);assert.deepEqual(running.annotations,declared.annotations);}
 const state=await call('tools/call',{name:'get_state',arguments:{}},3);
 assert.ok(state.content?.length);
-for(const path of ['/v1/entries','/v1/entries/not-owned/revert','/v1/submissions/not-owned/decision']){
-  const forbidden=await fetch(`${origin}${path}`,{method:'POST',headers:{Authorization:`Bearer ${token.access_token}`,'Content-Type':'application/json','Idempotency-Key':randomUUID()},body:'{}'});
+for(const path of ['/v1/entries','/v1/entries/not-owned/revert','/v1/submissions/not-owned/decision','/v1/preferences/equipment']){
+  const forbidden=await fetch(`${origin}${path}`,{method:path.includes('/preferences/')?'PUT':'POST',headers:{Authorization:`Bearer ${token.access_token}`,'Content-Type':'application/json','Idempotency-Key':randomUUID()},body:'{}'});
   assert.equal(forbidden.status,401,`${path} must require the Access user`);
 }
 const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());

@@ -7,7 +7,7 @@ test('isolated rehearsal uses real MCP proposals, one batch confirmation, live c
   await expect(page.locator('#status')).toContainText('已重置', {timeout:20000});
   const app=page.frameLocator('iframe'),login=app.getByRole('button',{name:'进入状态舱'});
   await app.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
-  const main=app.locator('[data-screen="Main"]');await expect(main).toContainText('胸与背');
+  const main=app.locator('[data-screen="Main"]');await expect(main).toContainText('杠铃平板卧推、坐姿绳索划船');
   const frame=page.frames().find(frame=>frame.url().includes(':5181/'))!;
   const state=()=>frame.evaluate(async()=>await(await fetch('/v1/state')).json());
   const initial=await state();expect(initial.entries).toHaveLength(5);

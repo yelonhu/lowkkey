@@ -7,7 +7,7 @@ import { z, ZodError } from 'zod';
 import { accessVerifier } from './auth.ts';
 import type { IdentityVerifier } from './auth.ts';
 import { accountFor, StoreError } from './account.ts';
-import { CaptureRequest, EntryDraft, Program, ProposeChangeRequest, ProposalDecisionRequest, ResolveHeldRequest, Snapshot, TriggerDecisionRequest } from '@lowkkey/protocol';
+import { EquipmentRequest, CaptureRequest, EntryDraft, Program, ProposeChangeRequest, ProposalDecisionRequest, ResolveHeldRequest, Snapshot, TriggerDecisionRequest } from '@lowkkey/protocol';
 import * as v1 from './v1-store.ts';
 import { ForbiddenError, NotFoundError } from '@lowkkey/core';
 
@@ -85,6 +85,7 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
   app.post('/v1/decisions/today',async c=>{userOnly(c.get('principal').kind);z.strictObject({}).parse(await jsonBody(c.req.raw));return c.json(await v1.claimDecision(c.env.DB,c.get('ownerId'),key(c.req.raw)));});
   app.get('/v1/program',async c=>{allowed(c.get('principal'),'read');return c.json((await v1.state(c.env.DB,c.get('ownerId'))).program);});
   app.put('/v1/program',async c=>{userOnly(c.get('principal').kind);return c.json(await v1.writeProgram(c.env.DB,c.get('ownerId'),key(c.req.raw),Program.parse(await jsonBody(c.req.raw,1_000_000))));});
+  app.put('/v1/preferences/equipment',async c=>{userOnly(c.get('principal').kind);return c.json(await v1.setEquipment(c.env.DB,c.get('ownerId'),key(c.req.raw),EquipmentRequest.parse(await jsonBody(c.req.raw))));});
   app.get('/v1/preferences/timezone',async c=>{userOnly(c.get('principal').kind);return c.json({timeZone:(await v1.state(c.env.DB,c.get('ownerId'))).timezone});});
   app.put('/v1/preferences/timezone',async c=>{userOnly(c.get('principal').kind);const body=z.strictObject({timeZone:z.string().min(1).max(80)}).parse(await jsonBody(c.req.raw));return c.json(await v1.setTimeZone(c.env.DB,c.get('ownerId'),key(c.req.raw),body.timeZone));});
   app.post('/v1/capture',async c=>{

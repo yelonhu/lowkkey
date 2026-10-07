@@ -67,9 +67,9 @@ describe('verifiers', () => {
   });
 
   it('杠片', () => {
-    expect(plates(125, 'lb').perSide).toEqual([35, 5]);
+    expect(plates(125, 'lb').perSide).toEqual([25, 10, 5]);
     expect(plates(135, 'lb').perSide).toEqual([45]);
-    expect(plates(100, 'kg').perSide).toEqual([25, 15]);
+    expect(plates(100, 'kg').perSide).toEqual([20, 20]);
     expect(plates(40, 'lb').remainder).toBe(-5);
   });
 
@@ -327,5 +327,26 @@ describe('natural training rules v1.1',()=>{
     const sparse={...s,entries:s.entries.slice(-3)};expect(refreshTriggers(sparse,user()).triggers[0].status).toBe('pending');
     expect(()=>decideTrigger(s,t.id,'accept',undefined,model())).toThrow(ForbiddenError);
     expect(decideTrigger(s,t.id,'accept',undefined,user()).entries).toHaveLength(count+1);
+  });
+});
+
+describe('equipment and session prescriptions',()=>{
+  it('finds an exact minimum-plate solution for custom denominations and reports real residuals',()=>{
+    expect(plates(32,'kg',20,[4,3]).perSide).toEqual([3,3]);
+    expect(plates(33,'kg',20,[4,3]).remainder).toBe(1);
+    expect(plates(20,'kg',20,[20,10])).toEqual({perSide:[],bar:20,remainder:0});
+    expect(plates(19,'kg',20,[20])).toEqual({perSide:[],bar:20,remainder:-1});
+    expect(plates(41,'kg',20,[10,.5]).perSide).toEqual([10,.5]);
+    expect(plates(125,'lb',45,[45,25,10,5,2.5]).perSide).toEqual([25,10,5]);
+  });
+  it('keeps the active prescription after the plan is replaced; free sessions have no invented next-set rule',()=>{
+    const base=emptySnapshot(TODAY,'UTC');base.program.days=[{id:'snapshot',name:'上肢 A',weekday:null,items:[{exerciseId:'bench_press',sets:2,repMin:5,repMax:8,startLoad:95}]}];
+    const started=startSession(base,'snapshot',user());const before=derive(started.snap)['next.bench_press'];
+    const changed=putProgram(started.snap,{...base.program,days:[]},user());
+    expect(derive(changed)['next.bench_press']).toEqual(before);
+    const recorded=logSet(changed,{sessionId:started.sessionId,exerciseId:'bench_press',load:95,unit:'lb',reps:8,rir:2},user()).snap;
+    expect(derive(recorded)['next.bench_press'].value).toBeGreaterThanOrEqual(95);
+    const free=startSession(base,null,user());
+    expect(derive(free.snap)['next.bench_press']).toBeUndefined();
   });
 });
