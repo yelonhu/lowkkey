@@ -19,7 +19,7 @@ function bindBarbell(center:HTMLElement,note:HTMLElement,ex:Exercise,load:number
   center.prepend(svg);svg.dataset.nodeKey='session-barbell';
   note.dataset.action='equipment-open';note.setAttribute('role','button');note.tabIndex=0;note.setAttribute('aria-label','杠铃与配片设置');
   const info=load==null?null:plates(convert(load,unit,physical),physical,profile.barLoad,profile.plateLoads);
-  note.textContent=info?`${physical} 杠铃 · 每侧 ${plateLabel(info.perSide)}${info.remainder<0?' · 低于空杆':info.remainder?` · 尚差 ${info.remainder} ${physical}，无法精确配出`:''} ›`:`${physical} 杠铃 · 配片设置 ›`;
+  note.textContent=info?`${info.remainder<0?'低于空杆':`每侧 ${plateLabel(info.perSide)}${info.perSide.length?` ${physical}`:''}`}${info.remainder>0?` · 尚差 ${info.remainder} ${physical}`:''} ›`:'配片 ›';
   const originals=[...svg.querySelectorAll('rect')].slice(-4),[large,small]=originals;originals.forEach(rect=>rect.remove());
   svg.setAttribute('aria-label',info?`每侧 ${plateLabel(info.perSide)}，空杆 ${info.bar} ${physical}`:'杠铃示意，输入重量后显示配片');
   if(!info)return;
@@ -51,15 +51,13 @@ export function bindSession(root:HTMLElement,c:HandoffContext){
   const text=c.manualLoad??(reference?.load==null?'':fmt(convert(reference.load,reference.unit,unit)));
   const number=text.trim()&&text!=='invalid'?Number(text):NaN,load=Number.isFinite(number)&&number>=0&&number<=1000?number:null;
 
-  weight.dataset.sessionWeight='';
+  weight.dataset.sessionWeight='';weight.dataset.loadEdited=String(c.loadEdited??false);
   const label=document.createElement('label');label.htmlFor='session-load';label.className='session-load-label';label.textContent='重量';label.dataset.nodeKey='session-load-label';
   const input=document.createElement('input');input.id='session-load';input.type='number';input.min='0';input.max='1000';input.step='any';input.inputMode='decimal';input.value=text==='invalid'?'':text;input.placeholder='—';input.dataset.action='load-input';input.dataset.nodeKey='session-load';input.setAttribute('enterkeyhint','done');input.setAttribute('aria-label',reference?.load==null?'首次重量：输入本组重量':'本组重量');input.style.setProperty('--load-length',String(Math.max(3,text.length)));
   const unitButton=button(`${unit} ▾`,'load-unit','session-unit');unitButton.dataset.unitDefault=unit;unitButton.setAttribute('aria-label',`重量单位 ${unit}，点按切换`);
-  const hint=document.createElement('label');hint.htmlFor=input.id;hint.dataset.nodeKey='load-hint';hint.className='session-load-hint';hint.textContent=text?'点按修改':'点按输入';
-  weight.replaceChildren(label,input,unitButton,hint);
-  const details=button('本组详情 ›','set-details','set-details');details.className='session-details';details.setAttribute('aria-label','本组详情与组别');
-  previous.className='session-reference';previous.removeAttribute('style');previous.dataset.sessionReference='';
-  previous.textContent=reference?.source==='session'?`沿用上组 ${reference.load} ${reference.unit} × ${reference.reps??'—'}`:reference?.source==='history'?`上次 ${reference.date?.slice(5).replace('-','月')}日 · ${reference.load} ${reference.unit} × ${reference.reps??'—'}`:reference?.source==='arrangement'?'来自已确认安排':reference?.source==='legacy_snapshot'?'来自本场快照，来源未标注':'';
+  const details=button('ⓘ','set-details','set-details');details.className='session-details';details.setAttribute('aria-label','重量来源与组别');
+  const heading=document.createElement('div');heading.className='session-load-heading';heading.dataset.nodeKey='load-heading';heading.append(label,details);
+  weight.replaceChildren(heading,input,unitButton);previous.remove();
   const arrangement=reference?.arrangement;
   if(arrangement&&load!=null&&Math.abs(convert(arrangement.load,arrangement.unit,unit)-load)>.01){
     const adopt=button(`安排 ${arrangement.load} ${arrangement.unit} · 采用`,'adopt-load','adopt-load');adopt.className='session-adopt';center.append(adopt);
@@ -67,9 +65,8 @@ export function bindSession(root:HTMLElement,c:HandoffContext){
   bindBarbell(center,note,ex,load,unit,c);
   // Existing handoff SVG and controls, rearranged into stable semantic groups.
   center.insertBefore(note,weight);
-  const referenceRow=document.createElement('div');referenceRow.className='session-reference-row';referenceRow.dataset.nodeKey='session-reference-row';referenceRow.append(previous,details);center.append(referenceRow);
   const rir=part(root,'rir'),rirLabel=rir.firstElementChild!;
-  const help=button('余力 RIR · 选填 ⓘ','rir-help','rir-help');help.className='rir-help';help.setAttribute('aria-label','了解余力 RIR');rirLabel.replaceWith(help);
+  const help=button('余力 ⓘ','rir-help','rir-help');help.className='rir-help';help.setAttribute('aria-label','了解余力 RIR');rirLabel.replaceWith(help);
   const display=part(root,'repValue');
   const reps=document.createElement('input');reps.type='number';reps.inputMode='numeric';reps.min='1';reps.max='100';reps.step='1';reps.dataset.action='reps-input';reps.dataset.nodeKey='reps-input';reps.className='reps-input';reps.setAttribute('aria-label','本组次数');reps.placeholder='次数';reps.value=c.reps==null||!Number.isFinite(c.reps)?'':String(c.reps);reps.style.cssText=display.style.cssText;display.replaceWith(reps);
   controls.querySelector<HTMLElement>('[aria-label="减一次"]')!.dataset.action='reps-minus';controls.querySelector<HTMLElement>('[aria-label="加一次"]')!.dataset.action='reps-plus';

@@ -4,7 +4,7 @@ import {expect,test} from '@playwright/test';
 test('training remains reachable in a keyboard-sized viewport and restores its draft',async({page},info)=>{
   await page.addInitScript(()=>Object.defineProperty(window,'visualViewport',{configurable:true,value:Object.assign(new EventTarget(),{height:852,offsetTop:0,scale:1})}));
   await page.setViewportSize({width:393,height:852});
-  await page.goto('/');await page.locator('.screen,.access-gate button').first().waitFor();
+  await page.goto('/?viewport=1');await page.locator('.screen,.access-gate button').first().waitFor();
   const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
   await expect(page.locator('[data-screen="Main"]')).toBeVisible();
   const original=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
@@ -25,14 +25,36 @@ test('training remains reachable in a keyboard-sized viewport and restores its d
       await page.evaluate(offsetTop=>{Object.assign(window.visualViewport!,{height:420,offsetTop});window.visualViewport!.dispatchEvent(new Event('resize'));window.visualViewport!.dispatchEvent(new Event('scroll'));},offsetTop);
       await expect(page.locator('.prototype-shell')).toHaveAttribute('data-keyboard','true');
       await expect.poll(()=>page.locator('.prototype-shell').evaluate(el=>el.getBoundingClientRect().top)).toBe(0);
-      await expect.poll(()=>board.locator('[data-page-frame]').evaluate(el=>el.getBoundingClientRect().top)).toBe(offsetTop);
+      await expect.poll(()=>board.locator('[data-page-frame]').evaluate(el=>el.getBoundingClientRect().top)).toBe(0);
+      const header=board.locator('[data-session-part="header"]');
+      await expect.poll(()=>header.evaluate((el,offset)=>el.getBoundingClientRect().top-offset,offsetTop)).toBe(59);
+      const dock=board.locator('[data-bottom-dock]');
+      await expect.poll(()=>dock.evaluate((el,offset)=>el.getBoundingClientRect().bottom-offset,offsetTop)).toBe(420);
+      expect(await header.evaluate(el=>{const r=el.getBoundingClientRect();return r.bottom<window.visualViewport!.offsetTop+window.visualViewport!.height;})).toBe(true);
+      const field=await input.boundingBox();expect(field!.y).toBeGreaterThanOrEqual(offsetTop+59);
+      expect(field!.y+field!.height).toBeLessThanOrEqual(offsetTop+420);
+      // WebKit may transiently report zero insets during keyboard animation.
+      await page.evaluate(()=>{document.documentElement.style.setProperty('--safe-top','0px');document.documentElement.style.setProperty('--safe-bottom','0px');window.visualViewport!.dispatchEvent(new Event('resize'));});
+      await expect.poll(()=>header.evaluate((el,offset)=>el.getBoundingClientRect().top-offset,offsetTop)).toBe(59);
       expect(await page.evaluate(()=>window.scrollY)).toBe(0);
       await expect(input).toHaveValue('127.25');
     }
+    // Rotation discards the portrait cache and measures the new orientation.
+    await page.setViewportSize({width:852,height:393});
+    await page.evaluate(()=>{document.documentElement.style.setProperty('--safe-top','0px');document.documentElement.style.setProperty('--safe-bottom','21px');document.documentElement.style.setProperty('--safe-left','59px');document.documentElement.style.setProperty('--safe-right','59px');Object.assign(window.visualViewport!,{height:220,offsetTop:12});window.visualViewport!.dispatchEvent(new Event('resize'));});
+    await expect.poll(()=>board.locator('[data-session-part="header"]').evaluate(el=>el.getBoundingClientRect().top)).toBe(12);
+    await expect.poll(()=>board.locator('[data-bottom-dock]').evaluate(el=>el.getBoundingClientRect().bottom)).toBe(232);
+    await page.evaluate(()=>{for(const side of ['top','bottom','left','right'])document.documentElement.style.removeProperty(`--safe-${side}`);Object.assign(window.visualViewport!,{height:420,offsetTop:0});});
+    await page.setViewportSize({width:393,height:852});
+    await expect.poll(()=>board.locator('[data-session-part="header"]').evaluate(el=>el.getBoundingClientRect().top)).toBe(59);
     const reps=await board.getByRole('spinbutton',{name:'本组次数'}).inputValue();
     const save=board.getByRole('button',{name:`记录 127.25 lb × ${reps}`});
     await expect.poll(async()=>{const box=await save.boundingBox();return box!.y+box!.height;}).toBeLessThanOrEqual(420);
-    await input.blur();await page.evaluate(()=>{Object.assign(window.visualViewport!,{height:852,offsetTop:0});window.visualViewport!.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('pageshow'));});
+    await page.evaluate(()=>{document.documentElement.style.removeProperty('--safe-top');document.documentElement.style.removeProperty('--safe-bottom');});
+    await input.blur();
+    // Blur restores the window even if the keyboard's visual height is stale.
+    await expect.poll(()=>board.locator('[data-bottom-dock]').evaluate(el=>el.getBoundingClientRect().bottom)).toBe(818);
+    await page.evaluate(()=>{Object.assign(window.visualViewport!,{height:852,offsetTop:0});window.visualViewport!.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('pageshow'));});
     await expect(page.locator('.prototype-shell')).toHaveAttribute('data-keyboard','false');
     await expect.poll(()=>board.locator('[data-scroll-region]').evaluate(el=>el.scrollTop)).toBe(scrollBefore);
     await expect(input).toHaveValue('127.25');
@@ -42,7 +64,7 @@ test('training remains reachable in a keyboard-sized viewport and restores its d
     await expect.poll(()=>header.evaluate(el=>el.getBoundingClientRect().top)).toBe(59);
     await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{}))));
     await board.screenshot({animations:'disabled',path:`.artifacts/playwright/${info.project.name}/iphone-training.png`});
-    await save.click();await expect(board).toContainText(`沿用上组 127.25 lb × ${reps}`);
+    await save.click();await expect(input).toHaveValue('127.25');
     await expect(board.locator('[data-session-part="count"]')).toContainText('第 2 组');
     await board.locator('a[data-action="end-session"]').click();
   }finally{

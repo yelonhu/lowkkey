@@ -22,6 +22,10 @@ test('cold launch ignores stale visual height; both docks stay complete above th
       await expect.poll(()=>page.locator('.prototype-shell').evaluate(el=>el.getBoundingClientRect().height)).toBe(height);
       const dock=board.locator('[data-bottom-dock]'),bottomControl=screen==='Main'?dock.locator('[data-action="capture-or-voice"]'):dock.locator(':scope > button:last-child');
       await fullyVisible(bottomControl,height-34);
+      if(screen==='Main')await expect.poll(()=>dock.locator(':scope > :last-child').evaluate(el=>el.getBoundingClientRect().bottom)).toBe(height-34-12);
+      await expect.poll(()=>board.locator('[data-page-frame]').evaluate(el=>el.firstElementChild!.getBoundingClientRect().top)).toBe(59);
+      await expect.poll(async()=>JSON.parse((await page.locator('html').getAttribute('data-viewport'))!).probes.inset.height).toBe(height);
+      await expect.poll(async()=>JSON.parse((await page.locator('html').getAttribute('data-viewport'))!).probes.dvh.height).toBe(height);
       await expect.poll(()=>dock.evaluate(el=>el.getBoundingClientRect().bottom)).toBe(height-34);
       if(screen==='Main')await fullyVisible(dock.locator('[data-training-action]'),height-34);
       expect(await page.evaluate(()=>window.scrollY)).toBe(0);
@@ -37,4 +41,11 @@ test('cold launch ignores stale visual height; both docks stay complete above th
   await input.blur();await page.evaluate(()=>{window.visualViewport!.dispatchEvent(new Event('resize'));});
   await expect(page.locator('[data-training-action]')).toBeVisible();await expect(input).toHaveValue('键盘不会改变外壳');
   await expect.poll(()=>page.locator('[data-bottom-dock]').evaluate(el=>el.getBoundingClientRect().bottom)).toBe(818);
+  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('Clipboard unavailable');}}}));
+  await page.getByRole('button',{name:'复制布局诊断'}).click();
+  const fallback=page.getByRole('textbox',{name:'布局诊断报告'});await expect(fallback).toHaveAttribute('readonly','');
+  const report=JSON.parse(await fallback.inputValue());
+  expect(report.shell.height).toBe(852);expect(report.header.top).toBe(59);expect(report.bottomControl.bottom).toBe(806);
+  expect(report.probes.inset.height).toBe(852);expect(report.probes.dvh.height).toBe(852);
+  expect(report).not.toHaveProperty('entries');expect(report).not.toHaveProperty('ownerId');
 });

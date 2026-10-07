@@ -8,7 +8,7 @@ import { prototypeScreen } from './prototype-template.ts';
 import { clientName } from './sheet-bindings.ts';
 import type { ReviewTarget, Screen } from './navigation.ts';
 
-export type HandoffContext={state:V1State;screen:Screen;toast:Entry|null;queueCount:number;busy:boolean;error:string;filter:'all'|'you'|'model'|'rule';answers:Record<string,string>;reviewOutcome?:string|null;reviewTarget?:ReviewTarget|null;reviewQuestions?:V1State['submissions'][number]['questions'];reviewLoading?:boolean;equipment?:EquipmentPreferences;reps:number|null;rir:number|null;exerciseId:string|null;manualLoad:string|null;manualUnit:'kg'|'lb'|null;setRole?:'work'|'warmup';allowExtra?:boolean;reference?:TrainingReference|null};
+export type HandoffContext={state:V1State;screen:Screen;toast:Entry|null;queueCount:number;busy:boolean;error:string;filter:'all'|'you'|'model'|'rule';answers:Record<string,string>;reviewOutcome?:string|null;reviewTarget?:ReviewTarget|null;reviewQuestions?:V1State['submissions'][number]['questions'];reviewLoading?:boolean;equipment?:EquipmentPreferences;reps:number|null;rir:number|null;exerciseId:string|null;manualLoad:string|null;loadEdited?:boolean;manualUnit:'kg'|'lb'|null;setRole?:'work'|'warmup';allowExtra?:boolean;reference?:TrainingReference|null};
 const one=<T extends Element=HTMLElement>(root:ParentNode,selector:string)=>root.querySelector<T>(selector);
 const kids=(element:Element)=>Array.from(element.children) as HTMLElement[];
 const text=(element:Element|null|undefined,value:string)=>{if(element)element.textContent=value;};

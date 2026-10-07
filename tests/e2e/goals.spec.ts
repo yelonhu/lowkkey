@@ -24,7 +24,7 @@ test('typed load overrides a recommendation and survives a concurrent state refr
     const input=page.locator('[data-action="load-input"]');await expect(input).toHaveValue('40');await input.fill('35');
     await page.evaluate(async()=>{await fetch('/v1/preferences/timezone',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({timeZone:'UTC'})});});
     await expect(input).toHaveValue('35');await page.getByRole('button',{name:/^记录 .* × /}).click();
-    await expect(page.locator('[data-screen="Session"]')).toContainText('沿用上组 35 kg × 10');
+    await expect(page.locator('[data-screen="Session"]').locator('[data-session-part="count"]')).toContainText('第 2 组');
     const state=await page.evaluate(async()=>await (await fetch('/v1/state')).json());const set=state.entries.findLast((e:{kind:string;exerciseId?:string})=>e.kind==='set'&&e.exerciseId==='calf_raise');expect(set.load).toBe(35);expect(set.setRole).toBe('work');expect(set.inputReference.load).toBe(40);
     await expect(input).toHaveValue('35');
     await page.getByRole('button',{name:/^记录 .* × /}).click();await expect(page.locator('[data-screen="Session"]')).toContainText('已记录 2 组 · 安排 2 组');

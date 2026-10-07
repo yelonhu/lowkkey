@@ -40,6 +40,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const state=chamber.state,submissionId=reviewTarget?(reviewTarget.kind==='submission'?reviewTarget.id:undefined):state?.submissions[0]?.id;
   useEffect(()=>{if(state&&reviewTarget&&(reviewTarget.kind==='proposal'||reviewTarget.kind==='trigger'))setSheet({kind:'decision',id:reviewTarget.id,type:reviewTarget.kind,revision:state.revision});},[reviewTarget]);
   useEffect(()=>{setReviewOutcome(null);if(!reviewTarget||!state)return;const controller=new AbortController();void fetch(`/v1/reviews/${reviewTarget.kind}/${encodeURIComponent(reviewTarget.id)}`,{signal:controller.signal}).then(async response=>{if(!response.ok)throw new Error();return response.json();}).then(value=>{const labels:Record<string,string>={accepted:'已确认入账',skipped:'已跳过',rejected:'未采用',applied:'已采用',dismissed:'已处理',resolved:'此事项已处理'};setReviewOutcome(labels[value.status]??null);}).catch(()=>{if(!controller.signal.aborted)setReviewOutcome('此事项暂时无法读取，请刷新后重试。');});return()=>controller.abort();},[reviewTarget,state?.revision]);
+  const [loadEdited,setLoadEdited]=useState(false);
   const [extraSetKey,setExtraSetKey]=useState<string|null>(null);
   const [setRole,setSetRole]=useState<'work'|'warmup'>('work');
   const editingSet=useRef(false),editingEquipment=useRef<EquipmentPreferences|null>(null);
@@ -104,7 +105,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     installPrototypeStyle();applyPageTheme(baseScreen);
     if(screen!=='Capture')shownReview.current=null;
     if(screen==='Capture'&&submissionId&&shownReview.current?.id!==submissionId)shownReview.current={id:submissionId,revision:state.revision};
-    const context={state,reviewOutcome,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewTarget,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,manualUnit,setRole,allowExtra:extraSetKey===setKey,reference:reference.current?.value,equipment:editingSet.current?editingEquipment.current??state.equipment:state.equipment};
+    const context={state,reviewOutcome,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewTarget,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,loadEdited,manualUnit,setRole,allowExtra:extraSetKey===setKey,reference:reference.current?.value,equipment:editingSet.current?editingEquipment.current??state.equipment:state.equipment};
     const target=prototypeScreen(baseScreen);prepareHandoff(target,baseScreen,state.today);bindHandoff(target,context);
     prepareViewport(target,baseScreen);
     const input=target.querySelector<HTMLInputElement>('input[data-action="capture-input"]');if(input){input.value=draft.current;const submit=target.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit&&draft.current.trim()){submit.textContent='提交';submit.setAttribute('aria-label','提交记录');}}
@@ -194,7 +195,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const clock=capturedClock(),current=openSession(state.entries),day=dayId===null?undefined:dayId?state.program.days.find(d=>d.id===dayId):state.program.days.find(d=>d.weekday===new Date(`${state.today}T12:00:00Z`).getUTCDay());
     const sessionId=event==='start'?crypto.randomUUID():current?.id;if(!sessionId)return;
     const entry:EntryDraft={kind:'session',event,sessionId,dayId:event==='start'?day?.id??null:null,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
-    await chamber.writeEntries([entry]);setRir(null);setReps(undefined);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setExerciseId(selected??null);setManualLoad(null);go(event==='start'?'Session':'Debrief');
+    await chamber.writeEntries([entry]);setRir(null);setReps(undefined);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setExerciseId(selected??null);setManualLoad(null);setLoadEdited(false);go(event==='start'?'Session':'Debrief');
   }
   async function completeSet(exercise:string,load:number,unit:'kg'|'lb'){
     if(!state||actualReps==null||!Number.isInteger(actualReps)||actualReps<1||actualReps>100)return;const session=openSession(state.entries),ex=state.exercises.find(e=>e.id===exercise);if(!session||!ex)return;
@@ -203,7 +204,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const unitQuestion=result.held.find(item=>item.gate==='G4'&&item.drafts[0]?.kind==='set'&&item.drafts[0].unit===unit&&item.drafts[0].exerciseId===exercise&&item.drafts[0].sessionId===session.id&&item.drafts[0].load===load&&item.options.some(option=>option.id==='as_is'));
     if(unitQuestion)result=await chamber.resolve(unitQuestion,{optionId:'as_is'});
     if(!result.committed.some(item=>item.kind==='set'&&item.sessionId===session.id&&item.exerciseId===exercise)){setNotice('这组需要核对，训练结束后确认。');return;}
-    setExtraSetKey(null);setRir(null);setReps(undefined);reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);
+    setExtraSetKey(null);setRir(null);setReps(undefined);reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);setLoadEdited(false);
   }
   const click=(event:React.MouseEvent<HTMLDivElement>)=>{
     const target=event.target as Element;if(!state)return;
@@ -229,10 +230,10 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='sheet-cancel'||action==='modal-close')dismiss();
         else if(action==='set-details'||action==='rir-help')openSheet({kind:'set-details',role:setRole,reference:reference.current?.value??null,note:currentItem?.note,help:action==='rir-help'});
         else if(action==='set-role-option'&&(button.dataset.role==='work'||button.dataset.role==='warmup')){
-          setSetRole(button.dataset.role);setManualLoad(null);setReps(undefined);setRir(null);reference.current=null;editingSet.current=false;editingEquipment.current=null;dismiss();
+          setSetRole(button.dataset.role);setManualLoad(null);setLoadEdited(false);setReps(undefined);setRir(null);reference.current=null;editingSet.current=false;editingEquipment.current=null;dismiss();
         }
         else if(action==='adopt-load'){
-          const arranged=reference.current?.value.arrangement;if(arranged)setManualLoad(String(Number(convert(arranged.load,arranged.unit,manualUnit??arranged.unit).toFixed(2))));
+          const arranged=reference.current?.value.arrangement;if(arranged){setManualLoad(String(Number(convert(arranged.load,arranged.unit,manualUnit??arranged.unit).toFixed(2))));setLoadEdited(true);}
         }
         else if(action==='decision-view'&&id)navigateReview({kind:button.dataset.kind as 'proposal'|'trigger',id});
         else if((action==='decision-accept'||action==='decision-later')&&sheet?.kind==='decision')run(action,async()=>{const decision=action==='decision-accept'?'accept':'later';try{if(sheet.type==='proposal')await chamber.decideProposal(sheet.id,decision,sheet.revision);else await chamber.decideTrigger(sheet.id,decision,sheet.revision);setNotice(decision==='accept'?'已保存':'已延期');dismiss();}catch(error){if(!(error instanceof RequestError&&error.status===409))chamber.setError('暂未确认，请重试。');throw error;}});
@@ -267,9 +268,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='extra-set'){setExtraSetKey(setKey);setSetRole('work');}
         else if((action==='next-exercise'||action==='select-exercise')&&id){
           if(!currentSession){run('start-session',()=>writeSession('start',null,id));return;}
-          setExerciseId(id);setReps(undefined);setRir(null);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);
+          setExerciseId(id);setReps(undefined);setRir(null);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);setLoadEdited(false);
           if(sheet?.kind==='exercises')dismiss();
-        }else if(action==='load-unit')setUnits(value=>({...value,[unitKey]:(value[unitKey]??button.dataset.unitDefault)==='kg'?'lb':'kg'}));
+        }else if(action==='load-unit'){setUnits(value=>({...value,[unitKey]:(value[unitKey]??button.dataset.unitDefault)==='kg'?'lb':'kg'}));setLoadEdited(true);}
         else if(action==='reps-minus')setReps(n=>Math.max(1,(n??actualReps??2)-1));
         else if(action==='reps-plus')setReps(n=>Math.min(100,(n??actualReps??0)+1));
         else if(action==='rir')setRir(value=>value===Number(button.dataset.value)?null:Number(button.dataset.value));
@@ -297,6 +298,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       else if(!event.shiftKey&&(target===items.at(-1)||target===dialog)){event.preventDefault();items[0].focus();}
     }
     if(event.key==='Enter'&&target.matches('input[data-action="capture-input"]')){if(event.nativeEvent.isComposing||composing.current||event.keyCode===229)return;event.preventDefault();run('capture-submit',submit);}
+    else if(event.key==='Enter'&&target instanceof HTMLInputElement&&target.matches('[data-action="load-input"],[data-action="reps-input"]')){event.preventDefault();target.blur();}
     else if((event.key==='Enter'||event.key===' ')&&target.matches('[role="button"][data-action],[role="button"][data-derived-key]')){event.preventDefault();target.dispatchEvent(new MouseEvent('click',{bubbles:true}));}
   };
   const pointerDown=(event:React.PointerEvent<HTMLDivElement>)=>{
@@ -337,7 +339,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     setUnits(value=>({...value,[unitKey]:value[unitKey]??manualUnit??currentExercise?.unit??'kg'}));
     setReps(value=>value===undefined?actualReps:value);
   }
-  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]')){draft.current=target.value;const submit=host.current?.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit){if(target.value.trim())submit.textContent='提交';else {const original=prototypeScreen('Main').querySelector('[aria-label="语音"]');if(original)submit.replaceChildren(...Array.from(original.childNodes));}submit.setAttribute('aria-label',target.value.trim()?'提交记录':'语音使用说明');}}else if(target.dataset.action==='exercise-search'&&sheet?.kind==='exercises')setSheet({...sheet,query:target.value});else if(target.dataset.action==='reps-input')setReps(target.value===''?null:target.validity.badInput?NaN:Number(target.value));else if((target.dataset.action==='equipment-bar'||target.dataset.action==='equipment-plates')&&sheet?.kind==='equipment'){const unit=sheet.draft.activeBarbellUnit;setSheet({...sheet,error:undefined,draft:{...sheet.draft,[unit]:{...sheet.draft[unit],[target.dataset.action==='equipment-bar'?'barLoad':'plateLoads']:target.value}}});}else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.validity.badInput?'invalid':target.value);}};
+  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]')){draft.current=target.value;const submit=host.current?.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit){if(target.value.trim())submit.textContent='提交';else {const original=prototypeScreen('Main').querySelector('[aria-label="语音"]');if(original)submit.replaceChildren(...Array.from(original.childNodes));}submit.setAttribute('aria-label',target.value.trim()?'提交记录':'语音使用说明');}}else if(target.dataset.action==='exercise-search'&&sheet?.kind==='exercises')setSheet({...sheet,query:target.value});else if(target.dataset.action==='reps-input')setReps(target.value===''?null:target.validity.badInput?NaN:Number(target.value));else if((target.dataset.action==='equipment-bar'||target.dataset.action==='equipment-plates')&&sheet?.kind==='equipment'){const unit=sheet.draft.activeBarbellUnit;setSheet({...sheet,error:undefined,draft:{...sheet.draft,[unit]:{...sheet.draft[unit],[target.dataset.action==='equipment-bar'?'barLoad':'plateLoads']:target.value}}});}else if(target.matches('input[data-action="load-input"]')){setManualLoad(target.validity.badInput?'invalid':target.value);setLoadEdited(true);}}};
   const feedback=chamber.error||notice;
   return <div className="prototype-shell" ref={shell} onClick={click} onFocus={event=>{if((event.target as Element).matches('[data-action="load-input"],[data-action="reps-input"]'))freezeSet();}} onKeyDown={keydown} onInput={onInput} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd}>
     <div ref={host}/>
