@@ -21,13 +21,13 @@ test('typed load overrides a recommendation and survives a concurrent state refr
   try{
     await page.evaluate(async program=>{await fetch('/v1/program',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(program)});},program);
     await page.reload();await page.locator('[data-action="start-session"]').click();
-    const input=page.locator('[data-action="load-input"]');await expect(input).toHaveAttribute('placeholder','40');await input.fill('35');
+    const input=page.locator('[data-action="load-input"]');await expect(input).toHaveValue('40');await input.fill('35');
     await page.evaluate(async()=>{await fetch('/v1/preferences/timezone',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({timeZone:'UTC'})});});
     await expect(input).toHaveValue('35');await page.getByRole('button',{name:/^记录 .* × /}).click();
-    await expect(page.locator('[data-screen="Session"]')).toContainText('上一组 35 × 10');
-    const state=await page.evaluate(async()=>await (await fetch('/v1/state')).json());const set=state.entries.findLast((e:{kind:string;exerciseId?:string})=>e.kind==='set'&&e.exerciseId==='calf_raise');expect(set.load).toBe(35);expect(set.setRole).toBe('work');expect(set.recommendation.load).toBe(40);
-    await expect(input).toHaveValue('');await expect(input).toHaveAttribute('placeholder','35');
-    await page.getByRole('button',{name:/^记录 .* × /}).click();await expect(page.locator('[data-screen="Session"]')).toContainText('已记录 2 组正式组');
+    await expect(page.locator('[data-screen="Session"]')).toContainText('沿用上组 35 kg × 10');
+    const state=await page.evaluate(async()=>await (await fetch('/v1/state')).json());const set=state.entries.findLast((e:{kind:string;exerciseId?:string})=>e.kind==='set'&&e.exerciseId==='calf_raise');expect(set.load).toBe(35);expect(set.setRole).toBe('work');expect(set.inputReference.load).toBe(40);
+    await expect(input).toHaveValue('35');
+    await page.getByRole('button',{name:/^记录 .* × /}).click();await expect(page.locator('[data-screen="Session"]')).toContainText('已记录 2 组 · 安排 2 组');
     await page.locator('a[data-action="end-session"]').click();
   }finally{await page.evaluate(async program=>{await fetch('/v1/program',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(program)});},original.program);}
 });

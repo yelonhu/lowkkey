@@ -144,6 +144,7 @@ test('training motion is interruptible and rapid set taps commit once through a 
   const session=page.locator('.screen[data-screen="Session"]');await expect(session).toBeVisible();
   const animations=()=>page.evaluate(()=>Reflect.get(window,'interactionAnimations') as {frames:Keyframe[];duration:number}[]);
   expect((await animations()).some(a=>a.duration===620&&a.frames.some(frame=>'clipPath' in frame))).toBe(true);
+  const initialReps=Number(await session.getByRole('spinbutton',{name:'本组次数'}).inputValue());
   const plus=session.locator('[data-action="reps-plus"]'),control=await plus.elementHandle();
   await plus.click();await plus.evaluate(el=>{for(let i=0;i<4;i++)(el as HTMLElement).click();});
   expect(await plus.evaluate((el,old)=>el===old,control)).toBe(true);
@@ -159,7 +160,7 @@ test('training motion is interruptible and rapid set taps commit once through a 
   await complete.evaluate(el=>{(el as HTMLElement).click();(el as HTMLElement).click();});expect(attempts).toHaveLength(1);release();
   await expect(page.getByRole('status')).toContainText('暂未确认');const committed=await state(page);
   await page.getByRole('button',{name:'重试',exact:true}).click();await expect(complete).toBeEnabled();
-  expect(attempts).toHaveLength(2);expect(attempts[1]).toEqual(attempts[0]);expect(JSON.parse(attempts[0].body).entries[0].reps).toBe(13);
+  expect(attempts).toHaveLength(2);expect(attempts[1]).toEqual(attempts[0]);expect(JSON.parse(attempts[0].body).entries[0].reps).toBe(initialReps+5);
   expect((await state(page)).revision).toBe(committed.revision);
   await session.locator('a[data-action="end-session"]').click();const debrief=page.locator('.screen[data-screen="Debrief"]');const written=JSON.parse(attempts[0].body).entries[0];await expect(debrief).toContainText(`${written.load} ${written.unit} × ${written.reps}`);
   await debrief.getByText('返回今日').click();

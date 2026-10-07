@@ -42,8 +42,8 @@ test('training remains reachable in a keyboard-sized viewport and restores its d
     await expect.poll(()=>header.evaluate(el=>el.getBoundingClientRect().top)).toBe(59);
     await page.evaluate(()=>Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{}))));
     await board.screenshot({animations:'disabled',path:`.artifacts/playwright/${info.project.name}/iphone-training.png`});
-    await save.click();await expect(board).toContainText(`上一组 127.25 × ${reps} lb`);
-    await expect(board.getByRole('progressbar')).toHaveAttribute('aria-valuenow','1');
+    await save.click();await expect(board).toContainText(`沿用上组 127.25 lb × ${reps}`);
+    await expect(board.locator('[data-session-part="count"]')).toContainText('第 2 组');
     await board.locator('a[data-action="end-session"]').click();
   }finally{
     await page.evaluate(async program=>{await fetch('/v1/program',{method:'PUT',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(program)});},original.program);

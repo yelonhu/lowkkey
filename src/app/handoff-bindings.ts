@@ -1,13 +1,14 @@
-import { sessionItems, trainingItems } from './training-state.ts';
-import { DEFAULT_EQUIPMENT, MUSCLE_LABEL, Muscle } from '@lowkkey/protocol';
-import type { EquipmentPreferences, Entry, EntryDraft, SetEntry, WeightEntry } from '@lowkkey/protocol';
-import { active, convert, openSession, plates, sessions } from '@lowkkey/core';
+import { sessionItems } from './training-state.ts';
+import { MUSCLE_LABEL, Muscle } from '@lowkkey/protocol';
+import type { EquipmentPreferences, Entry, EntryDraft, SetEntry, WeightEntry, TrainingReference } from '@lowkkey/protocol';
+import { active, openSession, sessions } from '@lowkkey/core';
 import type { V1State } from '../server/v1-store.ts';
+import { bindSession } from './session-bindings.ts';
 import { prototypeScreen } from './prototype-template.ts';
 import { clientName } from './sheet-bindings.ts';
 import type { ReviewTarget, Screen } from './navigation.ts';
 
-export type HandoffContext={state:V1State;screen:Screen;toast:Entry|null;queueCount:number;busy:boolean;error:string;filter:'all'|'you'|'model'|'rule';answers:Record<string,string>;reviewOutcome?:string|null;reviewTarget?:ReviewTarget|null;reviewQuestions?:V1State['submissions'][number]['questions'];reviewLoading?:boolean;equipment?:EquipmentPreferences;reps:number|null;rir:number|null;exerciseId:string|null;manualLoad:string;manualUnit:'kg'|'lb'|null;setRole?:'work'|'warmup';allowExtra?:boolean;suggestion?:{value:number|null;unit:'kg'|'lb';ruleVersion:string;inputs:string[]}|null};
+export type HandoffContext={state:V1State;screen:Screen;toast:Entry|null;queueCount:number;busy:boolean;error:string;filter:'all'|'you'|'model'|'rule';answers:Record<string,string>;reviewOutcome?:string|null;reviewTarget?:ReviewTarget|null;reviewQuestions?:V1State['submissions'][number]['questions'];reviewLoading?:boolean;equipment?:EquipmentPreferences;reps:number|null;rir:number|null;exerciseId:string|null;manualLoad:string|null;manualUnit:'kg'|'lb'|null;setRole?:'work'|'warmup';allowExtra?:boolean;reference?:TrainingReference|null};
 const one=<T extends Element=HTMLElement>(root:ParentNode,selector:string)=>root.querySelector<T>(selector);
 const kids=(element:Element)=>Array.from(element.children) as HTMLElement[];
 const text=(element:Element|null|undefined,value:string)=>{if(element)element.textContent=value;};
@@ -66,8 +67,8 @@ function bindMain(root:HTMLElement,c:HandoffContext){
   const plan=one(root,'[data-bind="main-plan"]');if(plan){const heading=kids(plan)[0],source=prototypeScreen('Main').querySelector('[data-bind="main-plan"]');const template=source?.children[1];
     for(const row of kids(plan).slice(1,-1))row.remove();
     const items=day?.items??[];text(kids(heading)[0],s.program.days.length?'今天的安排':'训练安排');text(kids(heading)[1],session&&!items.length?`本场已记录 ${session.sets.length} 组`:day?`${items.length} 个动作 · ${items.reduce((n,i)=>n+i.sets,0)} 组`:'');
-    if(s.program.days.length){heading.dataset.action='plan-view';heading.setAttribute('role','button');heading.tabIndex=0;heading.setAttribute('aria-label','查看动作安排');}if(day){const summary=document.createElement('span');summary.className='plan-summary';summary.textContent=`${items.slice(0,2).map(item=>exName(s,item.exerciseId)).join('、')}${items.length>2?'等动作':''}`;heading.append(summary);}
-    if(items.length&&template)for(const item of items){const row=template.cloneNode(true) as HTMLElement;row.dataset.rowKey=item.exerciseId;const [name,,load]=kids(row);const rx=s.derived[`rx.${day!.id}.${item.exerciseId}`];text(name,exName(s,item.exerciseId));text(load,`${item.sets} × ${item.repMin}–${item.repMax}${rx?.value==null?'':` · ${rx.value} ${rx.unit??''}`}`);plan.insertBefore(row,plan.lastElementChild);}
+    if(s.program.days.length){heading.dataset.action='plan-view';heading.setAttribute('role','button');heading.tabIndex=0;heading.setAttribute('aria-label','查看动作安排');}
+    if(items.length&&template)for(const item of items){const row=template.cloneNode(true) as HTMLElement;row.dataset.rowKey=item.exerciseId;const [name,,load]=kids(row);const rx=session?null:s.derived[`rx.${day!.id}.${item.exerciseId}`];text(name,exName(s,item.exerciseId));text(load,`${item.sets} × ${item.repMin}–${item.repMax}${session?(item.startLoad==null?'':` · ${session.prescriptionOrigin==='confirmed_arrangement'?'安排':'本场快照'} ${item.startLoad} ${s.exercises.find(ex=>ex.id===item.exerciseId)?.unit??''}`):rx?.value==null?'':` · ${rx.value} ${rx.unit??''}`}`);plan.insertBefore(row,plan.lastElementChild);}
     else if(template){const row=template.cloneNode(true) as HTMLElement;const [label,line,value]=kids(row);text(label,session?'按实际完成继续记录。':s.program.days.length?'今天没有预定训练':'选一个动作，记下实际完成。');line.remove();value.remove();plan.insertBefore(row,plan.lastElementChild);}
     const start=plan.lastElementChild as HTMLElement;if(session){text(start,'继续训练');start.dataset.action='resume-session';enable(start);start.setAttribute('href','#Session');}
     else if(day){text(start,'开始训练');start.dataset.action='start-session';enable(start);start.setAttribute('href','#Session');}
@@ -104,57 +105,6 @@ function bindCapture(root:HTMLElement,c:HandoffContext){
     if(rowTemplate)for(const option of held.options){const row=rowTemplate.cloneNode(true) as HTMLButtonElement;text(kids(row)[0],option.label);text(kids(row)[1],option.hint??'');row.dataset.rowKey=`${held.id}:${option.id}`;row.dataset.heldOption=option.id;row.dataset.id=held.id;options.append(row);}
     text(left,'查看记录');left.href='#Ledger';text(right,'跳过');right.dataset.action='held-skip';right.dataset.id=held.id;enable(right);
   }
-}
-function bindSession(root:HTMLElement,c:HandoffContext){
-  const s=c.state,session=openSession(s.entries),page=root.firstElementChild as HTMLElement,items=trainingItems(s,session,c.exerciseId),item=items.find(i=>i.exerciseId===c.exerciseId)??items[0],ex=s.exercises.find(e=>e.id===item?.exerciseId);if(!session||!item||!ex){
-    const [header,rest,center,controls]=kids(page);text(kids(kids(header)[1])[0],session?'选择一个动作':'训练未开始');text(kids(kids(header)[1])[1],session?'已记录内容会保留':'可以直接选动作记录');
-    const end=one<HTMLAnchorElement>(header,'a[href="#Debrief"]');if(end){if(session){end.dataset.action='end-session';enable(end);}else{end.removeAttribute('href');end.setAttribute('aria-disabled','true');}}
-    text(kids(rest)[0],'进度');text(kids(rest)[2],'未开始');const bar=one<HTMLElement>(rest,'div[style*="width: 68%"]');if(bar)bar.style.width='0';
-    text(kids(center)[0],'下一组');text(kids(kids(center)[1])[0],'—');text(kids(kids(center)[1])[1],'');text(kids(center)[2],'选动作后开始记录');
-    one(center,'svg[role="img"]')?.remove();text(kids(center).at(-2),'暂无配片');text(kids(center).at(-1),'尚无上一组');
-    text(one(controls,'[style*="min-width: 44px"]'),'—');for(const button of controls.querySelectorAll('button')){button.disabled=true;button.style.opacity='0.45';}
-    const choose=controls.lastElementChild as HTMLButtonElement;choose.disabled=false;choose.style.opacity='1';choose.dataset.action=session?'exercise-list':'free-session';text(choose,'选择动作');
-    return;
-  }
-  const previous=session.sets.filter(e=>e.exerciseId===item.exerciseId).at(-1),lastActual=activeEntries(s).filter(e=>e.kind==='set'&&e.exerciseId===item.exerciseId).at(-1),next=s.derived[`next.${item.exerciseId}`];
-  const [header,rest,center,controls]=kids(page),source=prototypeScreen('Session'),name=kids(header)[1];text(kids(name)[0],ex?.name??item.exerciseId);text(kids(name)[1],`第 ${session.sets.filter(e=>e.exerciseId===item.exerciseId&&e.setRole==='work').length+1} 组${item.sets==null?'':`，共 ${item.sets} 组`}`);name.dataset.action='exercise-list';name.setAttribute('role','button');name.tabIndex=0;name.setAttribute('aria-label','动作清单');const list=document.createElement('span');list.className='exercise-list-label';list.textContent='动作清单 ›';name.append(list);
-  header.dataset.sessionHeader='';rest.dataset.sessionProgress='';
-  const sourcePage=source.firstElementChild as HTMLElement,sourceHeader=kids(sourcePage)[0],sourceCenter=kids(sourcePage)[2];
-  const sourceEnd=one<HTMLAnchorElement>(sourceHeader,'a[href="#Debrief"]');if(sourceEnd){const end=sourceEnd.cloneNode(true) as HTMLAnchorElement;end.dataset.action='end-session';header.lastElementChild?.replaceWith(end);}
-  const total=items.reduce((sum,rx)=>sum+(rx.sets??0),0),done=items.reduce((sum,rx)=>sum+Math.min(rx.sets??0,session.sets.filter(set=>set.exerciseId===rx.exerciseId&&set.setRole==='work').length),0);text(kids(rest)[2],total?`${done} / ${total} 组`:`已记录 ${session.sets.length} 组`);const progress=one<HTMLElement>(rest,'div[style*="width: 68%"]');if(progress){progress.style.width=`${total?done/total*100:0}%`;progress.parentElement!.hidden=!total;progress.parentElement!.setAttribute('role','progressbar');progress.parentElement!.setAttribute('aria-label','本场正式组进度');progress.parentElement!.setAttribute('aria-valuemin','0');progress.parentElement!.setAttribute('aria-valuemax',String(total));progress.parentElement!.setAttribute('aria-valuenow',String(done));}
-  const originalHeading=kids(sourceCenter)[0];if(originalHeading)center.firstElementChild?.replaceWith(originalHeading.cloneNode(true));const weight=kids(center)[1],suggested=c.suggestion?c.suggestion.value:(item.repMin==null?null:next?.value??item.startLoad),entered=c.manualLoad.trim()?Number(c.manualLoad):null,load=entered!==null?(Number.isFinite(entered)&&entered>=0&&entered<=1000?entered:null):suggested==null?null:Number(convert(suggested,c.suggestion?.unit??ex?.unit??'kg',c.manualUnit??ex?.unit??'kg').toFixed(2));
-  if(item.repMin==null){text(center.firstElementChild,'本组重量');if(!previous&&lastActual?.kind==='set')text(kids(center).at(-1),`上次记录 ${lastActual.load} ${lastActual.unit} × ${lastActual.reps}`);}
-  weight.dataset.sessionWeight='';
-  {const input=document.createElement('input');input.type='number';input.min='0';input.max='1000';input.step='any';input.inputMode='decimal';input.value=c.manualLoad==='invalid'?'':c.manualLoad;input.placeholder=load==null?'输入重量':String(load);input.dataset.action='load-input';input.dataset.nodeKey='session-load';input.dataset.empty=String(load==null);input.setAttribute('enterkeyhint','done');input.setAttribute('aria-label',suggested==null?'首次重量：输入本组重量':'本组重量（留空采用建议）');input.setAttribute('style',"width: 250px; height: 116px; padding: 0; border: 0; border-bottom: 1px solid #7F7F84; border-radius: 0; outline: none; background: transparent; color: #F2F2F0; text-align: right; font-family: Geist,-apple-system,'SF Pro Display',sans-serif; font-variant-numeric: tabular-nums; font-size: 90px; font-weight: 500");input.style.setProperty('--load-length',String(Math.max(1,(c.manualLoad==='invalid'?'':c.manualLoad||String(load??'')).length)));kids(weight)[0].replaceWith(input);
-    const unit=document.createElement('button');unit.type='button';unit.dataset.action='load-unit';unit.dataset.unitDefault=ex?.unit??'kg';unit.textContent=`${c.manualUnit??ex.unit} ▾`;unit.dataset.nodeKey='session-unit';unit.setAttribute('aria-label',`重量单位 ${c.manualUnit??ex.unit}，点按切换`);unit.setAttribute('style',"padding: 0; border: 0; background: transparent; color: #7F7F84; font: inherit; font-size: 20px");kids(weight)[1].replaceWith(unit);
-  }
-  const role=kids(rest)[0];text(role,c.setRole==='warmup'?'热身组':'正式组');role.dataset.action='set-role';role.setAttribute('role','button');role.setAttribute('aria-label','切换热身或正式组');role.tabIndex=0;
-  text(kids(center)[2],`${item.repMin==null?'按实际完成记录':`× ${item.repMin}–${item.repMax}`}${ex?.perHand?' · 单只哑铃':ex?.type==='assisted'?' · 辅助配重':''}`);text(kids(center).at(-1),previous?`上一组 ${previous.load} × ${previous.reps} ${previous.unit} · RIR ${previous.rir??'未记'}`:lastActual?.kind==='set'?`上次记录 ${lastActual.load} ${lastActual.unit} × ${lastActual.reps}`:'本场尚无上一组');
-  const unit=c.manualUnit??ex.unit,equipment=c.equipment??s.equipment??DEFAULT_EQUIPMENT,plateUnit=equipment.activeBarbellUnit,profile=equipment[plateUnit],canPlate=ex.type==='barbell'&&load!=null,plateInfo=canPlate?plates(convert(load!,unit,plateUnit),plateUnit,profile.barLoad,profile.plateLoads):null;
-  const plateLabel=(values:number[])=>[...new Set(values)].map(value=>{const count=values.filter(p=>p===value).length;return count>1?`${value} × ${count}`:String(value);}).join(' + ')||'无杠片';
-  const note=kids(center).at(-2);if(note){
-    text(note,ex.type==='barbell'?`${plateUnit} 杠铃 · 空杆 ${profile.barLoad} ${plateUnit}${plateInfo?` · 每侧 ${plateLabel(plateInfo.perSide)}${plateInfo.remainder<0?' · 低于空杆重量，请核对器械':plateInfo.remainder?` · 尚差 ${plateInfo.remainder} ${plateUnit}，无法精确配出`:''}`:' · 输入重量后显示配片'} ›`:ex.perHand?'按单只哑铃重量记录':ex.type==='assisted'?'按辅助配重记录':'按器械读数记录');
-    if(ex.type==='barbell'){note.dataset.action='equipment-open';note.setAttribute('role','button');note.tabIndex=0;note.setAttribute('aria-label','杠铃与配片设置');}
-  }
-  const rirLabel=controls.querySelector('[role="radiogroup"]')?.previousElementSibling;if(rirLabel)text(rirLabel,'RIR · 这组结束时，还能再做几次（可不填）');
-  const display=one<HTMLElement>(controls,'[style*="min-width: 44px"]');if(display){const input=document.createElement('input');input.type='number';input.inputMode='numeric';input.min='1';input.max='100';input.step='1';input.dataset.action='reps-input';input.dataset.nodeKey='reps-input';input.className='reps-input';input.setAttribute('aria-label','本组次数');input.placeholder='次数';input.value=c.reps==null||!Number.isFinite(c.reps)?'':String(c.reps);input.style.cssText=display.style.cssText;display.replaceWith(input);}
-  const minus=one<HTMLButtonElement>(controls,'button[aria-label="减一次"]'),plus=one<HTMLButtonElement>(controls,'button[aria-label="加一次"]');if(minus){minus.dataset.action='reps-minus';enable(minus);}if(plus){plus.dataset.action='reps-plus';enable(plus);}
-  for(const radio of controls.querySelectorAll<HTMLButtonElement>('[role="radio"]')){const value=radio.textContent==='3+'?3:Number(radio.textContent);radio.dataset.action='rir';radio.dataset.value=String(value);radio.setAttribute('aria-checked',String(c.rir===value));enable(radio);}
-  const complete=controls.lastElementChild as HTMLButtonElement;if(complete){const validReps=c.reps!=null&&Number.isInteger(c.reps)&&c.reps>=1&&c.reps<=100,ready=load!=null&&validReps;const reason=load!=null&&!validReps?'请填写 1–100 的整数次数':c.manualLoad.trim()?'请填写 0–1000 的有效重量':'填写重量后完成本组';text(complete,ready?`记录 ${load} ${unit} × ${c.reps}`:reason);complete.title=ready?'按显示的重量、单位和次数保存本组':reason;if(ready){complete.dataset.action='complete-set';complete.dataset.exerciseId=item.exerciseId;complete.dataset.load=String(load);complete.dataset.unit=c.manualUnit??ex?.unit??'kg';enable(complete);}else complete.disabled=true;}
-  const awaiting=s.held.some(held=>held.drafts.some(draft=>draft.kind==='set'&&draft.sessionId===session.id&&draft.exerciseId===item.exerciseId&&draft.setIndex===session.sets.filter(set=>set.exerciseId===item.exerciseId).length+1));
-  if(awaiting&&complete){complete.disabled=true;complete.removeAttribute('data-action');text(complete,'本组待核对，训练后确认');complete.title='已保存待确认内容，可以切换动作或结束训练后核对';}
-  const workCount=session.sets.filter(set=>set.exerciseId===item.exerciseId&&set.setRole==='work').length,planned=session.prescription?.find(rx=>rx.exerciseId===item.exerciseId)?.sets??item.sets;
-  if(planned!=null&&workCount>=planned&&!c.allowExtra){
-    text(kids(name)[1],`已记录 ${workCount} 组正式组 · 计划 ${planned} 组`);
-    const remaining=items.find(candidate=>candidate.exerciseId!==item.exerciseId&&session.sets.filter(set=>set.exerciseId===candidate.exerciseId&&set.setRole==='work').length<(candidate.sets??Infinity));
-    if(complete){
-      for(const key of ['exerciseId','load','unit'])delete complete.dataset[key];
-      text(complete,remaining?`下一个动作：${exName(s,remaining.exerciseId)}`:'结束本次训练');complete.dataset.action=remaining?'next-exercise':'end-session';if(remaining)complete.dataset.id=remaining.exerciseId;enable(complete);
-      const extra=document.createElement('button');extra.type='button';extra.dataset.action='extra-set';extra.className='extra-set-button';extra.textContent='再记一组';controls.insertBefore(extra,complete);
-    }
-  }
-  const formula=one<HTMLButtonElement>(center,'button[aria-label="计算方式"]');if(formula){if(item.repMin!=null&&next?.value!=null){formula.dataset.derivedKey=`next.${item.exerciseId}`;enable(formula);}else{formula.disabled=true;formula.setAttribute('aria-label','首次重量由你填写');}}
-  const svg=one<SVGSVGElement>(center,'svg[role="img"]');if(svg){svg.dataset.nodeKey='session-barbell';if(plateInfo){svg.setAttribute('aria-label',`每侧 ${plateLabel(plateInfo.perSide)}，空杆 ${plateInfo.bar} ${plateUnit}`);const original=[...svg.querySelectorAll('rect')].slice(-4);const large=original[0],small=original[1];original.forEach(rect=>rect.remove());let offset=0;for(const [index] of plateInfo.perSide.slice(0,8).entries()){const plate=(index===0?large:small);const width=Math.min(Number(plate.getAttribute('width')),60/Math.max(1,Math.min(8,plateInfo.perSide.length))-2);for(const side of ['left','right']){const copy=plate.cloneNode(true) as SVGRectElement;copy.setAttribute('width',String(width));copy.setAttribute('x',String(side==='left'?83-offset-width:243+offset));copy.dataset.nodeKey=`plate:${side}:${index}:${plateInfo.perSide[index]}`;copy.classList.add('session-plate');svg.append(copy);}offset+=width+2;}}else if(ex.type==='barbell'){svg.setAttribute('aria-label','杠铃示意，输入重量后显示配片');[...svg.querySelectorAll('rect')].slice(-4).forEach(rect=>rect.remove());}else svg.remove();}
 }
 function bindBody(root:HTMLElement,c:HandoffContext){
   const s=c.state,readings=weights(s),latest=readings.at(-1),main=one(root,'main');if(!main)return;

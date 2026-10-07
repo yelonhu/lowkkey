@@ -34,5 +34,12 @@ export function prototypeScreen(screen: Screen): HTMLElement {
     if (target.tagName !== tag) throw new Error(`Handoff node changed: ${screen}:${index}`);
     target.setAttribute(name,value);
   }
+  if(screen==='Session'){
+    // Resolve the handoff structure once, before runtime rearrangement. Bindings
+    // and motion address named regions rather than child positions afterwards.
+    const [header,progress,center,controls]=Array.from(node.firstElementChild!.children);
+    const parts:Record<string,Element>={header,progress,center,controls,name:header.children[1],title:header.children[1].children[0],count:header.children[1].children[1],caption:center.children[0],weight:center.children[1],range:center.children[2],plates:center.children[4],previous:center.children[5],reps:controls.children[0],repValue:controls.children[0].children[1].children[1],rir:controls.children[1],submit:controls.children[2]};
+    for(const [name,element] of Object.entries(parts))element.setAttribute('data-session-part',name);
+  }
   return node;
 }

@@ -44,6 +44,7 @@ export type Session = {
   endedAt: string | null;
   sets: SetEntry[];
   prescription?:ProgramItem[];
+  prescriptionOrigin?:'confirmed_arrangement';
 };
 
 /** 把 session 事件与组聚合成训练。没有 start 事件的组（如事后补录）也会成组。 */
@@ -63,7 +64,7 @@ export function sessions(entries: Entry[]): Session[] {
       const ev = e as SessionEntry;
       if (ev.event === 'start') {
         s.startedAt = ev.createdAt;
-        s.dayId = ev.dayId;s.prescription=ev.prescription;
+        s.dayId = ev.dayId;s.prescription=ev.prescription;s.prescriptionOrigin=ev.prescriptionOrigin;
       } else s.endedAt = ev.createdAt;
     } else if (e.kind === 'set') {
       ensure(e.sessionId, e.date).sets.push(e);

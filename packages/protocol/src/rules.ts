@@ -12,8 +12,8 @@ export const VERIFIERS: Record<VerifierId, { name: string; summary: string; vers
   V2: { name: 'e1rm', summary: 'Epley：有效负荷 × (1 + 次数/30)；>12 次标记偏差大，>20 次不计算', version: '1.1.0' },
   V3: { name: 'net_load', summary: '辅助动作有效负荷 = 当日体重 − 辅助（kg）', version: '1.1.0' },
   V4: { name: 'warmup_tag', summary: '仅明确标记的热身组不计入正式组；未知分类单独展示', version: '1.1.0' },
-  V5: { name: 'intra_session', summary: '组内调节：根据本场动作快照、上一组次数与 RIR 给出下一组重量', version: '1.2.0' },
-  V6: { name: 'double_progression', summary: '双进阶 + 周期：下次处方重量与组数、目标 RIR', version: '1.1.0' },
+  V5: { name: 'intra_session', summary: '本场录入参考：同动作同组别实际重量优先，已确认安排单独展示；不自动加减重量', version: '2.0.0' },
+  V6: { name: 'double_progression', summary: '跨场录入参考：沿用最近实际重量，无历史才使用已确认安排；组次读取用户安排', version: '2.0.0' },
   V7: { name: 'weekly_volume', summary: '每肌群每周有效组 = Σ 组 × 肌群权重；用户约束优先', version: '1.1.0' },
   V8: { name: 'calorie_trigger', summary: '用户确认的观察期与目标 → 待审建议；只有采用才追加指令', version: '1.1.0' },
   V9: { name: 'waist_ratio', summary: 'Δ腰围 / Δ体重，仅作描述，不判合格', version: '1.1.0' },
@@ -39,19 +39,6 @@ export const GATE_THRESHOLDS = {
   weightDailyDeltaKg: 1.5,
   e1rmJumpRatio: 1.15,
   modelConfidence: 0.85,
-} as const;
-
-/** 加重档位（同动作单位）。 */
-export const INCREMENTS = {
-  barbellUpperLb: 5,
-  barbellLowerLb: 10,
-  barbellUpperKg: 2.5,
-  barbellLowerKg: 5,
-  dumbbellLb: 5,
-  dumbbellKg: 2,
-  machineKg: 2.5,
-  machineLb: 10,
-  assistKg: 2.3,
 } as const;
 
 /** 杠铃片（单侧，从大到小）与空杆。 */

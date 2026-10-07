@@ -12,7 +12,7 @@ import {
   endSession,
   log,
   logSet,
-  nextSet,
+  trainingReference,
   openSession,
   parse,
   plates,
@@ -84,22 +84,23 @@ describe('verifiers', () => {
     expect(warmupFlags([{setRole:'warmup'},{setRole:'work'},{}, {setRole:'work'}])).toEqual([true, false, false, false]);
   });
 
-  it('V5 组内调节', () => {
-    const bench = ex('bench_press');
-    expect(nextSet(bench, { load: 135, reps: 8, rir: 2 }, 5, 8).load).toBe(140);
-    expect(nextSet(bench, { load: 135, reps: 8, rir: 1 }, 5, 8).load).toBe(135);
-    expect(nextSet(bench, { load: 135, reps: 6, rir: 0 }, 5, 8).load).toBe(135);
-    expect(nextSet(bench, { load: 135, reps: 4, rir: 0 }, 5, 8).load).toBe(130);
-    expect(nextSet(ex('pull_up'), { load: 20, reps: 8, rir: 2 }, 5, 8).load).toBeCloseTo(20, 5); // 辅助减少
+  it('V5 holds actual load regardless of reps and RIR', () => {
+    for(const [reps,rir] of [[8,2],[8,3],[4,0],[6,null]] as const){
+      const start=startSession(fresh(),'lower_a',user());
+      const snap=logSet(start.snap,{sessionId:start.sessionId,exerciseId:'back_squat',load:165,unit:'lb',reps,rir},user()).snap;
+      const next=derive(snap)['next.back_squat'];
+      expect(next).toMatchObject({value:165,ruleVersion:'2.0.0',trainingReference:{source:'session',load:165,unit:'lb',reps}});
+      expect(next.inputs).toEqual([snap.entries.at(-1)!.id]);
+    }
   });
 
-  it('V6 双进阶：下肢杠铃 +10 lb', () => {
+  it('V6 keeps actual load after a complete session', () => {
     let s = fresh();
     const ctx = user('2030-03-10');const started=startSession(s,'lower_a',ctx);s=started.snap;
     for (let i = 0; i < 4; i++) s = logSet(s, { sessionId: started.sessionId, exerciseId: 'back_squat', load: 185, unit: 'lb', reps: 8, rir: 2 }, ctx).snap;
     s=endSession(s,started.sessionId,ctx);
     const rx = prescribe({ exerciseId: 'back_squat', sets: 4, repMin: 6, repMax: 8, startLoad: null }, ex('back_squat'), s.entries, TODAY, s.program);
-    expect(rx.load).toBe(195);
+    expect(rx.load).toBe(185);
   });
 });
 
@@ -293,12 +294,6 @@ describe('natural training rules v1.1',()=>{
     s=revert(s,s.entries.at(-1)!.id,'标错了',user()).snap;
     expect(active(s.entries).find(e=>e.id===id)).toMatchObject({setRole:'work'});
   });
-  it('limits increments and holds unknown effort or assistance',()=>{
-    expect(nextSet(ex('lateral_raise'),{load:10,reps:15,rir:3},12,15).load).toBe(10);
-    expect(nextSet(ex('bench_press'),{load:135,reps:8,rir:null},5,8).load).toBe(135);
-    expect(nextSet(ex('pull_up'),{load:20,reps:8,rir:2},5,8,null).load).toBe(20);
-    expect(nextSet(ex('pull_up'),{load:20,reps:8,rir:2},5,8,70).load).toBe(17.7);
-  });
   it('does not progress an incomplete session or one with missing RIR',()=>{
     const started=startSession(fresh(),'upper_a',user());let s=started.snap;
     s=logSet(s,{sessionId:started.sessionId,exerciseId:'bench_press',load:135,unit:'lb',reps:8,rir:null},user()).snap;
@@ -331,6 +326,41 @@ describe('natural training rules v1.1',()=>{
 });
 
 describe('equipment and session prescriptions',()=>{
+  it('keeps actual 165 separate from confirmed 175 and freezes the arrangement at session start',()=>{
+    let s=fresh();
+    const prior=startSession(s,'lower_a',user('2030-03-13'));
+    s=logSet(prior.snap,{sessionId:prior.sessionId,exerciseId:'back_squat',load:165,unit:'lb',reps:8,rir:2},user('2030-03-13')).snap;
+    const actual=s.entries.at(-1)!;
+    s=endSession(s,prior.sessionId,user('2030-03-13'));
+    s.program.days.find(d=>d.id==='lower_a')!.items[0].startLoad=175;
+    const started=startSession(s,'lower_a',user());s=started.snap;
+    const session=openSession(s.entries)!,item=session.prescription![0];
+    expect(item.startLoad).toBe(175);
+    expect(trainingReference(s.entries,ex('back_squat'),TODAY,{session,item})).toMatchObject({source:'history',load:165,entryId:actual.id,date:'2030-03-13',arrangement:{load:175,unit:'lb'}});
+    s=putProgram(s,{...s.program,days:[]},user());
+    expect(derive(s)['next.back_squat']).toMatchObject({value:165,trainingReference:{arrangement:{load:175}}});
+    s=revert(s,actual.id,'重新记录',user()).snap;
+    expect(derive(s)['next.back_squat']).toMatchObject({value:175,trainingReference:{source:'arrangement',entryId:null}});
+    // Existing snapshots have no proven provenance; never relabel them as AI arrangements.
+    const legacy={...session,prescriptionOrigin:undefined};
+    expect(trainingReference(s.entries,ex('back_squat'),TODAY,{session:legacy,item})).toMatchObject({source:'legacy_snapshot',arrangement:null});
+  });
+  it('chooses same-role history in original units, respects corrections and excludes unknown roles',()=>{
+    const started=startSession(fresh(),'upper_a',user());let s=started.snap;
+    const mixed=logSet(s,{sessionId:started.sessionId,exerciseId:'bench_press',load:60,unit:'kg',reps:8,rir:null},user());
+    s=resolveHeld(mixed.snap,mixed.result.held[0]!.id,{optionId:'as_is'},user()).snap;
+    const id=s.entries.at(-1)!.id;
+    s=log(s,[{kind:'set',sessionId:started.sessionId,exerciseId:'bench_press',setIndex:2,load:80,unit:'lb',loadKind:'external',reps:10,rir:2,setRole:'warmup',date:TODAY,dateOrigin:'device',source:user().source}],user()).snap;
+    const session=openSession(s.entries)!;
+    expect(trainingReference(s.entries,ex('bench_press'),TODAY,{session})).toMatchObject({load:60,unit:'kg',reps:8,entryId:id});
+    expect(trainingReference(s.entries,ex('bench_press'),TODAY,{session,role:'warmup'})).toMatchObject({load:80,unit:'lb'});
+    s=log(s,[{kind:'set_annotation',targetId:id,setRole:'warmup',date:TODAY,dateOrigin:'device',source:user().source}],user()).snap;
+    expect(trainingReference(s.entries,ex('bench_press'),TODAY,{session})).toMatchObject({source:'none',load:null});
+    s=revert(s,s.entries.at(-1)!.id,'恢复组别',user()).snap;
+    expect(trainingReference(s.entries,ex('bench_press'),TODAY,{session})).toMatchObject({entryId:id});
+    s.entries=s.entries.map(entry=>entry.kind==='set'?{...entry,setRole:'unknown'}:entry);
+    expect(trainingReference(s.entries,ex('bench_press'),TODAY,{session})).toMatchObject({source:'none',load:null});
+  });
   it('finds an exact minimum-plate solution for custom denominations and reports real residuals',()=>{
     expect(plates(32,'kg',20,[4,3]).perSide).toEqual([3,3]);
     expect(plates(33,'kg',20,[4,3]).remainder).toBe(1);
@@ -345,7 +375,7 @@ describe('equipment and session prescriptions',()=>{
     const changed=putProgram(started.snap,{...base.program,days:[]},user());
     expect(derive(changed)['next.bench_press']).toEqual(before);
     const recorded=logSet(changed,{sessionId:started.sessionId,exerciseId:'bench_press',load:95,unit:'lb',reps:8,rir:2},user()).snap;
-    expect(derive(recorded)['next.bench_press'].value).toBeGreaterThanOrEqual(95);
+    expect(derive(recorded)['next.bench_press'].value).toBe(95);
     const free=startSession(base,null,user());
     expect(derive(free.snap)['next.bench_press']).toBeUndefined();
   });

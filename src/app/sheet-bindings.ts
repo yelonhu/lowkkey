@@ -1,11 +1,12 @@
 import { sessionItems } from './training-state.ts';
 import { Program as ProgramSchema } from '@lowkkey/protocol';
 import { mergePatch, openSession } from '@lowkkey/core';
-import type { Program } from '@lowkkey/protocol';
+import type { Program,TrainingReference } from '@lowkkey/protocol';
 import type { V1State } from '../server/v1-store.ts';
 
 export type SheetState =
   | { kind:'program' }
+  | { kind:'set-details';role:'work'|'warmup';reference:TrainingReference|null;note?:string;help?:boolean }
   | { kind:'equipment';revision:number;error?:string;draft:{activeBarbellUnit:'kg'|'lb';kg:{barLoad:string;plateLoads:string};lb:{barLoad:string;plateLoads:string}} }
   | { kind:'decision';id:string;type:'proposal'|'trigger';revision:number }
   | { kind:'exercises';exerciseId:string|null;query?:string };
@@ -42,12 +43,22 @@ export function bindDecisionSheet(root:HTMLElement,state:V1State,sheet:SheetStat
       row(`${prefix}${prefix?' · ':''}${day.weekday==null?'按需动作':days[day.weekday]}`,day.items.map(item=>[...state.exercises,...proposedExercises].find(ex=>ex.id===item.exerciseId)?.name??item.exerciseId).join('、'),`${prefix}:${day.id}`,sheet.kind==='program'&&!openSession(state.entries)?'begin-arrangement':undefined,day.id);
       for(const [index,item] of day.items.entries()){
         const ex=[...state.exercises,...proposedExercises].find(ex=>ex.id===item.exerciseId);
-        row(ex?.name??item.exerciseId,`${item.sets} 组 × ${item.repMin}–${item.repMax} 次${item.startLoad==null?'':` · 起始 ${item.startLoad} ${ex?.unit??''}`}${item.note?` · ${item.note}`:''}`,`${prefix}:${day.id}:${index}`);
+        row(ex?.name??item.exerciseId,`${item.sets} 组 × ${item.repMin}–${item.repMax} 次${item.startLoad==null?'':` · 安排 ${item.startLoad} ${ex?.unit??''}`}${item.note?` · ${item.note}`:''}`,`${prefix}:${day.id}:${index}`);
       }
     }
   };
   const [left,right]=Array.from(footer.children) as [HTMLAnchorElement,HTMLButtonElement];left.removeAttribute('href');right.disabled=false;
   text(right,'关闭');right.dataset.action='sheet-cancel';
+  if(sheet.kind==='set-details'){
+    dialog.setAttribute('aria-label',sheet.help?'余力 RIR':'本组详情');heading('本组详情','按实际记录');title.textContent=sheet.help?'余力 RIR':'本组详情';
+    detail.textContent='RIR 表示这组结束时，还能再完成几次。可以不填；再次点选可取消。记录后不会自动加重。';
+    for(const role of ['work','warmup'] as const){const option=row(role==='work'?'正式组':'热身组',role===sheet.role?'当前组别':'切换本组类别',role,'set-role-option');option.dataset.role=role;option.setAttribute('aria-pressed',String(role===sheet.role));}
+    const ref=sheet.reference;
+    if(ref?.load!=null)row('重量来源',ref.entryId?`${ref.source==='session'?'本场上一组':'历史记录'} · ${ref.date} · ${ref.load} ${ref.unit} × ${ref.reps??'—'}`:ref.source==='arrangement'?'已确认的动作安排':'本场旧快照，来源未标注','reference');
+    if(ref?.arrangement)row('安排重量',`${ref.arrangement.load} ${ref.arrangement.unit}。与实际重量不同可在训练页主动采用。`,'arrangement');
+    if(sheet.note)row('动作备注',sheet.note,'note');
+    text(left,'完成');left.dataset.action='sheet-cancel';right.remove();return;
+  }
   if(sheet.kind==='decision'){
     dialog.setAttribute('aria-label','查看建议');
     const proposal=sheet.type==='proposal'?state.proposals.find(p=>p.id===sheet.id):null,trigger=sheet.type==='trigger'?state.triggers.find(t=>t.id===sheet.id):null;

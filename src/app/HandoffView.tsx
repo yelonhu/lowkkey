@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { DEFAULT_EQUIPMENT, EquipmentPreferences, VERIFIERS } from '@lowkkey/protocol';
-import type { EntryDraft } from '@lowkkey/protocol';
-import { openSession } from '@lowkkey/core';
+import { DEFAULT_EQUIPMENT, EquipmentPreferences } from '@lowkkey/protocol';
+import type { EntryDraft, TrainingReference } from '@lowkkey/protocol';
+import { convert, openSession, trainingReference } from '@lowkkey/core';
 import { capturedClock } from '../client/offline.ts';
 import { bindHandoff, prepareHandoff } from './handoff-bindings.ts';
 import { installPrototypeStyle, prototypeScreen } from './prototype-template.ts';
@@ -25,7 +25,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const failedCapture=useRef('');
   const [filter,setFilter]=useState<'all'|'you'|'model'|'rule'>('all'),[answers,setAnswers]=useState<Record<string,string>>({});
   const [reps,setReps]=useState<number|null|undefined>(undefined),[rir,setRir]=useState<number|null>(null),[exerciseId,setExerciseId]=useState<string|null>(null);
-  const [formula,setFormula]=useState<string|null>(null),[sheet,setSheet]=useState<SheetState|null>(null),[manualLoad,setManualLoad]=useState(''),[units,setUnits]=useState<Record<string,'kg'|'lb'>>({});
+  const [formula,setFormula]=useState<string|null>(null),[sheet,setSheet]=useState<SheetState|null>(null),[manualLoad,setManualLoad]=useState<string|null>(null),[units,setUnits]=useState<Record<string,'kg'|'lb'>>({});
   const [review,setReview]=useState<{id:string;questions:NonNullable<Chamber['state']>['submissions'][number]['questions'];revision:number}|null>(null);
   const [reviewLoading,setReviewLoading]=useState(false),[activeAction,setActiveAction]=useState<string|null>(null),[notice,setNotice]=useState(''),[captureRetry,setCaptureRetry]=useState(false);
   const shownReview=useRef<{id:string;revision:number}|null>(null);
@@ -43,16 +43,17 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const [extraSetKey,setExtraSetKey]=useState<string|null>(null);
   const [setRole,setSetRole]=useState<'work'|'warmup'>('work');
   const editingSet=useRef(false),editingEquipment=useRef<EquipmentPreferences|null>(null);
-  const suggestion=useRef<{key:string;value:number|null;unit:'kg'|'lb';ruleVersion:string;inputs:string[]}|null>(null),claiming=useRef(false),lastClaim=useRef(-1);
+  const reference=useRef<{key:string;value:TrainingReference}|null>(null),claiming=useRef(false),lastClaim=useRef(-1);
   const currentSession=state?openSession(state.entries):null,items=state?trainingItems(state,currentSession,exerciseId):[],currentItem=items.find(item=>item.exerciseId===exerciseId)??items[0];
-  const unitKey=`${currentSession?.id}:${currentItem?.exerciseId}`,manualUnit=units[unitKey]??currentSession?.sets.filter(set=>set.exerciseId===currentItem?.exerciseId).at(-1)?.unit??null;
+  const unitKey=`${currentSession?.id}:${currentItem?.exerciseId}`;
   const setKey=`${currentSession?.id}:${currentItem?.exerciseId}:${currentSession?.sets.length}`;
-  const previousReps=state?.entries.filter(entry=>entry.kind==='set'&&entry.exerciseId===currentItem?.exerciseId&&!state.entries.some(r=>r.kind==='revert'&&r.targetId===entry.id)).at(-1);
-  const actualReps=reps===undefined?(previousReps?.kind==='set'?previousReps.reps:currentItem?.repMin??null):reps;
   const currentExercise=state?.exercises.find(ex=>ex.id===currentItem?.exerciseId);
-  if(state&&currentItem&&currentExercise){const ex=currentExercise,derived=state.derived[`next.${ex.id}`],key=`${currentSession?.id}:${ex.id}:${currentSession?.sets.filter(set=>set.exerciseId===ex.id).length}`;
-    if(!suggestion.current||suggestion.current.key!==key&&!editingSet.current&&!manualLoad&&!host.current?.querySelector('[data-action="load-input"]:focus'))suggestion.current={key,value:currentItem.repMin==null?null:derived?.value??currentItem.startLoad??null,unit:ex.unit,ruleVersion:derived?.ruleVersion??VERIFIERS.V5.version,inputs:derived?.inputs??[]};
+  if(state&&currentItem&&currentExercise){
+    const key=`${currentSession?.id}:${currentExercise.id}:${setRole}`;
+    if(!reference.current||reference.current.key!==key||!editingSet.current)reference.current={key,value:trainingReference(state.entries,currentExercise,state.today,{session:currentSession,item:currentItem,role:setRole})};
   }
+  const manualUnit=units[unitKey]??reference.current?.value.unit??currentExercise?.unit??null;
+  const actualReps=reps===undefined?reference.current?.value.reps??(setRole==='work'?currentItem?.repMin??null:null):reps;
   useEffect(()=>{
     if(!state||screen!=='Main'||currentSession||state.decisionSlots?.[state.today]||claiming.current||lastClaim.current===state.revision||chamber.busy)return;
     if(!state.proposals.some(p=>p.status==='open'&&(!p.snoozedUntil||p.snoozedUntil<=state.today))&&!state.triggers.some(t=>t.status==='will_fire'&&(!t.snoozedUntil||t.snoozedUntil<=state.today)))return;
@@ -92,7 +93,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       if(control instanceof HTMLInputElement&&['load-input','reps-input'].includes(action??''))control.readOnly=activeAction==='complete-set';
       if(control instanceof HTMLInputElement&&['equipment-bar','equipment-plates'].includes(action??''))control.readOnly=activeAction==='equipment-save';
       if(control instanceof HTMLAnchorElement&&!control.hasAttribute('href')){control.setAttribute('role','button');control.tabIndex=0;}
-      if(activeAction&&(writes.has(action??'')||activeAction==='equipment-save'&&action==='equipment-unit'||activeAction==='start-session'&&action==='select-exercise'||control.dataset.heldOption||action==='capture-or-voice'||activeAction==='complete-set'&&['equipment-open','set-role','rir','reps-plus','reps-minus','load-unit','next-exercise','exercise-list','select-exercise','extra-set'].includes(action??''))){
+      if(activeAction&&(writes.has(action??'')||activeAction==='equipment-save'&&action==='equipment-unit'||activeAction==='start-session'&&action==='select-exercise'||control.dataset.heldOption||action==='capture-or-voice'||activeAction==='complete-set'&&['equipment-open','set-role','set-role-option','set-details','rir-help','adopt-load','rir','reps-plus','reps-minus','load-unit','next-exercise','exercise-list','select-exercise','extra-set'].includes(action??''))){
         control.setAttribute('aria-disabled','true');if(control instanceof HTMLButtonElement)control.disabled=true;
         if(action===activeAction){control.setAttribute('aria-busy',String(chamber.busy));if(control.childElementCount===0)control.textContent=chamber.retry?'等待重试':'正在保存…';}
       }
@@ -103,7 +104,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     installPrototypeStyle();applyPageTheme(baseScreen);
     if(screen!=='Capture')shownReview.current=null;
     if(screen==='Capture'&&submissionId&&shownReview.current?.id!==submissionId)shownReview.current={id:submissionId,revision:state.revision};
-    const context={state,reviewOutcome,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewTarget,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,manualUnit,setRole,allowExtra:extraSetKey===setKey,suggestion:suggestion.current,equipment:editingSet.current?editingEquipment.current??state.equipment:state.equipment};
+    const context={state,reviewOutcome,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewTarget,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,manualUnit,setRole,allowExtra:extraSetKey===setKey,reference:reference.current?.value,equipment:editingSet.current?editingEquipment.current??state.equipment:state.equipment};
     const target=prototypeScreen(baseScreen);prepareHandoff(target,baseScreen,state.today);bindHandoff(target,context);
     prepareViewport(target,baseScreen);
     const input=target.querySelector<HTMLInputElement>('input[data-action="capture-input"]');if(input){input.value=draft.current;const submit=target.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit&&draft.current.trim()){submit.textContent='提交';submit.setAttribute('aria-label','提交记录');}}
@@ -193,16 +194,16 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const clock=capturedClock(),current=openSession(state.entries),day=dayId===null?undefined:dayId?state.program.days.find(d=>d.id===dayId):state.program.days.find(d=>d.weekday===new Date(`${state.today}T12:00:00Z`).getUTCDay());
     const sessionId=event==='start'?crypto.randomUUID():current?.id;if(!sessionId)return;
     const entry:EntryDraft={kind:'session',event,sessionId,dayId:event==='start'?day?.id??null:null,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
-    await chamber.writeEntries([entry]);setReps(undefined);setExtraSetKey(null);setSetRole('work');suggestion.current=null;editingSet.current=false;editingEquipment.current=null;setExerciseId(selected??null);setManualLoad('');go(event==='start'?'Session':'Debrief');
+    await chamber.writeEntries([entry]);setRir(null);setReps(undefined);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setExerciseId(selected??null);setManualLoad(null);go(event==='start'?'Session':'Debrief');
   }
   async function completeSet(exercise:string,load:number,unit:'kg'|'lb'){
     if(!state||actualReps==null||!Number.isInteger(actualReps)||actualReps<1||actualReps>100)return;const session=openSession(state.entries),ex=state.exercises.find(e=>e.id===exercise);if(!session||!ex)return;
-    const clock=capturedClock(),entry:EntryDraft={kind:'set',sessionId:session.id,exerciseId:exercise,setIndex:session.sets.filter(e=>e.exerciseId===exercise).length+1,load,unit,loadKind:ex.type==='assisted'?'assist':'external',reps:actualReps,rir,setRole,recommendation:suggestion.current?.value!=null?{load:suggestion.current.value,unit:suggestion.current.unit,ruleVersion:suggestion.current.ruleVersion,inputs:suggestion.current.inputs}:undefined,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
+    const clock=capturedClock(),entry:EntryDraft={kind:'set',sessionId:session.id,exerciseId:exercise,setIndex:session.sets.filter(e=>e.exerciseId===exercise).length+1,load,unit,loadKind:ex.type==='assisted'?'assist':'external',reps:actualReps,rir,setRole,inputReference:reference.current?.value,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
     let result=await chamber.writeEntries([entry],true);
     const unitQuestion=result.held.find(item=>item.gate==='G4'&&item.drafts[0]?.kind==='set'&&item.drafts[0].unit===unit&&item.drafts[0].exerciseId===exercise&&item.drafts[0].sessionId===session.id&&item.drafts[0].load===load&&item.options.some(option=>option.id==='as_is'));
     if(unitQuestion)result=await chamber.resolve(unitQuestion,{optionId:'as_is'});
     if(!result.committed.some(item=>item.kind==='set'&&item.sessionId===session.id&&item.exerciseId===exercise)){setNotice('这组需要核对，训练结束后确认。');return;}
-    setExtraSetKey(null);setRir(null);setReps(undefined);suggestion.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad('');
+    setExtraSetKey(null);setRir(null);setReps(undefined);reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);
   }
   const click=(event:React.MouseEvent<HTMLDivElement>)=>{
     const target=event.target as Element;if(!state)return;
@@ -223,10 +224,16 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       }
       if(button.dataset.heldOption){const held=state.held.find(h=>h.id===id);if(held)run('held-resolve',async()=>{await chamber.resolve(held,{optionId:button.dataset.heldOption!});dismiss();});return;}
       if(action){event.preventDefault();
-        if(['rir','reps-plus','reps-minus','load-unit','set-role'].includes(action))freezeSet();
+        if(['rir','reps-plus','reps-minus','load-unit','adopt-load'].includes(action))freezeSet();
         if(action==='account-settings')window.dispatchEvent(new Event('lowkkey-account'));
         else if(action==='sheet-cancel'||action==='modal-close')dismiss();
-        else if(action==='set-role')setSetRole(value=>value==='work'?'warmup':'work');
+        else if(action==='set-details'||action==='rir-help')openSheet({kind:'set-details',role:setRole,reference:reference.current?.value??null,note:currentItem?.note,help:action==='rir-help'});
+        else if(action==='set-role-option'&&(button.dataset.role==='work'||button.dataset.role==='warmup')){
+          setSetRole(button.dataset.role);setManualLoad(null);setReps(undefined);setRir(null);reference.current=null;editingSet.current=false;editingEquipment.current=null;dismiss();
+        }
+        else if(action==='adopt-load'){
+          const arranged=reference.current?.value.arrangement;if(arranged)setManualLoad(String(Number(convert(arranged.load,arranged.unit,manualUnit??arranged.unit).toFixed(2))));
+        }
         else if(action==='decision-view'&&id)navigateReview({kind:button.dataset.kind as 'proposal'|'trigger',id});
         else if((action==='decision-accept'||action==='decision-later')&&sheet?.kind==='decision')run(action,async()=>{const decision=action==='decision-accept'?'accept':'later';try{if(sheet.type==='proposal')await chamber.decideProposal(sheet.id,decision,sheet.revision);else await chamber.decideTrigger(sheet.id,decision,sheet.revision);setNotice(decision==='accept'?'已保存':'已延期');dismiss();}catch(error){if(!(error instanceof RequestError&&error.status===409))chamber.setError('暂未确认，请重试。');throw error;}});
         else if(action==='decision-refresh'&&sheet?.kind==='decision')setSheet({...sheet,revision:state.revision});
@@ -260,7 +267,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='extra-set'){setExtraSetKey(setKey);setSetRole('work');}
         else if((action==='next-exercise'||action==='select-exercise')&&id){
           if(!currentSession){run('start-session',()=>writeSession('start',null,id));return;}
-          setExerciseId(id);setReps(undefined);setRir(null);setExtraSetKey(null);setSetRole('work');suggestion.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad('');
+          setExerciseId(id);setReps(undefined);setRir(null);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);
           if(sheet?.kind==='exercises')dismiss();
         }else if(action==='load-unit')setUnits(value=>({...value,[unitKey]:(value[unitKey]??button.dataset.unitDefault)==='kg'?'lb':'kg'}));
         else if(action==='reps-minus')setReps(n=>Math.max(1,(n??actualReps??2)-1));
@@ -325,6 +332,8 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   function freezeSet(){
     if(!editingSet.current)editingEquipment.current=structuredClone(state?.equipment??DEFAULT_EQUIPMENT);
     editingSet.current=true;
+    const value=reference.current?.value;
+    setManualLoad(current=>current??(value?.load==null?null:String(Number(convert(value.load,value.unit,manualUnit??value.unit).toFixed(2)))));
     setUnits(value=>({...value,[unitKey]:value[unitKey]??manualUnit??currentExercise?.unit??'kg'}));
     setReps(value=>value===undefined?actualReps:value);
   }

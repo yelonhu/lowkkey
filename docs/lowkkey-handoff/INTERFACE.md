@@ -9,7 +9,7 @@
 **模型负责理解，规则负责计算和把关，数据只属于用户。**
 
 - 模型（Claude / GPT / 任意）把自然语言、截图翻译成结构化条目，并在规则覆盖不到的地方提建议。
-- 规则（确定性代码）算出所有数字（趋势、e1RM、下一组重量、周组数、触发器），并决定一条输入能否直接记录。
+- 规则（确定性代码）算出所有数字（趋势、e1RM、录入参考、周组数、触发器），并决定一条输入能否直接记录。
 - 用户是唯一能撤销、改计划、做决定的一方。
 
 ---
@@ -19,7 +19,7 @@
 | 能力 | 用户（网页 / App） | 模型（MCP） | 规则（服务端） |
 |---|---|---|---|
 | 读取状态与派生值 | ✓ | ✓ `read` | — |
-| 写入新条目（必须过闸） | ✓ | ✗；模型仅以 `submit` 提交待审批次 | ✓（仅触发器执行） |
+| 写入新条目（必须过闸） | ✓ | ✗；模型仅以 `submit` 提交待审批次 | 仅执行用户已确认的写入 |
 | 提出计划修改（进收件箱） | ✓ | ✓ `propose` | ✓（如里程碑建议） |
 | 回答「需要确认」 | ✓ | ✗ | ✗ |
 | 撤销任何一条 | ✓ | ✗ | ✗ |
@@ -38,7 +38,7 @@ Token 按 scope 发放：`user`（仅用户会话）、`read`、`submit`、`prop
 |---|---|---|
 | 01 今日 | `program.days`（今天对应的训练日）、`derived.rx.*`、最近一条体重、`derived.bw.slope7d`、`derived.cycle.week`、待决 `triggers`、`held` 数量 | `POST /v1/capture`（捕获栏）；`POST /v1/triggers/{id}/decision`（采用 / 以后）；`POST /v1/entries/{id}/revert`（撤销条）；开始训练 = `POST /v1/entries` 写一条 `session:start` |
 | 02 需要确认 | `held[]` 与 `submissions[]`（模型批次、问题、原话与草稿） | `POST /v1/held/{id}/resolve`；`POST /v1/submissions/{id}/review`；`POST /v1/submissions/{id}/decision` |
-| 03 训练中 | 当前动作的 `derived.rx.*`、`derived.next.<exerciseId>`（下一组建议）、本场已完成的组 | `POST /v1/entries`（`kind:set`，`inSession:true`）；结束 = 写 `session:end` |
+| 03 训练中 | 当前动作的 `derived.rx.*`、`derived.next.<exerciseId>`（本组录入参考）、本场已完成的组 | `POST /v1/entries`（`kind:set`，`inSession:true`）；结束 = 写 `session:end` |
 | 04 体征 | 每日体重、`derived.bw.*`、`program.targets`、当前触发器、腰围 | `POST /v1/triggers/{id}/decision`；`POST /v1/capture`（录入腰围） |
 | 05 进步 | `derived.rel.*`、`derived.e1rm.*`、`derived.volume.*`、规则提议 | `POST /v1/proposals/{id}/decision`（「加入计划」） |
 | 06 日志 | `entries[]`（含 `source`、撤销关系） | `POST /v1/entries/{id}/revert` |
@@ -126,8 +126,8 @@ SSE 事件：`entry.committed`、`entry.reverted`、`held.created`、`held.resol
 | `cycle.week` | 周期第几周 | V6 |
 | `e1rm.best.<ex>` / `e1rm.first.<ex>` / `e1rm.latest.<ex>` | 最佳 / 首次 / 最近 e1RM | V2, V3 |
 | `rel.<ex>` | 最近 e1RM ÷ 最近体重 | V2 |
-| `rx.<dayId>.<ex>` | 下次处方重量（formula 含组数、次数区间、目标 RIR） | V6 |
-| `next.<ex>` | 训练中：下一组建议重量 | V5 |
+| `rx.<dayId>.<ex>` | 跨场录入参考（formula 含来源及已确认组次） | V6 |
+| `next.<ex>` | 训练中：同组别实际重量参考；热身使用 `next.warmup.<ex>` | V5 |
 | `volume.<muscle>` | 本周有效组 | V7 |
 
 ---
@@ -172,8 +172,8 @@ SSE 事件：`entry.committed`、`entry.reverted`、`held.created`、`held.resol
 | V2 | 1 次为实际举起重量；其余 e1RM = 有效负荷 × (1 + 次数/30)，仅为估算；> 12 次标记偏差大，> 20 次不算 |
 | V3 | 辅助动作有效负荷 = 当日体重 − 辅助（kg） |
 | V4 | 仅明确标记为热身的组排除；未分类单列，降重不自动等于热身 |
-| V5 | 次数 ≥ 上限且 RIR ≥ 2 → 最多 +1 档；次数 < 下限 → 最多 −1 档；其他保持。变化不得超过有效负荷 10%，器械档位不满足或辅助负荷未知则保持 |
-| V6 | 最近完成场次有完整处方，全部正式组达到上限且 RIR ≥ 1 才考虑 +1 档；缺数据沿用。周期仅用户启用，结束后恢复基础计划，不重复末周 |
+| V5 | v2.0.0：本场同动作同组别实际记录 → 最近有效实际记录 → 已确认安排 → 留空。次数和 RIR 不自动改变重量。`trainingReference` 携带原始单位、日期、条目 ID 与独立的 `arrangement` |
+| V6 | v2.0.0：跨场沿用实际重量；无历史才用已确认安排，不自动进阶。新场次保存未混入历史默认值的动作快照及 `prescriptionOrigin`；旧快照来源缺失时不得标作 AI 安排。周期仅用户启用，结束后恢复基础计划，不重复末周 |
 | V7 | 每肌群分别显示正式、未分类及基础计划的折算组数；不设置统一合格线 |
 | V8 | 用户确认目标速度、观察期与调整配置后，至少 7 个日读数、跨度至少 13 天才评估；仅生成建议。到期不执行，“采用”才追加指令 |
 | V9 | 描述 Δ腰围 / Δ体重，不判合格 |
@@ -235,3 +235,7 @@ REST 继续使用 `/v1` 路径；快照与生成契约的协议版本升为 2.0.
 工具源码与运行时注册统一使用协议包。新增 `list_exercises`、`get_review`、精确审阅链接和 MCP Apps 只读卡片。`get_state` 的条目与 `get_history` 的场次分页；后者返回 `{items,nextCursor}`，因此提升主版本。模型草稿必须提供置信度。`propose_change` 使用明确的 ProgramPatch，支持与计划同时待审的自定义动作，记录 baseProgram 与提交时 revision。已有动作负荷语义不能覆盖。
 
 `propose_entries` 的 `corrects` 指向本人已有同类记录，用户确认时追加 revert 和替代记录，未确认不影响事实。`set_annotation` 可提议组别纠正。模型仍没有决定、撤销、直接改计划或直接入账权限。`GET /v1/reviews/{kind}/{id}` 返回当前处理结果，用户审阅链接带事项 ID；不会默认打开别的待审事项。
+
+### 训练录入参考（2026-10-07）
+
+数字输入显示实际预填值；清空后必须重新填写。已确认安排与实际参考不同时单独显示“采用”，点击才覆盖。`SetEntry.inputReference` 保存录入时冻结的依据；旧 `recommendation` 仅保留读取。模型草稿不能提交上述依据字段。原始重量与单位、次数、RIR 在提交时冻结，重试不重新计算。

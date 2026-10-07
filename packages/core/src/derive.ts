@@ -1,6 +1,7 @@
 import { MUSCLE_LABEL, VERIFIERS, type Derived, type LocalDate, type SetEntry, type Snapshot, type VerifierId } from '@lowkkey/protocol';
 import { active, bodyweightOn, dailyWeights, openSession } from './ledger.ts';
-import { calorieCheck, cycleWeek, e1rm, effectiveLoad, nextSet, prescribe, projectDate, trend, trendAt, waistRatio, warmupFlags, weeklyVolume, weighinObservation } from './verifiers.ts';
+import { calorieCheck, cycleWeek, e1rm, effectiveLoad, prescribe, projectDate, trend, trendAt, waistRatio, warmupFlags, weeklyVolume, weighinObservation } from './verifiers.ts';
+import { trainingReference } from './training-reference.ts';
 import { convert, diffDays, round, toKg } from './util.ts';
 
 /**
@@ -88,25 +89,25 @@ export function derive(snap: Snapshot, asOf: LocalDate = snap.today): Record<str
       const ex = exercises.find((x) => x.id === it.exerciseId);
       if (!ex) continue;
       const rx = prescribe(it, ex, entries, asOf, program);
-      put(`rx.${day.id}.${ex.id}`, `${ex.name} 处方`, 'V6', rx.load, ex.unit, `${rx.reason}；${rx.sets} 组 × ${rx.repMin}–${rx.repMax}${rx.targetRir != null ? `，RIR ${rx.targetRir}` : ''}`, rx.basedOn);
+      put(`rx.${day.id}.${ex.id}`, `${ex.name} 录入参考`, 'V6', rx.load, ex.unit, `${rx.reason}；${rx.sets} 组 × ${rx.repMin}–${rx.repMax}${rx.targetRir != null ? `，RIR ${rx.targetRir}` : ''}`, rx.basedOn);
+      out[`rx.${day.id}.${ex.id}`].trainingReference=trainingReference(entries,ex,asOf,{item:it});
     }
 
-  /* 进行中训练的下一组；同场上一组是 V5 的唯一输入。 */
+  /* 本场已确认快照与真实记录分开；自由训练也可沿用实际重量。 */
   const session = openSession(entries);
   if (session) {
-    const day = program.days.find((d) => d.id === session.dayId);
-    for (const item of session.prescription ?? day?.items ?? []) {
-      const ex = exercises.find((x) => x.id === item.exerciseId);
-      if (!ex) continue;
-      const previous = session.sets.filter((s) => s.exerciseId === ex.id&&s.setRole!=='warmup').at(-1);
-      if (previous) {
-        const normalized=convert(previous.load,previous.unit,ex.unit);
-        const next = nextSet(ex, {...previous,load:normalized}, item.repMin, item.repMax,bodyweightOn(entries,previous.date)?.kg??null);
-        put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', next.load, ex.unit, `${previous.load} ${previous.unit}${previous.unit===ex.unit?'':` → ${round(normalized,2)} ${ex.unit}`} × ${previous.reps}，RIR ${previous.rir ?? '未记'} → ${next.reason} → ${next.load} ${ex.unit}`, [previous.id]);
-      } else {
-        const rx = prescribe(item, ex, entries, asOf, program);
+    const items=session.prescription??program.days.find(d=>d.id===session.dayId)?.items??[];
+    const ids=[...new Set([...items.map(item=>item.exerciseId),...session.sets.map(set=>set.exerciseId)])];
+    for(const id of ids){
+      const ex=exercises.find(ex=>ex.id===id);if(!ex)continue;
+      for(const role of ['work','warmup'] as const){
+        const reference=trainingReference(entries,ex,asOf,{session,item:items.find(item=>item.exerciseId===id),role});
+        const key=role==='work'?`next.${id}`:`next.warmup.${id}`;
+        const value=reference.load==null?null:round(convert(reference.load,reference.unit,ex.unit),2);
+        const reason=reference.entryId?`${reference.source==='session'?'本场上一组':'最近实际记录'} ${reference.date}：${reference.load} ${reference.unit}${reference.unit===ex.unit?'':` → ${value} ${ex.unit}`}；沿用实际重量，不自动加减`:reference.source==='arrangement'?'没有同组别历史，使用已确认安排':reference.source==='legacy_snapshot'?'本场旧快照，来源未标注':'没有重量依据，由你填写';
         const start=entries.find(entry=>entry.kind==='session'&&entry.sessionId===session.id&&entry.event==='start');
-        put(`next.${ex.id}`, `${ex.name} 下一组`, 'V5', session.prescription?item.startLoad:rx.load, ex.unit, session.prescription?'本场首组使用开始时保存的动作处方':'本场首组使用处方：'+rx.reason, session.prescription&&start?[start.id]:rx.basedOn);
+        put(key,`${ex.name} ${role==='warmup'?'热身组':'本组'}录入参考`,'V5',value,ex.unit,reason,reference.entryId?[reference.entryId]:reference.load!=null&&start?[start.id]:[]);
+        out[key].trainingReference=reference;
       }
     }
   }

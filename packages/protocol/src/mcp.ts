@@ -26,7 +26,7 @@ export const MCP_TOOLS = [
     title: '读取状态',
     description:
       '读取用户的训练与体征状态：条目、训练计划、需要确认的事项、提议、触发器，以及所有派生值（带公式与输入）。' +
-      '引用任何数字（斜率、e1RM、下一组重量、周组数）前必须先读取这里的派生值，不得自行计算。',
+      '引用任何数字（斜率、e1RM、录入参考、周组数）前必须先读取这里的派生值，不得自行计算。V5/V6 沿用实际重量，不按次数或 RIR 自动加减；trainingReference 给出原始单位与来源，arrangement 是单独的已确认安排。',
     input: z.object({
       from: LocalDate.optional().describe('可选起始日期'),
       to: LocalDate.optional().describe('可选结束日期'),
@@ -76,8 +76,8 @@ export const MCP_TOOLS = [
     scope: 'propose',
     title: '提出计划修改',
     description:
-      '提出对训练计划的修改（JSON Merge Patch）。只用于规则覆盖不到的事，例如换动作、调整训练日。' +
-      '规则已经能算出的处方（如双进阶加重）不要提议。提议进入收件箱，由用户决定。',
+      '提出对训练计划的修改（JSON Merge Patch）。可提议换动作、调整训练日或参考重量。' +
+      '重量安排与实际记录分别保留。提议进入收件箱，用户采用后才生效；录入默认仍沿用实际记录。',
     input: z.object({
       idempotencyKey: z.uuid(),
       title: z.string().max(80),

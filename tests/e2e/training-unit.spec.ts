@@ -20,7 +20,7 @@ test('first-load explicit save preserves the raw unit and converts the next-set 
     await rir.click();await expect(rir).toHaveAttribute('aria-checked','false');
     await rir.click();
     await session.getByRole('button',{name:'记录 90 lb × 8'}).click();
-    await expect(session).toContainText('上一组 90 × 8 lb');
+    await expect(session).toContainText('沿用上组 90 lb × 8');
     await expect(session.getByRole('button',{name:'重量单位 lb，点按切换'})).toBeVisible();
     const state=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
     const set=state.entries.findLast((entry:{kind:string;exerciseId?:string})=>entry.kind==='set'&&entry.exerciseId==='hack_squat');

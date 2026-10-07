@@ -51,7 +51,8 @@ export class Motion {
       void this.play(outgoing.firstElementChild??outgoing,[{transform:'scale(1)',opacity:1,filter:'blur(0)'},{transform:'scale(.92)',opacity:.35,filter:'blur(3px)'}],380);
       void this.play(next.firstElementChild??next,[{clipPath:circle(0),offset:0},{clipPath:circle(radius),offset:380/620},{clipPath:circle(radius),offset:1}],620).then(finish);
       const center=next.querySelector('[data-session-center]');
-      if(center?.children[1])void this.play(center.children[1],[{transform:'translateY(12px)',opacity:0},{transform:'translateY(0)',opacity:1}],240,380);
+      const weight=center?.querySelector('[data-session-weight]');
+      if(weight)void this.play(weight,[{transform:'translateY(12px)',opacity:0},{transform:'translateY(0)',opacity:1}],240,380);
       const bar=center?.querySelector('svg[role="img"]');if(bar)void this.play(bar,[{opacity:0},{opacity:1}],160,460);
     }else{
       outgoing.style.zIndex='1';

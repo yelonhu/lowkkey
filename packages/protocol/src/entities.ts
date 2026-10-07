@@ -33,7 +33,7 @@ export const ProgramItem = z.strictObject({
   sets: z.number().int().min(1).max(10),
   repMin: z.number().int().min(1).max(50),
   repMax: z.number().int().min(1).max(50),
-  startLoad: z.number().min(0).nullable().default(null).describe('首次处方重量；null = 第一次由你自选'),
+  startLoad: z.number().min(0).nullable().default(null).describe('已确认安排的参考重量；历史实际重量优先，存在差异时由用户主动采用；null = 未安排重量'),
   note: z.string().max(400).optional(),
 }).refine(v=>v.repMin<=v.repMax,'次数下限不能高于上限');
 export type ProgramItem = z.infer<typeof ProgramItem>;
@@ -128,6 +128,14 @@ export const WeightEntry = z.object({
 export const LoadKind = z.enum(['external', 'assist', 'bodyweight']);
 export type LoadKind = z.infer<typeof LoadKind>;
 
+export const TrainingReference=z.object({
+  source:z.enum(['session','history','arrangement','legacy_snapshot','none']),
+  load:z.number().nonnegative().nullable(),unit:Unit,
+  entryId:Id.nullable(),date:LocalDate.nullable(),reps:z.number().int().nullable(),
+  arrangement:z.object({load:z.number().nonnegative(),unit:Unit}).nullable().describe('单独展示的已确认安排；与实际记录不同时须由用户主动采用'),
+});
+export type TrainingReference=z.infer<typeof TrainingReference>;
+
 export const SetEntry = z.object({
   ...EntryCommon,
   kind: z.literal('set'),
@@ -141,6 +149,7 @@ export const SetEntry = z.object({
   rir: z.number().int().min(0).max(10).nullable().default(null),
   straps: z.boolean().optional(),
   setRole:z.enum(['work','warmup','unknown']).optional(),
+  inputReference:TrainingReference.optional().describe('本组录入时冻结的参考来源，不代表推荐或自动加重'),
   recommendation:z.object({ruleVersion:z.string(),inputs:z.array(Id),load:z.number().nullable(),unit:Unit}).optional(),
 });
 
@@ -153,6 +162,7 @@ export const SessionEntry = z.object({
   event: z.enum(['start', 'end']),
   dayId: Id.nullable().default(null),
   prescription:z.array(ProgramItem).optional(),
+  prescriptionOrigin:z.literal('confirmed_arrangement').optional().describe('服务端标记：本场快照来自已确认安排；旧快照缺少此标记时不推断来源'),
 });
 
 export const WaistEntry = z.object({
@@ -298,6 +308,7 @@ export const Derived = z.object({
   inputs: z.array(Id),
   asOf: LocalDate,
   formula: z.string().max(400).describe('代入数字后的公式，用于 ƒ 抽屉'),
+  trainingReference:TrainingReference.optional().describe('V5/V6 录入参考与来源；不按次数或 RIR 自动加减重量'),
 });
 export type Derived = z.infer<typeof Derived>;
 
@@ -333,7 +344,7 @@ export type Snapshot = z.infer<typeof Snapshot>;
 export { GateId };
 
 /** Model submissions exclude directives, reverts and live-session controls. */
-export const ModelEntryDraft=z.discriminatedUnion('kind',[EntryDraft.options[0].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[1].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[2].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[4].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[5].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')})]);
+export const ModelEntryDraft=z.discriminatedUnion('kind',[EntryDraft.options[0].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[1].omit({inputReference:true,recommendation:true}).extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[2].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[4].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')}),EntryDraft.options[5].extend({source:Source.default({actor:'model',channel:'mcp'}),confidence:z.number().min(0).max(1),corrects:Id.optional().describe('更正本人已有同类记录的 ID；用户确认时追加撤销与新记录，模型不能自行撤销。')})]);
 export const ProgramPatch=z.strictObject({
   days:z.array(ProgramDay).max(14).optional(),cycleStart:LocalDate.nullable().optional(),ramp:z.array(RampWeek).max(52).optional(),constraints:z.array(Constraint).optional(),
   targets:z.strictObject(Targets.shape).partial().extend({goal:Goal.omit({confirmedAt:true}).partial().optional(),calorieTrigger:Targets.shape.calorieTrigger.unwrap().unwrap().omit({confirmedAt:true}).partial().nullable().optional()}).optional(),

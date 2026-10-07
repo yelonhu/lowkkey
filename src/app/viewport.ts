@@ -29,11 +29,11 @@ export function prepareViewport(node:HTMLElement,screen:Screen){
   }
   else if(screen==='Connect')(page.children[1] as HTMLElement).dataset.scrollRegion='';
   else if(screen==='Session'){
-    const center=page.children[2] as HTMLElement,controls=page.children[3] as HTMLElement;
+    const center=page.querySelector<HTMLElement>('[data-session-part="center"]')!,controls=page.querySelector<HTMLElement>('[data-session-part="controls"]')!;
     center.dataset.sessionCenter='';controls.dataset.sessionControls='';
     page.dataset.docked='';
     const dock=document.createElement('div');dock.dataset.bottomDock='session';dock.dataset.nodeKey='session-dock';
-    for(const action of controls.querySelectorAll(':scope > .extra-set-button,:scope > button:last-child'))dock.append(action);
+    for(const action of controls.querySelectorAll(':scope > .extra-set-button,:scope > [data-session-part="submit"]'))dock.append(action);
     const content=document.createElement('div');content.dataset.scrollRegion='session';content.dataset.nodeKey='session-scroll';
     while(page.children.length>1)content.append(page.children[1]);
     page.append(content,dock);
@@ -74,6 +74,13 @@ export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,
     host.style.setProperty('--keyboard-height',keyboard?`${viewport!.height}px`:'100%');
     host.style.setProperty('--keyboard-top',keyboard?`${Math.max(0,viewport!.offsetTop)}px`:'0px');
     shell.dataset.keyboard=String(keyboard);
+    if(keyboard&&document.activeElement instanceof HTMLElement){
+      const input=document.activeElement,region=input.closest<HTMLElement>('[data-scroll-region]');
+      if(region){const field=input.getBoundingClientRect(),bounds=region.getBoundingClientRect();
+        if(field.bottom>bounds.bottom-8)region.scrollTop+=field.bottom-bounds.bottom+8;
+        else if(field.top<bounds.top+8)region.scrollTop-=bounds.top+8-field.top;
+      }
+    }
     if(!keyboard&&keyboardScroll){for(const {node,top} of keyboardScroll)if(node.isConnected)node.scrollTop=top;keyboardScroll=null;}
     if(diagnostic){
       const page=host.querySelector<HTMLElement>('.screen:not(.motion-outgoing) [data-page-frame]');

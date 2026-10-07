@@ -243,7 +243,7 @@
                     },
                     "startLoad": {
                       "default": null,
-                      "description": "首次处方重量；null = 第一次由你自选",
+                      "description": "已确认安排的参考重量；历史实际重量优先，存在差异时由用户主动采用；null = 未安排重量",
                       "anyOf": [
                         {
                           "type": "number",
@@ -703,6 +703,116 @@
                 "unknown"
               ]
             },
+            "inputReference": {
+              "description": "本组录入时冻结的参考来源，不代表推荐或自动加重",
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "session",
+                    "history",
+                    "arrangement",
+                    "legacy_snapshot",
+                    "none"
+                  ]
+                },
+                "load": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": [
+                    "kg",
+                    "lb"
+                  ]
+                },
+                "entryId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                      "description": "用户本地日期 YYYY-MM-DD"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reps": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "arrangement": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "load": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "kg",
+                            "lb"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "load",
+                        "unit"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "单独展示的已确认安排；与实际记录不同时须由用户主动采用"
+                }
+              },
+              "required": [
+                "source",
+                "load",
+                "unit",
+                "entryId",
+                "date",
+                "reps",
+                "arrangement"
+              ],
+              "additionalProperties": false
+            },
             "recommendation": {
               "type": "object",
               "properties": {
@@ -911,7 +1021,7 @@
                   },
                   "startLoad": {
                     "default": null,
-                    "description": "首次处方重量；null = 第一次由你自选",
+                    "description": "已确认安排的参考重量；历史实际重量优先，存在差异时由用户主动采用；null = 未安排重量",
                     "anyOf": [
                       {
                         "type": "number",
@@ -936,6 +1046,11 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "prescriptionOrigin": {
+              "description": "服务端标记：本场快照来自已确认安排；旧快照缺少此标记时不推断来源",
+              "type": "string",
+              "const": "confirmed_arrangement"
             }
           },
           "required": [
@@ -1360,6 +1475,116 @@
                 "unknown"
               ]
             },
+            "inputReference": {
+              "description": "本组录入时冻结的参考来源，不代表推荐或自动加重",
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "session",
+                    "history",
+                    "arrangement",
+                    "legacy_snapshot",
+                    "none"
+                  ]
+                },
+                "load": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": [
+                    "kg",
+                    "lb"
+                  ]
+                },
+                "entryId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "不透明 ID，推荐 ULID"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                      "description": "用户本地日期 YYYY-MM-DD"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reps": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "arrangement": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "load": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "kg",
+                            "lb"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "load",
+                        "unit"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "单独展示的已确认安排；与实际记录不同时须由用户主动采用"
+                }
+              },
+              "required": [
+                "source",
+                "load",
+                "unit",
+                "entryId",
+                "date",
+                "reps",
+                "arrangement"
+              ],
+              "additionalProperties": false
+            },
             "recommendation": {
               "type": "object",
               "properties": {
@@ -1550,7 +1775,7 @@
                   },
                   "startLoad": {
                     "default": null,
-                    "description": "首次处方重量；null = 第一次由你自选",
+                    "description": "已确认安排的参考重量；历史实际重量优先，存在差异时由用户主动采用；null = 未安排重量",
                     "anyOf": [
                       {
                         "type": "number",
@@ -1575,6 +1800,11 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "prescriptionOrigin": {
+              "description": "服务端标记：本场快照来自已确认安排；旧快照缺少此标记时不推断来源",
+              "type": "string",
+              "const": "confirmed_arrangement"
             },
             "confidence": {
               "type": "number",
@@ -2192,6 +2422,116 @@
           "type": "string",
           "maxLength": 400,
           "description": "代入数字后的公式，用于 ƒ 抽屉"
+        },
+        "trainingReference": {
+          "description": "V5/V6 录入参考与来源；不按次数或 RIR 自动加减重量",
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "session",
+                "history",
+                "arrangement",
+                "legacy_snapshot",
+                "none"
+              ]
+            },
+            "load": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unit": {
+              "type": "string",
+              "enum": [
+                "kg",
+                "lb"
+              ]
+            },
+            "entryId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "description": "不透明 ID，推荐 ULID"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "用户本地日期 YYYY-MM-DD"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reps": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "arrangement": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "load": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "enum": [
+                        "kg",
+                        "lb"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "load",
+                    "unit"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "单独展示的已确认安排；与实际记录不同时须由用户主动采用"
+            }
+          },
+          "required": [
+            "source",
+            "load",
+            "unit",
+            "entryId",
+            "date",
+            "reps",
+            "arrangement"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -2691,43 +3031,6 @@
                                 "warmup",
                                 "unknown"
                               ]
-                            },
-                            "recommendation": {
-                              "type": "object",
-                              "properties": {
-                                "ruleVersion": {
-                                  "type": "string"
-                                },
-                                "inputs": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 64,
-                                    "description": "不透明 ID，推荐 ULID"
-                                  }
-                                },
-                                "load": {
-                                  "type": [
-                                    "number",
-                                    "null"
-                                  ]
-                                },
-                                "unit": {
-                                  "type": "string",
-                                  "enum": [
-                                    "kg",
-                                    "lb"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "ruleVersion",
-                                "inputs",
-                                "load",
-                                "unit"
-                              ],
-                              "additionalProperties": false
                             },
                             "confidence": {
                               "type": "number",

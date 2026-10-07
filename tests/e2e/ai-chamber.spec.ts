@@ -40,7 +40,7 @@ test('optional training uses an explicit exercise list, next exercise and explic
     const count=(await snapshot(page)).entries.filter((e:{kind:string})=>e.kind==='set').length;
     await session.getByRole('button',{name:'再记一组',exact:true}).click();
     expect((await snapshot(page)).entries.filter((e:{kind:string})=>e.kind==='set')).toHaveLength(count);
-    await session.getByRole('button',{name:/^记录 .* × /}).click();await expect(session).toContainText('已记录 2 组正式组');
+    await session.getByRole('button',{name:/^记录 .* × /}).click();await expect(session).toContainText('已记录 2 组 · 安排 1 组');
     await session.getByRole('button',{name:'下一个动作：杠铃平板卧推'}).click();
     await session.getByRole('button',{name:/^记录 .* × /}).click();
     await expect(session.getByRole('button',{name:'结束本次训练',exact:true})).toBeVisible();

@@ -39,7 +39,7 @@ test('a new account reviews a proposed plan, optionally trains, and sees its rec
   await expect(session.getByRole('button',{name:'记录 152.5 lb × 5'})).toBeEnabled();
   await session.getByRole('radio',{name:'2'}).click();
   await session.getByRole('button',{name:'记录 152.5 lb × 5'}).click();
-  await expect(session).toContainText('上一组 152.5 × 5');
+  await expect(session).toContainText('沿用上组 152.5 lb × 5');
   await expect(session).toContainText('45 + 5 + 2.5');await expect(session).toContainText('尚差 2.5 lb，无法精确配出');await expect(session).not.toContainText('每侧 35 + 5');
   const during=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
   expect(during.entries.some((entry:{kind:string;load?:number;sessionId?:string})=>entry.kind==='set'&&entry.load===152.5&&entry.sessionId)).toBe(true);

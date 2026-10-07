@@ -1,6 +1,5 @@
 import {
   BAR,
-  INCREMENTS,
   PLATES,
   type Constraint,
   type Entry,
@@ -15,7 +14,8 @@ import {
   type WaistEntry,
   type WeightEntry,
 } from '@lowkkey/protocol';
-import { bodyweightOn, dailyWeights, active, sessions } from './ledger.ts';
+import { bodyweightOn, dailyWeights, active } from './ledger.ts';
+import { trainingReference } from './training-reference.ts';
 import { addDays, convert, dayIndex, diffDays, fromDayIndex, ols, round, toKg, weekStart } from './util.ts';
 
 /* ═══════════════ V1 体重趋势 ═══════════════ */
@@ -82,37 +82,6 @@ export function warmupFlags(sets: Pick<SetEntry,'setRole'>[]): boolean[] {
 
 /* ═══════════════ 档位与杠片 ═══════════════ */
 
-const LOWER: Muscle[] = ['quads', 'hamstrings', 'glutes', 'adductors', 'calves'];
-
-export function isLowerBody(ex: Exercise): boolean {
-  const entries = Object.entries(ex.muscles) as [Muscle, number][];
-  const primary = entries.filter(([, w]) => w >= 1).map(([m]) => m);
-  return primary.some((m) => LOWER.includes(m));
-}
-
-/** 一档加重（动作单位）。辅助动作的「加重」= 减少辅助，由调用方取反。 */
-export function increment(ex: Exercise): number {
-  if (ex.increment) return ex.increment;
-  const u = ex.unit;
-  switch (ex.type) {
-    case 'barbell':
-      return isLowerBody(ex) ? (u === 'lb' ? INCREMENTS.barbellLowerLb : INCREMENTS.barbellLowerKg) : u === 'lb' ? INCREMENTS.barbellUpperLb : INCREMENTS.barbellUpperKg;
-    case 'dumbbell':
-      return u === 'lb' ? INCREMENTS.dumbbellLb : INCREMENTS.dumbbellKg;
-    case 'assisted':
-      return convert(INCREMENTS.assistKg,'kg',u);
-    default:
-      return u === 'kg' ? INCREMENTS.machineKg : INCREMENTS.machineLb;
-  }
-}
-
-/** 按档位移动负荷：steps > 0 表示更难。辅助动作更难 = 辅助更少。 */
-export function stepLoad(ex: Exercise, load: number, steps: number): number {
-  const inc = increment(ex);
-  const next = ex.type === 'assisted' ? load - steps * inc : load + steps * inc;
-  return Math.max(0, round(next, 2));
-}
-
 /** 左右对称配片：优先精确匹配、再选较少片数，返回每侧片重及总重差额。 */
 export function plates(total: number, unit: Unit, bar: number = BAR[unit], available:readonly number[]=PLATES[unit]): { perSide: number[]; bar: number; remainder: number } {
   const perSide:number[]=[],side=(total-bar)/2;
@@ -128,31 +97,7 @@ export function plates(total: number, unit: Unit, bar: number = BAR[unit], avail
   return {perSide:perSide.sort((a,b)=>b-a),bar,remainder:round(total-bar-2*matched/100,2)};
 }
 
-/* ═══════════════ V5 组内调节 ═══════════════ */
-
-export type NextSet = { load: number; reason: string; steps: number };
-
-/**
- * V5：
- * - 次数 ≥ 上限 且 RIR ≥ 2 → 至多 +1 档（且不超过 10%）
- * - RIR = 1 或未知 → 保持
- * - RIR = 0 且 次数 ≥ 下限 → 保持
- * - 次数 < 下限 → −1 档
- * - 其余（在区间内且 RIR ≥ 1，或 RIR 未知）→ 保持
- */
-/** At most one hardware step and 10% of effective load; this is a product guardrail. */
-export function guardedStep(ex:Exercise,load:number,steps:number,bodyweightKg:number|null=null):number {
-  const effective=ex.type==='assisted'?(bodyweightKg==null?null:convert(bodyweightKg,'kg',ex.unit)-load):load;
-  const next=stepLoad(ex,load,steps);
-  return effective==null||effective<=0||Math.abs(next-load)>effective*.1+1e-6?load:next;
-}
-export function nextSet(ex: Exercise, last: { load: number; reps: number; rir: number | null }, repMin: number, repMax: number,bodyweightKg:number|null=null): NextSet {
-  const desired=last.reps<repMin?-1:last.reps>=repMax&&last.rir!=null&&last.rir>=2?1:0;
-  const load=guardedStep(ex,last.load,desired,bodyweightKg),steps=load===last.load?0:desired;
-  return {load,steps,reason:steps>0?'达到次数上限，还能再做至少 2 次；加一档':steps<0?'低于次数下限；减一档':desired?'器械档位超过 10% 或有效负荷未知，保持':'保持本组重量'};
-}
-
-/* ═══════════════ V6 双进阶 + 周期 ═══════════════ */
+/* ═══════════════ V6 跨场录入参考与已确认组次 ═══════════════ */
 
 export function cycleWeek(cycleStart: LocalDate | null, date: LocalDate): number | null {
   if (!cycleStart) return null;
@@ -178,26 +123,13 @@ export type Prescription = {
   basedOn: string[];
 };
 
-/**
- * V6：最近完成场次的全部规定正式组达到上限且明确 RIR ≥ 1 → 至多 +1 档；否则沿用最近重量。
- * 没有历史 → startLoad（可能为 null：由你自选）。组数按周期系数缩放：max(2, round(sets × 系数))。
- */
+/** Actual history wins; a confirmed arrangement remains an explicit alternative. */
 export function prescribe(item: ProgramItem, ex: Exercise, entries: Entry[], asOf: LocalDate, program: Pick<Program, 'cycleStart' | 'ramp'>): Prescription {
-  const week = cycleWeek(program.cycleStart, asOf);
-  const r = rampFor(program.ramp, week);
-  const sets = r ? Math.max(2, Math.round(item.sets * r.setMultiplier)) : item.sets;
-  const base = { exerciseId: ex.id, unit: ex.unit, sets, repMin: item.repMin, repMax: item.repMax, targetRir: r?.targetRir ?? null };
-
-  const last=sessions(entries).filter(session=>session.endedAt&&session.date<=asOf&&session.sets.some(set=>set.exerciseId===ex.id)).sort((a,b)=>a.endedAt!.localeCompare(b.endedAt!)).at(-1);
-  const history=active(entries).filter((e):e is SetEntry=>e.kind==='set'&&e.exerciseId===ex.id&&e.date<=asOf);
-  const previous=last?.sets.filter(set=>set.exerciseId===ex.id&&set.setRole!=='warmup')??history.filter(set=>set.setRole!=='warmup').slice(-1);
-  if(!previous.length)return {...base,load:item.startLoad,reason:item.startLoad==null?'第一次练，重量自选':'计划起始重量',basedOn:[]};
-  const recent=previous.at(-1)!,load=convert(recent.load,recent.unit,ex.unit);
-  const required=last?.prescription?.find(it=>it.exerciseId===ex.id)?.sets;
-  const work=previous.filter(set=>set.setRole==='work');
-  const complete=!!last&&required!=null&&work.length>=required&&previous.every(set=>set.setRole==='work'&&set.reps>=item.repMax&&set.rir!=null&&set.rir>=1&&Math.abs(convert(set.load,set.unit,ex.unit)-load)<.01);
-  const next=complete?guardedStep(ex,load,1,bodyweightOn(entries,last!.date)?.kg??null):load;
-  return {...base,load:round(next,2),reason:next!==load?'上次完成全部正式组并达到上限，加一档':'沿用最近记录；资料不完整或未全部达到上限',basedOn:previous.map(set=>set.id)};
+  const r=rampFor(program.ramp,cycleWeek(program.cycleStart,asOf));
+  const reference=trainingReference(entries,ex,asOf,{item});
+  const load=reference.load==null?null:round(convert(reference.load,reference.unit,ex.unit),2);
+  return {exerciseId:ex.id,unit:ex.unit,sets:r?Math.max(2,Math.round(item.sets*r.setMultiplier)):item.sets,repMin:item.repMin,repMax:item.repMax,targetRir:r?.targetRir??null,
+    load,reason:reference.entryId?`沿用 ${reference.date} 实际记录 ${reference.load} ${reference.unit}${reference.unit===ex.unit?'':` → ${load} ${ex.unit}`}；不自动加减重量`:load==null?'尚无重量依据，由你填写':'已确认安排的参考重量',basedOn:reference.entryId?[reference.entryId]:[]};
 }
 
 /* ═══════════════ V7 每周有效组 ═══════════════ */
