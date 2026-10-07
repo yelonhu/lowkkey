@@ -251,7 +251,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         }else if(action==='load-unit')setUnits(value=>({...value,[unitKey]:(value[unitKey]??button.dataset.unitDefault)==='kg'?'lb':'kg'}));
         else if(action==='reps-minus')setReps(n=>Math.max(1,(n??actualReps)-1));
         else if(action==='reps-plus')setReps(n=>Math.min(100,(n??actualReps)+1));
-        else if(action==='rir')setRir(Number(button.dataset.value));
+        else if(action==='rir')setRir(value=>value===Number(button.dataset.value)?null:Number(button.dataset.value));
         else if(action==='trigger-accept'&&id)run(action,()=>chamber.decideTrigger(id,'accept'));
         else if(action==='trigger-later'&&id)run(action,()=>chamber.decideTrigger(id,'later'));
         else if(action==='proposal-accept'&&id)run(action,()=>chamber.decideProposal(id,'accept'));

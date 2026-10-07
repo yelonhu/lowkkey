@@ -44,13 +44,14 @@ export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,
     const keyboard=!!viewport&&!zoomed&&!!editable&&window.innerHeight-viewport.height>120;
     if(keyboard&&!keyboardScroll)keyboardScroll=[...host.querySelectorAll<HTMLElement>('[data-scroll-region]')].map(node=>({node,top:node.scrollTop}));
     const available=width===390?(!zoomed&&viewport?viewport.height:window.innerHeight):height*scale;
-    host.style.width=phone?`${Math.min(window.innerWidth,600)}px`:`${width}px`;host.style.height=`${available/scale}px`;host.style.transform=`scale(${scale})`;
+    host.style.width=phone?`${Math.min(window.innerWidth,600)}px`:`${width}px`;host.style.height=`${available/scale}px`;host.style.transform=phone?'none':`scale(${scale})`;
     host.style.setProperty('--page-height',`${available/scale}px`);host.style.setProperty('--viewport-scale',String(scale));
-    // One visual-viewport offset, on the shell only. Body remains fixed; never
+    // One visual-viewport offset, on the shell only. The document does not scroll; never
     // scroll the whole document to reveal a footer input or resize into zoom.
     shell.style.height=`${available}px`;shell.style.top=keyboard?`${Math.max(0,viewport!.offsetTop)}px`:'0px';
     shell.dataset.keyboard=String(keyboard);shell.dataset.compact=String(available/scale<844);
     if(!keyboard&&keyboardScroll){for(const {node,top} of keyboardScroll)if(node.isConnected)node.scrollTop=top;keyboardScroll=null;}
+    if(new URLSearchParams(location.search).has('viewport'))document.documentElement.dataset.viewport=JSON.stringify({standalone:window.matchMedia('(display-mode: standalone)').matches,screen:[window.screen.width,window.screen.height],inner:[window.innerWidth,window.innerHeight],visual:viewport?{height:viewport.height,top:viewport.offsetTop,scale:viewport.scale}:null,shell:shell.getBoundingClientRect().toJSON(),safeTop:getComputedStyle(host.querySelector('.screen')??host).paddingTop,theme:document.documentElement.dataset.theme});
     if(!zoomed&&window.scrollY!==0)window.scrollTo({top:0,left:0,behavior:'instant'});
   };
   const schedule=()=>{if(!frame)frame=requestAnimationFrame(resize);};

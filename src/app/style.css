@@ -1,6 +1,5 @@
 /* The ten screens and visual rules come from docs/lowkkey-handoff/frontend/lowkkey-frontend.html. */
 html,body,#root{margin:0;width:100%;height:100dvh;overflow:hidden;overscroll-behavior-y:none}
-html,body{position:fixed;inset:0}
 *{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text}
 :root{--motion-curve:cubic-bezier(0.32,0.72,0,1);--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
@@ -75,7 +74,7 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 /* Fluid phone layout: preserve type and hit areas instead of scaling the artboard. */
 .prototype-host.phone>.screen,.prototype-host.phone>.screen>div,.prototype-host.phone [data-scrim],.prototype-host.phone .sheet-layer [role="dialog"]{width:100%!important}
 .prototype-host.phone svg[width="350"]{width:100%;height:auto}
-.prototype-host.phone>.screen:not(.sheet-layer){scale:var(--sheet-depth,1);transform-origin:center center}
+.prototype-host.phone>.screen:not(.sheet-layer)>div{scale:var(--sheet-depth,1);transform-origin:center center}
 .prototype-host.phone :is(button,a,[role="button"]){min-height:44px}
 .prototype-host.phone input{min-width:0;max-width:100%;box-sizing:border-box}
 .prototype-host [data-action="load-unit"]{min-width:52px;min-height:44px}
@@ -87,7 +86,7 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .formula-scrim{background:transparent}
 .formula-scrim>[data-scrim]{position:absolute;inset:0;background:rgba(20,20,21,.24)}
 .formula-drawer{position:relative;width:100%}
-@media(prefers-reduced-motion:reduce){.prototype-host.phone>.screen{scale:1!important}}
+@media(prefers-reduced-motion:reduce){.prototype-host.phone>.screen>div{scale:1!important}}
 
 /* Native number steppers must not clip the editable training weight on WebKit. */
 .prototype-host input[data-action="load-input"]{appearance:textfield;-moz-appearance:textfield}
@@ -109,3 +108,10 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .access-gate form{display:grid;gap:16px;width:min(100%,360px);margin:24px auto}.access-gate label{display:grid;gap:8px;text-align:left}.access-gate input{font:inherit;font-size:16px;padding:14px;border:1px solid #ddd;border-radius:12px;min-width:0}.account-panel{position:fixed;inset:0;z-index:100;background:#0005;display:flex;align-items:flex-end}.account-panel .formula-drawer{width:100%;max-height:85dvh;overflow:auto;padding-bottom:max(24px,env(safe-area-inset-bottom))}.account-panel button,.account-button{font:inherit;padding:12px 18px;border:0;border-radius:24px;margin:8px 4px;background:#fff;color:#141415;min-height:44px}
 
 .account-panel input{width:100%;font:inherit;user-select:text;-webkit-user-select:text;}
+
+/* The safe-area canvas never participates in page or sheet motion. */
+.prototype-host.phone>.motion-outgoing{background:transparent!important}
+.prototype-host [data-session-weight]{display:flex!important;justify-content:center;align-items:baseline!important;gap:10px;width:100%;padding-inline:20px;box-sizing:border-box}
+.prototype-host [data-session-weight] input{width:min(250px,calc(100% - 62px))!important;flex:0 1 250px;line-height:1.2}
+.prototype-host [data-action="rir"][aria-checked="true"]{background:#F2F2F0!important;color:#141415!important;box-shadow:inset 0 0 0 2px #F2F2F0}
+.prototype-host [data-action="rir"]{transition:background-color 120ms var(--motion-curve),color 120ms var(--motion-curve),scale 120ms var(--motion-curve)}
