@@ -77,7 +77,7 @@ test('visual viewport keyboard changes restore the fixed shell and safe areas ar
   await expect.poll(()=>page.locator('.prototype-shell').evaluate(el=>el.getBoundingClientRect().top)).toBe(0);
   await page.goto('/#Session');await page.locator('[data-screen="Session"]').waitFor();
   await page.addStyleTag({content:':root{--safe-top:47px;--safe-bottom:34px}'});
-  await expect.poll(()=>page.locator('[data-screen="Session"]').evaluate(el=>({background:getComputedStyle(el).backgroundColor,pageHeight:el.getBoundingClientRect().height,innerHeight:el.firstElementChild!.getBoundingClientRect().height,top:el.firstElementChild!.getBoundingClientRect().top}))).toEqual({background:'rgb(0, 0, 0)',pageHeight:844,innerHeight:763,top:47});
+  await expect.poll(()=>page.locator('[data-screen="Session"]').evaluate(el=>({background:getComputedStyle(el).backgroundColor,pageHeight:el.getBoundingClientRect().height,innerHeight:el.firstElementChild!.getBoundingClientRect().height,top:el.querySelector('[data-page-frame]')!.firstElementChild!.getBoundingClientRect().top}))).toEqual({background:'rgb(0, 0, 0)',pageHeight:844,innerHeight:844,top:47});
 });
 
 

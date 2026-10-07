@@ -41,7 +41,7 @@ export class Motion {
       void this.play(next.firstElementChild??next,[{opacity:0},{opacity:1}],200).then(finish);return;
     }
     const rect=host.getBoundingClientRect(),scale=rect.width/host.offsetWidth;
-    const anchor=next.querySelector<HTMLElement>('[data-bind="main-plan"]')?.lastElementChild?.getBoundingClientRect();
+    const anchor=next.querySelector<HTMLElement>('[data-training-action]')?.getBoundingClientRect();
     const x=returning&&anchor?(anchor.left+anchor.width/2-rect.left)/scale:point?(point.x-rect.left)/scale:host.offsetWidth/2;
     const y=returning&&anchor?(anchor.top+anchor.height/2-rect.top)/scale:point?(point.y-rect.top)/scale:host.offsetHeight*.75;
     const radius=Math.hypot(Math.max(x,host.offsetWidth-x),Math.max(y,host.offsetHeight-y));

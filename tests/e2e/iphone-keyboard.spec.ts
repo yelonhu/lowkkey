@@ -24,19 +24,18 @@ test('training remains reachable in a keyboard-sized viewport and restores its d
     for(const offsetTop of [0,24,70,0]){
       await page.evaluate(offsetTop=>{Object.assign(window.visualViewport!,{height:420,offsetTop});window.visualViewport!.dispatchEvent(new Event('resize'));window.visualViewport!.dispatchEvent(new Event('scroll'));},offsetTop);
       await expect(page.locator('.prototype-shell')).toHaveAttribute('data-keyboard','true');
-      await expect.poll(()=>page.locator('.prototype-shell').evaluate(el=>el.getBoundingClientRect().top)).toBe(offsetTop);
-      await input.scrollIntoViewIfNeeded();await expect(input).toBeInViewport();
+      await expect.poll(()=>page.locator('.prototype-shell').evaluate(el=>el.getBoundingClientRect().top)).toBe(0);
+      await expect.poll(()=>board.locator('[data-page-frame]').evaluate(el=>el.getBoundingClientRect().top)).toBe(offsetTop);
       expect(await page.evaluate(()=>window.scrollY)).toBe(0);
       await expect(input).toHaveValue('127.25');
     }
     const reps=await board.getByRole('spinbutton',{name:'本组次数'}).inputValue();
     const save=board.getByRole('button',{name:`记录 127.25 lb × ${reps}`});
-    await save.scrollIntoViewIfNeeded();
     await expect.poll(async()=>{const box=await save.boundingBox();return box!.y+box!.height;}).toBeLessThanOrEqual(420);
     await input.blur();await page.evaluate(()=>{Object.assign(window.visualViewport!,{height:852,offsetTop:0});window.visualViewport!.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('pageshow'));});
     await expect(page.locator('.prototype-shell')).toHaveAttribute('data-keyboard','false');
     await expect.poll(()=>board.locator('[data-scroll-region]').evaluate(el=>el.scrollTop)).toBe(scrollBefore);
-    await expect(input).toHaveValue('127.25');await input.scrollIntoViewIfNeeded();
+    await expect(input).toHaveValue('127.25');
     const header=board.locator(':scope > div > div').first();
     await expect(header.getByRole('link',{name:'今日',exact:true})).toBeInViewport();
     await expect(header.getByRole('button',{name:'动作清单'})).toBeInViewport();

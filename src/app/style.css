@@ -25,24 +25,34 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .formula-drawer button{border:0;background:transparent;color:#2C4A66;font:600 15px/44px inherit;float:right}
 /* Interaction layers do not alter the resting handoff styles. */
 .prototype-host{position:relative}
-/* Safe areas are outside the original artboard padding, and counted once. */
-.prototype-host.phone>.screen:not(.sheet-layer){height:var(--page-height,844px);box-sizing:border-box;background:#F1F1EF;padding:calc(var(--safe-top) / var(--viewport-scale,1)) 0 calc(var(--safe-bottom) / var(--viewport-scale,1))}
+/* The full-height canvas stays still; only its interior frame yields to a keyboard. */
+.prototype-host.phone>.screen:not(.sheet-layer){height:100%;box-sizing:border-box;background:#F1F1EF}
 .prototype-host.phone>.screen:is([data-screen="Session"],[data-screen="Debrief"]){background:#000}
-.prototype-host.phone>.screen:not(.sheet-layer)>div{height:100%!important;overflow:hidden}
+.prototype-host.phone>.screen:not(.sheet-layer)>div{height:100%!important;min-height:0;overflow:hidden;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom);box-sizing:border-box}
+.prototype-host.phone [data-page-frame][data-docked]{display:grid!important;grid-template-rows:auto minmax(0,1fr) auto}
+.prototype-host.phone [data-bottom-dock]{display:flex;flex-direction:column;gap:8px;padding:8px 12px 12px!important;min-width:0;box-sizing:border-box}
+.prototype-host.phone [data-bottom-dock="session"]{padding-inline:16px!important}
+.prototype-host.phone [data-bottom-dock] [data-training-action]{margin:0 8px}
+.prototype-host.phone [data-bottom-dock] > button:last-child{flex:none;width:100%}
+.prototype-host.phone [data-page-frame][data-docked]>[data-scroll-region]{min-height:0;margin:0}
 :where(.prototype-host.phone>.screen>div>*,[data-scroll-region]>*,[data-scroll-frame]>*){flex-shrink:0}
 .prototype-host.phone [data-scroll-region],.prototype-host.phone [data-scroll-frame]{flex:1 1 auto;min-height:0;min-width:0}
 .prototype-host.phone [data-scroll-region]{overflow-x:hidden;overflow-y:auto!important;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch}
 .prototype-host.phone [data-scroll-frame]{overflow:hidden!important}
 .prototype-host.phone [data-bind="ledger-timeline"]{flex-grow:0}
 .prototype-host.phone [data-scroll-region="session"]{display:flex;flex-direction:column;overflow-anchor:none}
-.prototype-host.phone [data-session-center]{flex:1 0 auto;min-height:330px;box-sizing:border-box;padding-block:16px}
-.prototype-host.phone [data-session-controls]{flex:none}
-.prototype-shell[data-keyboard="true"] [data-session-center]{min-height:240px;padding-block:8px}
+.prototype-host.phone [data-session-center]{flex:1 0 auto;box-sizing:border-box;padding-block:16px}
+.prototype-host.phone [data-session-controls]{flex:none;padding-bottom:8px!important}
+.prototype-shell[data-keyboard="true"] [data-session-center]{padding-block:8px}
 .prototype-shell[data-keyboard="true"] [data-session-controls]{gap:8px!important;padding-bottom:8px!important}
 .prototype-shell[data-keyboard="true"] [data-session-center]>svg{display:none}
 .prototype-host.phone [data-scroll-region="debrief"]{display:flex;flex-direction:column}
 .prototype-host.phone [data-scroll-region="debrief"]>[style*="flex-grow"]{flex:1 0 0}
-.prototype-shell[data-keyboard="true"]{--safe-bottom:0px}
+.prototype-shell[data-keyboard="true"] .prototype-host.phone>.screen:not(.sheet-layer)>div{position:relative;top:var(--keyboard-top);height:var(--keyboard-height)!important;padding-top:max(0px,calc(var(--safe-top) - var(--keyboard-top)));padding-bottom:0}
+.prototype-shell[data-keyboard="true"] [data-training-action]{display:none!important}
+.prototype-shell[data-keyboard="true"] .sheet-layer{top:var(--keyboard-top);height:var(--keyboard-height)}
+.viewport-diagnostic{position:absolute;z-index:100;right:8px;top:max(8px,env(safe-area-inset-top));font:12px/1.4 -apple-system,sans-serif;padding:6px;border:1px solid #7F7F84;border-radius:8px;background:#F1F1EF;color:#141415}
+.viewport-report{position:absolute;z-index:101;inset:20%;background:#fff;color:#141415;user-select:text;-webkit-user-select:text}
 .prototype-host :is(button,a,[role="button"],[role="radio"]),.action-status button,.access-gate button{touch-action:manipulation;transition:scale 120ms var(--motion-curve),opacity 120ms var(--motion-curve)}
 .prototype-host [data-pressed]:not(:disabled):not([aria-disabled="true"]),.action-status button[data-pressed],.access-gate button[data-pressed]{scale:.97}
 .prototype-host :is(button,a,input,[tabindex]):focus-visible{outline:2px solid #2C4A66;outline-offset:3px}
