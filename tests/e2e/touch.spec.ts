@@ -69,6 +69,8 @@ test('visual viewport keyboard changes restore the fixed shell and safe areas ar
   const input=page.getByLabel('今天发生了什么？');await input.fill('键盘草稿');await input.focus();
   await page.evaluate(()=>{Object.assign(window.visualViewport!,{height:500,offsetTop:10});window.visualViewport!.dispatchEvent(new Event('resize'));});
   await expect(page.locator('.prototype-shell')).toHaveAttribute('data-keyboard','true');
+  await expect(page.locator('[data-screen="Main"] h1')).toBeInViewport();
+  expect(await page.evaluate(()=>window.scrollY)).toBe(0);
   await expect.poll(async()=>{const box=await input.boundingBox();return box!.y+box!.height;}).toBeLessThanOrEqual(510);
   await input.blur();await page.evaluate(()=>{Object.assign(window.visualViewport!,{height:844,offsetTop:0});window.visualViewport!.dispatchEvent(new Event('resize'));});
   await expect(page.locator('.prototype-shell')).toHaveAttribute('data-keyboard','false');await expect(input).toHaveValue('键盘草稿');
@@ -91,4 +93,19 @@ test('phone artboards use the viewport width and sheet depth restores after dism
   await expect.poll(()=>page.locator('[data-screen="Main"]').evaluate(el=>getComputedStyle(el).scale)).toBe('0.96');
   await page.keyboard.press('Escape');
   await expect.poll(()=>page.locator('[data-screen="Main"]').evaluate(el=>getComputedStyle(el).scale)).toBe('1');
+});
+
+
+test('page chrome follows interrupted dark and light navigation',async({page})=>{
+  await page.goto('/');await page.locator('.screen,.access-gate button').first().waitFor();
+  const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
+  for(const screen of ['Session','Ledger','Debrief','Main','Session','Body']){
+    await page.evaluate(screen=>{location.hash=screen;},screen);
+    await expect(page.locator(`.screen[data-screen="${screen}"]:not(.motion-outgoing)`)).toBeVisible();
+    const dark=['Session','Debrief'].includes(screen),color=dark?'rgb(0, 0, 0)':'rgb(241, 241, 239)';
+    await expect.poll(()=>page.evaluate(()=>[document.documentElement,document.body,document.getElementById('root')!].map(el=>getComputedStyle(el).backgroundColor))).toEqual([color,color,color]);
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content',dark?'#000000':'#F1F1EF');
+  }
+  await expect(page.locator('.motion-outgoing')).toHaveCount(0);
+  await expect(page.locator('.sheet-layer')).toHaveCount(0);
 });

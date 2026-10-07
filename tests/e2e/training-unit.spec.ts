@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('first-load unit confirmation preserves the raw unit and converts the next-set rule',async({page})=>{
+test('first-load explicit save preserves the raw unit and converts the next-set rule',async({page})=>{
   await page.goto('/');const login=page.getByRole('button',{name:'进入状态舱'});await page.locator('.screen,.access-gate button').first().waitFor();if(await login.isVisible())await login.click();
   await page.locator('.screen[data-screen="Main"]').waitFor();
   const original=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
@@ -12,12 +12,12 @@ test('first-load unit confirmation preserves the raw unit and converts the next-
     const session=page.locator('.screen[data-screen="Session"]');
     await expect(session.getByRole('spinbutton',{name:'首次重量'})).toBeVisible();
     await session.getByRole('spinbutton',{name:'首次重量'}).fill('90');
-    await session.getByRole('button',{name:'确认重量单位 kg'}).click();
-    await session.getByRole('button',{name:'重量单位已确认 kg，点按切换'}).click();
-    await expect(session.getByRole('button',{name:'重量单位已确认 lb，点按切换'})).toBeVisible();
+    await session.getByRole('button',{name:'重量单位 kg，点按切换'}).click();
+    await expect(session.getByRole('button',{name:'重量单位 lb，点按切换'})).toBeVisible();
     await session.getByRole('radio',{name:'2'}).click();
-    await session.getByRole('button',{name:'完成本组'}).click();
+    await session.getByRole('button',{name:'记录 90 lb × 8'}).click();
     await expect(session).toContainText('上一组 90 × 8 lb');
+    await expect(session.getByRole('button',{name:'重量单位 lb，点按切换'})).toBeVisible();
     const state=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
     const set=state.entries.findLast((entry:{kind:string;exerciseId?:string})=>entry.kind==='set'&&entry.exerciseId==='hack_squat');
     expect(set.load).toBe(90);expect(set.unit).toBe('lb');

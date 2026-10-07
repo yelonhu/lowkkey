@@ -29,17 +29,20 @@ test('optional training uses an explicit exercise list, next exercise and explic
     await program(page,{...before.program,days:[{id:'optional',name:'胸 / 背 · 自己的安排',weekday,items:[{exerciseId:'bench_press',sets:1,repMin:5,repMax:8,startLoad:95},{exerciseId:'seated_row',sets:1,repMin:8,repMax:12,startLoad:30}]}]});
     await page.reload();await expect(page.locator('[data-bind="main-plan"]')).toContainText('胸 / 背 · 自己的安排');
     await page.locator('[data-action="start-session"]').click();const session=page.locator('[data-screen="Session"]');
+    // Editing the weekly plan on another device must not rewrite this session.
+    await program(page,{...before.program,days:[]});
+    await expect.poll(async()=>(await snapshot(page)).program.days.length).toBe(0);
     await session.getByRole('button',{name:'动作清单',exact:true}).click();const list=page.getByRole('dialog',{name:'动作清单'});
     await expect(list).toContainText('正式组 0 / 1');await list.getByRole('button',{name:/坐姿绳索划船/}).click();await expect(list).toHaveCount(0);
-    await session.getByRole('button',{name:'完成本组',exact:true}).click();
+    await session.getByRole('button',{name:/^记录 .* × /}).click();
     await expect(session.getByRole('button',{name:'下一个动作：杠铃平板卧推'})).toBeVisible();
     await expect(session.locator('[data-action="complete-set"]')).toHaveCount(0);
     const count=(await snapshot(page)).entries.filter((e:{kind:string})=>e.kind==='set').length;
     await session.getByRole('button',{name:'再记一组',exact:true}).click();
     expect((await snapshot(page)).entries.filter((e:{kind:string})=>e.kind==='set')).toHaveLength(count);
-    await session.getByRole('button',{name:'完成本组',exact:true}).click();await expect(session).toContainText('已记录 2 组正式组');
+    await session.getByRole('button',{name:/^记录 .* × /}).click();await expect(session).toContainText('已记录 2 组正式组');
     await session.getByRole('button',{name:'下一个动作：杠铃平板卧推'}).click();
-    await session.getByRole('button',{name:'完成本组',exact:true}).click();
+    await session.getByRole('button',{name:/^记录 .* × /}).click();
     await expect(session.getByRole('button',{name:'结束本次训练',exact:true})).toBeVisible();
     await session.getByRole('button',{name:'结束本次训练',exact:true}).click();await expect(page.locator('[data-screen="Debrief"]')).toContainText('2 个动作 · 3 组');
   }finally{await program(page,before.program);}

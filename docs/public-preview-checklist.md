@@ -6,6 +6,10 @@
 
 2026-10-05 已应用增量迁移 `0003_customer_auth.sql`。没有导入本地测试记录；已有业务条目保留。发布前 Worker 版本为 `05811396-b687-4da5-ace6-ca39ca9ed51b`，数据库恢复点保存在本机 `.artifacts/releases/2026-10-05/pre-deploy.json`。
 
+## iPhone 本轮复测
+
+2026-10-06 前端修复的四项真机清单见 [iPhone 状态舱验收](iphone-chamber-qa.md)。本轮没有数据库迁移或认证切换。真机仍待验证，自动化通过不等于 iPhone 已通过。
+
 ## 你可以立即验证
 
 1. 在已登录的浏览器打开 `https://lowkkey-preview.yelon-hu.workers.dev/healthz`。应显示 `status: ok`，`version` 应等于 GitHub main 最新提交的完整 SHA。

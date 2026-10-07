@@ -38,11 +38,11 @@ test('a new account reviews a proposed plan, optionally trains, and sees its rec
   const firstLoad=session.getByRole('spinbutton',{name:/首次重量/});
   await expect(firstLoad).toBeVisible();
   await expect(session.getByRole('button',{name:'填写重量后完成本组'})).toBeDisabled();
+  await expect(session.getByRole('img',{name:'杠铃示意，输入重量后显示配片'})).toBeVisible();
   await firstLoad.fill('152.5');
-  await expect(session.getByRole('button',{name:'确认单位后完成本组'})).toBeDisabled();
-  await session.getByRole('button',{name:'确认重量单位 lb'}).click();
+  await expect(session.getByRole('button',{name:'记录 152.5 lb × 5'})).toBeEnabled();
   await session.getByRole('radio',{name:'2'}).click();
-  await session.getByRole('button',{name:'完成本组'}).click();
+  await session.getByRole('button',{name:'记录 152.5 lb × 5'}).click();
   await expect(session).toContainText('上一组 152.5 × 5');
   await expect(session).toContainText('45 + 5 + 2.5');await expect(session).toContainText('2.5 lb 无法配出');await expect(session).not.toContainText('每侧 35 + 5');
   const during=await page.evaluate(async()=>await (await fetch('/v1/state')).json());

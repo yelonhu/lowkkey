@@ -14,7 +14,7 @@ test('training uses the plan, V5 next set, and a real debrief',async({page})=>{
     const session=page.locator('.screen[data-screen="Session"]');await expect(session).toBeVisible();
     await expect(session.locator('[data-action="load-input"]')).toHaveAttribute('placeholder','185');
     await session.getByRole('radio',{name:'2'}).click();
-    await session.getByRole('button',{name:'完成本组'}).click();
+    await session.getByRole('button',{name:/^记录 .* × /}).click();
     await expect(session).toContainText('上一组 185 × 5');
     const derived=await page.evaluate(async()=>await (await fetch('/v1/state')).json());
     expect(derived.derived['next.romanian_deadlift'].rule).toBe('V5');

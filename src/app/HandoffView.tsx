@@ -6,13 +6,14 @@ import { bindHandoff, prepareHandoff } from './handoff-bindings.ts';
 import { installPrototypeStyle, prototypeScreen } from './prototype-template.ts';
 import { navigate, screens, reviewFromHash, navigateReview } from './navigation.ts';
 import type { Screen } from './navigation.ts';
+import { sessionItems } from './training-state.ts';
 import { bindDecisionSheet } from './sheet-bindings.ts';
 import type { SheetState } from './sheet-bindings.ts';
 import { RequestError } from './useHandoff.ts';
 import type { useHandoff } from './useHandoff.ts';
 import { patchNode } from './dom-patch.ts';
 import { Motion, reducedMotion } from './motion.ts';
-import { observeViewport, prepareViewport } from './viewport.ts';
+import { applyPageTheme, observeViewport, prepareViewport } from './viewport.ts';
 
 type Chamber=ReturnType<typeof useHandoff>;
 const writes=new Set(['decision-accept','decision-later','set-classify','day-start','capture-submit','toast-revert','entry-revert','submission-accept','submission-skip','held-skip','start-session','end-session','complete-set','trigger-accept','trigger-later','proposal-accept','proposal-later','proposal-reject','client-revoke']);
@@ -23,7 +24,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const failedCapture=useRef('');
   const [filter,setFilter]=useState<'all'|'you'|'model'|'rule'>('all'),[answers,setAnswers]=useState<Record<string,string>>({});
   const [reps,setReps]=useState<number|null>(null),[rir,setRir]=useState<number|null>(null),[exerciseId,setExerciseId]=useState<string|null>(null);
-  const [formula,setFormula]=useState<string|null>(null),[sheet,setSheet]=useState<SheetState|null>(null),[manualLoad,setManualLoad]=useState(''),[manualUnit,setManualUnit]=useState<'kg'|'lb'|null>(null);
+  const [formula,setFormula]=useState<string|null>(null),[sheet,setSheet]=useState<SheetState|null>(null),[manualLoad,setManualLoad]=useState(''),[units,setUnits]=useState<Record<string,'kg'|'lb'>>({});
   const [review,setReview]=useState<{id:string;questions:NonNullable<Chamber['state']>['submissions'][number]['questions'];revision:number}|null>(null);
   const [reviewLoading,setReviewLoading]=useState(false),[activeAction,setActiveAction]=useState<string|null>(null),[notice,setNotice]=useState(''),[captureRetry,setCaptureRetry]=useState(false);
   const shownReview=useRef<{id:string;revision:number}|null>(null);
@@ -41,11 +42,13 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   const [extraSetKey,setExtraSetKey]=useState<string|null>(null);
   const [setRole,setSetRole]=useState<'work'|'warmup'>('work');
   const suggestion=useRef<{key:string;value:number|null;unit:'kg'|'lb';ruleVersion:string;inputs:string[]}|null>(null),claiming=useRef(false),lastClaim=useRef(-1);
-  const currentSession=state?openSession(state.entries):null,currentItem=state?.program.days.find(day=>day.id===currentSession?.dayId)?.items.find(item=>item.exerciseId===exerciseId)??state?.program.days.find(day=>day.id===currentSession?.dayId)?.items[0];
+  const currentSession=state?openSession(state.entries):null,items=state?sessionItems(state,currentSession):[],currentItem=items.find(item=>item.exerciseId===exerciseId)??items[0];
+  const unitKey=`${currentSession?.id}:${currentItem?.exerciseId}`,manualUnit=units[unitKey]??currentSession?.sets.filter(set=>set.exerciseId===currentItem?.exerciseId).at(-1)?.unit??null;
   const setKey=`${currentSession?.id}:${currentItem?.exerciseId}:${currentSession?.sets.length}`;
   const previousReps=state?.entries.filter(entry=>entry.kind==='set'&&entry.exerciseId===currentItem?.exerciseId&&!state.entries.some(r=>r.kind==='revert'&&r.targetId===entry.id)).at(-1);
   const actualReps=reps??(previousReps?.kind==='set'?previousReps.reps:currentItem?.repMin??1);
-  if(state&&currentItem){const ex=state.exercises.find(ex=>ex.id===currentItem.exerciseId)!,derived=state.derived[`next.${ex.id}`],key=`${currentSession?.id}:${ex.id}:${currentSession?.sets.filter(set=>set.exerciseId===ex.id).length}`;
+  const currentExercise=state?.exercises.find(ex=>ex.id===currentItem?.exerciseId);
+  if(state&&currentItem&&currentExercise){const ex=currentExercise,derived=state.derived[`next.${ex.id}`],key=`${currentSession?.id}:${ex.id}:${currentSession?.sets.filter(set=>set.exerciseId===ex.id).length}`;
     if(!suggestion.current||suggestion.current.key!==key&&!manualLoad&&!host.current?.querySelector('[data-action="load-input"]:focus'))suggestion.current={key,value:derived?.value??currentItem.startLoad,unit:ex.unit,ruleVersion:derived?.ruleVersion??'1.1.0',inputs:derived?.inputs??[]};
   }
   useEffect(()=>{
@@ -94,7 +97,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   }
   useLayoutEffect(()=>{
     if(!state||!host.current)return;
-    installPrototypeStyle();
+    installPrototypeStyle();applyPageTheme(baseScreen);
     if(screen!=='Capture')shownReview.current=null;
     if(screen==='Capture'&&submissionId&&shownReview.current?.id!==submissionId)shownReview.current={id:submissionId,revision:state.revision};
     const context={state,reviewOutcome,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewTarget,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,manualUnit,setRole,allowExtra:extraSetKey===setKey,suggestion:suggestion.current};
@@ -188,15 +191,16 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     if(event==='start'&&!day)return;
     const sessionId=event==='start'?crypto.randomUUID():current?.id;if(!sessionId)return;
     const entry:EntryDraft={kind:'session',event,sessionId,dayId:event==='start'?day!.id:null,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
-    await chamber.writeEntries([entry]);setReps(null);setExtraSetKey(null);setSetRole('work');suggestion.current=null;setExerciseId(null);setManualLoad('');setManualUnit(null);go(event==='start'?'Session':'Debrief');
+    await chamber.writeEntries([entry]);setReps(null);setExtraSetKey(null);setSetRole('work');suggestion.current=null;setExerciseId(null);setManualLoad('');go(event==='start'?'Session':'Debrief');
   }
   async function completeSet(exercise:string,load:number,unit:'kg'|'lb'){
     if(!state)return;const session=openSession(state.entries),ex=state.exercises.find(e=>e.id===exercise);if(!session||!ex)return;
     const clock=capturedClock(),entry:EntryDraft={kind:'set',sessionId:session.id,exerciseId:exercise,setIndex:session.sets.filter(e=>e.exerciseId===exercise).length+1,load,unit,loadKind:ex.type==='assisted'?'assist':'external',reps:actualReps,rir,setRole,recommendation:suggestion.current?{load:suggestion.current.value,unit:suggestion.current.unit,ruleVersion:suggestion.current.ruleVersion,inputs:suggestion.current.inputs}:undefined,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
-    const result=await chamber.writeEntries([entry],true);
-    const unitQuestion=result.held.find(item=>item.gate==='G4'&&item.drafts[0]?.kind==='set'&&item.drafts[0].unit===unit&&item.options.some(option=>option.id==='as_is'));
-    if(unitQuestion&&manualUnit!==null)await chamber.resolve(unitQuestion,{optionId:'as_is'});
-    setExtraSetKey(null);setRir(null);setReps(null);suggestion.current=null;setManualLoad('');setManualUnit(null);
+    let result=await chamber.writeEntries([entry],true);
+    const unitQuestion=result.held.find(item=>item.gate==='G4'&&item.drafts[0]?.kind==='set'&&item.drafts[0].unit===unit&&item.drafts[0].exerciseId===exercise&&item.drafts[0].sessionId===session.id&&item.drafts[0].load===load&&item.options.some(option=>option.id==='as_is'));
+    if(unitQuestion)result=await chamber.resolve(unitQuestion,{optionId:'as_is'});
+    if(!result.committed.some(item=>item.kind==='set'&&item.sessionId===session.id&&item.exerciseId===exercise)){setNotice('这组需要核对，训练结束后确认。');return;}
+    setExtraSetKey(null);setRir(null);setReps(null);suggestion.current=null;setManualLoad('');
   }
   const click=(event:React.MouseEvent<HTMLDivElement>)=>{
     const target=event.target as Element;if(!state)return;
@@ -242,9 +246,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='exercise-list')openSheet({kind:'exercises',exerciseId:currentItem?.exerciseId??null});
         else if(action==='extra-set'){setExtraSetKey(setKey);setSetRole('work');}
         else if((action==='next-exercise'||action==='select-exercise')&&id){
-          setExerciseId(id);setReps(null);setRir(null);setExtraSetKey(null);setSetRole('work');suggestion.current=null;setManualLoad('');setManualUnit(null);
+          setExerciseId(id);setReps(null);setRir(null);setExtraSetKey(null);setSetRole('work');suggestion.current=null;setManualLoad('');
           if(sheet?.kind==='exercises')dismiss();
-        }else if(action==='load-unit')setManualUnit(unit=>unit===null?button.dataset.unitDefault as 'kg'|'lb':unit==='kg'?'lb':'kg');
+        }else if(action==='load-unit')setUnits(value=>({...value,[unitKey]:(value[unitKey]??button.dataset.unitDefault)==='kg'?'lb':'kg'}));
         else if(action==='reps-minus')setReps(n=>Math.max(1,(n??actualReps)-1));
         else if(action==='reps-plus')setReps(n=>Math.min(100,(n??actualReps)+1));
         else if(action==='rir')setRir(Number(button.dataset.value));
@@ -304,9 +308,9 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const close=event.type==='pointerup'&&(distance>80||distance>24&&velocity>.5);
     if(close)dismiss();else sheetMotion.current.sheet(active.layer,true,undefined,base.current);
   };
-  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]')){draft.current=target.value;const submit=host.current?.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit){if(target.value.trim())submit.textContent='提交';else {const original=prototypeScreen('Main').querySelector('[aria-label="语音"]');if(original)submit.replaceChildren(...Array.from(original.childNodes));}submit.setAttribute('aria-label',target.value.trim()?'提交记录':'语音使用说明');}}else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.value);}};
+  const onInput=(event:React.FormEvent<HTMLDivElement>)=>{const target=event.target;if(target instanceof HTMLInputElement){if(target.matches('input[data-action="capture-input"]')){draft.current=target.value;const submit=host.current?.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit){if(target.value.trim())submit.textContent='提交';else {const original=prototypeScreen('Main').querySelector('[aria-label="语音"]');if(original)submit.replaceChildren(...Array.from(original.childNodes));}submit.setAttribute('aria-label',target.value.trim()?'提交记录':'语音使用说明');}}else if(target.matches('input[data-action="load-input"]'))setManualLoad(target.validity.badInput?'invalid':target.value);}};
   const feedback=chamber.error||notice;
-  return <div className="prototype-shell" ref={shell} onClick={click} onKeyDown={keydown} onInput={onInput} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd}>
+  return <div className="prototype-shell" ref={shell} onClick={click} onFocus={event=>{if((event.target as Element).matches('[data-action="load-input"]')){setUnits(value=>({...value,[unitKey]:value[unitKey]??manualUnit??currentExercise?.unit??'kg'}));setReps(value=>value??actualReps);}}} onKeyDown={keydown} onInput={onInput} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd}>
     <div ref={host}/>
     {feedback&&<div className="action-status" role="status" aria-live="polite"><span>{feedback}</span>{chamber.retry?<button type="button" data-action="retry-operation">重试</button>:captureRetry&&chamber.error?<button type="button" data-action="retry-capture">重试</button>:null}</div>}
   </div>;

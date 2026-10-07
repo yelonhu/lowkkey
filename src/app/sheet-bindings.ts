@@ -1,3 +1,4 @@
+import { sessionItems } from './training-state.ts';
 import { Program as ProgramSchema } from '@lowkkey/protocol';
 import { mergePatch, openSession } from '@lowkkey/core';
 import type { Program } from '@lowkkey/protocol';
@@ -90,7 +91,7 @@ export function bindDecisionSheet(root:HTMLElement,state:V1State,sheet:SheetStat
   const session=openSession(state.entries);
   if(sheet.kind==='exercises'){
     dialog.setAttribute('aria-label','动作清单');heading('本次训练','动作清单');title.textContent='选择动作';detail.textContent='查看已完成组数，选择要继续的动作。';
-    for(const item of state.program.days.find(day=>day.id===session?.dayId)?.items??[]){
+    for(const item of sessionItems(state,session)){
       const count=session?.sets.filter(set=>set.exerciseId===item.exerciseId&&set.setRole==='work').length??0,planned=session?.prescription?.find(rx=>rx.exerciseId===item.exerciseId)?.sets??item.sets;
       const button=row(state.exercises.find(ex=>ex.id===item.exerciseId)?.name??item.exerciseId,`正式组 ${count} / ${planned} · ${item.repMin}–${item.repMax} 次`,item.exerciseId,'select-exercise',item.exerciseId);
       button.setAttribute('aria-pressed',String(item.exerciseId===sheet.exerciseId));
