@@ -1,3 +1,5 @@
+> Historical: pre-showroom event-ledger version. This is not the current product or acceptance record. See [current design](lowkkey-handoff/DESIGN.md) and [current deployment](lowkkey-handoff/DEPLOY.md).
+
 # iPhone 交互打磨与验收
 
 > 历史验收记录：以下结论对应各批次当时的代码与检查结果。当前发布状态、未解决问题及复测要求以 [公网预览验收](public-preview-checklist.md) 为准。旧诊断入口的说明仅供追溯；本轮源码已移除该功能。

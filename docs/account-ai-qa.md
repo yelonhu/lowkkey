@@ -1,3 +1,5 @@
+> Historical: pre-showroom event-ledger version. This is not the current product or acceptance record. See [current design](lowkkey-handoff/DESIGN.md) and [current deployment](lowkkey-handoff/DEPLOY.md).
+
 # 账户与 AI 授权验收记录
 
 > 历史验收记录：以下结论对应当时的代码与检查结果。当前发布状态及未完成的外部验收以 [公网预览验收](public-preview-checklist.md) 为准。

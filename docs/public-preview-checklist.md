@@ -1,3 +1,5 @@
+> Historical: pre-showroom event-ledger version. This is not the current product or acceptance record. See [current design](lowkkey-handoff/DESIGN.md) and [current deployment](lowkkey-handoff/DEPLOY.md).
+
 # 公网预览验收
 
 ## 当前状态（2026-10-08）

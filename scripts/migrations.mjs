@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
-export async function applyMigrations(db, directory = 'db/migrations') {
+export async function applyMigrations(db, directory = 'db/showroom-migrations') {
   await db.prepare('CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL)').run();
   for (const name of (await readdir(directory)).filter(item => item.endsWith('.sql')).sort()) {
     const sql = await readFile(`${directory}/${name}`, 'utf8');

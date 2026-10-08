@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lowkkey-showroom-beta",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/v1/*", "/mcp", "/.well-known/*", "/authorize", "/oauth/*", "/healthz"]
+  },
+  "vars": {
+    "APP_ENV": "production",
+    "AUTH_MODE": "customer",
+    "AI_CONNECTION_ENABLED": "1",
+    "APP_ORIGIN": "https://lowkkey-showroom-beta.yelon-hu.workers.dev"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "lowkkey-showroom-beta",
+    "database_id": "REPLACE_WITH_NEW_SHOWROOM_D1_ID",
+    "migrations_dir": "db/showroom-migrations"
+  }],
+  "kv_namespaces": [{"binding": "OAUTH_KV", "id": "REPLACE_WITH_NEW_SHOWROOM_KV_ID"}]
+}

@@ -56,15 +56,6 @@ for (const [op, r] of Object.entries(P.ROUTES)) {
   if (params.length) item.parameters = params;
   (paths[route.path] ??= {})[route.method.toLowerCase()] = item;
 }
-paths['/v1/events'] = {
-  get: {
-    operationId: 'events',
-    summary: '实时事件流（Server-Sent Events），每条 data 为一个 ServerEvent',
-    'x-scopes': ['user', 'read'],
-    responses: { '200': { description: 'text/event-stream', content: { 'text/event-stream': { schema: { $ref: '#/components/schemas/ServerEvent' } } } } },
-  },
-};
-
 writeFileSync(
   join(out, 'openapi.json'),
   JSON.stringify(

@@ -1,40 +1,25 @@
-# 生产接入
+# 独立展厅环境配置
 
-客户登录与 AI 授权的新部署请先读 [账户与 AI 授权手册](../account-ai-rollout.md)。下文 workers.dev 部分记录既有 Access 测试环境；客户模式不沿用整站 Access 登录墙。
+本次重构只进行本地验证，没有发布公网。不得将新迁移应用到旧事件账本数据库。
 
-## GitHub 驱动的 workers.dev 测试环境
+## 本地隔离
 
-测试 Worker 使用仓库根目录的 `wrangler.json`，部署名称为 `lowkkey-preview`。D1 与 KV 的绑定 ID、应用地址和 Access AUD 固定在这份配置中；Wrangler 登录凭据不属于仓库。`wrangler.local.json` 专供本地开发，由 Vite 在启动开发服务时显式选择。
+- wrangler.local.json：新 showroom 数据库标识，migrations_dir 为 db/showroom-migrations。
+- scripts/local-runtime.mjs / Vite：默认 .data/showroom。
+- 测试和演练：每次新建 .data/e2e-showroom 下的临时目录，退出清理。
+- 旧 .data/v02 与 db/migrations 保持原样。
+- 默认 build 使用本地配置。wrangler.json 是旧公网配置，不用于新版本默认构建；原 deploy:preview 捷径已移除。
 
-把已存在的 Worker 接到 GitHub：Cloudflare **Workers & Pages → lowkkey-preview → Settings → Builds → Connect**，选择 `yelonhu/lowkkey`，根目录为仓库根目录，生产分支为 `main`。构建版本由 `.node-version` 固定为 Node 24.21.0。设置如下：
+## 未来公网环境
 
-| 项目 | 值 |
-| --- | --- |
-| Build command | `npm run build:preview` |
-| Deploy command | `npm run deploy:preview` |
+需要显式建立新的 D1 和 OAuth KV，复制 wrangler.production.example.jsonc 为独立配置，填入新绑定、新域名及 APP_ORIGIN。新库只应用 db/showroom-migrations；旧公网资源不复用。正式发布另行进行。
 
-不要采用默认的 `wrangler deploy`：前端和 Worker 必须先由 Vite 构建，且生成的配置位于 `.artifacts/build/lowkkey_preview/wrangler.json`。连接时核对目标 Worker 是 `lowkkey-preview`；其他分支的 Preview 部署应等独立的测试 D1/KV 准备好后再启用。Cloudflare 的自动依赖安装使用仓库 `package-lock.json`。
+客户登录继续支持邀请制 Google 和邮箱验证码。环境需配置 AUTH_MODE=customer、BETTER_AUTH_SECRET、APP_ORIGIN；Google 使用 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET；邮箱使用 RESEND_API_KEY / AUTH_EMAIL_FROM。启用 AI 连接入口需 AI_CONNECTION_ENABLED=1 与 HTTPS。
 
-每次推送 `main` 前在本地运行 `./scripts/run check`、`./scripts/run test` 和 `./scripts/run test:e2e`。如果改动包含新的 SQL 迁移，先在对应测试 D1 上执行：
+允许连接的路由包含 /api/*、/v1/*、/mcp、/.well-known/*、/authorize、/oauth/*。OAuth 使用 read / write 两种权限，并在同意页明确直接写入及同日覆盖。用户在账户面板撤销授权后，访问与刷新令牌均不得再使用。
 
-```sh
-npx wrangler d1 migrations apply lowkkey-preview --remote --config wrangler.json
-```
+邀请管理继续使用 scripts/invite.mjs。--local 默认使用 .data/showroom；必须传入对应的新环境配置。撤销邀请同时撤销客户会话与 oauth_clients 授权。
 
-随后提交并推送代码；Cloudflare Builds 从 GitHub 检出提交、构建并部署。普通代码部署不会重建 D1/KV，也不会迁移本地 `.data/`。紧急手动部署使用相同的 `build:preview` 和 `deploy:preview` 命令，再把对应代码提交到 GitHub，避免云端版本与仓库分叉。
+## 验证边界
 
-当前 Worker 的 Access 全流量策略适合网页验收。实际连接远程 MCP 前，应给 `/.well-known/*`、`/oauth/*` 和 `/mcp` 配置精确的边缘绕过路径；`/authorize` 和 `/v1/*` 始终要求 Access 登录。
-
-## 自定义域名生产环境
-
-`wrangler.production.example.jsonc` 是生产配置模板。生产域名、D1、KV、Google OAuth 与邮件服务就绪后，将模板复制为受版本控制的生产配置，替换域名、资源 ID 和客户登录配置；Access 变量仅在迁移旧账户时需要。业务事实只在 D1；OAuth 授权码、令牌与客户端注册信息在 KV。
-
-客户模式由应用会话保护 `/authorize` 和 `/v1/*`。`/.well-known/*` 与 `/oauth/*` 按 OAuth 标准可达，`/mcp` 验证 OAuth 令牌与 D1 授权。Access 不应拦截客户登录和 AI 发现路径；迁移路径可以单独受 Access 保护。具体配置见账户手册。
-
-```sh
-npx wrangler d1 migrations apply lowkkey-production --remote --config wrangler.production.jsonc
-LOWKKEY_WRANGLER_CONFIG=wrangler.production.jsonc npx vite build
-npx wrangler deploy --config .artifacts/build/lowkkey/wrangler.json
-```
-
-部署前在独立测试 D1 运行规则、API、OAuth/MCP 和浏览器测试。生产域名发布和 Claude 官方客户端连接验收须在生产基础设施就绪后进行。
+本地测试覆盖 OTP、账户隔离、OAuth PKCE、四工具契约、直接写入、读取权限、撤销和 Chromium / WebKit 三屏流程。官方 Claude / ChatGPT 公网实连及 iPhone 真机验收仍需在正式配置后进行，不以本地演练替代。

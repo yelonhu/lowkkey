@@ -1,3 +1,5 @@
+> Historical: pre-showroom event-ledger version. This is not the current product or acceptance record. See [current design](lowkkey-handoff/DESIGN.md) and [current deployment](lowkkey-handoff/DEPLOY.md).
+
 # 客户账户与 AI 授权交付手册
 
 ## 当前边界

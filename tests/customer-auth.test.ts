@@ -10,7 +10,7 @@ let mf:Miniflare,env:AuthBindings;const codes=new Map<string,string>();
 beforeAll(async()=>{
   mf=new Miniflare({modules:true,script:'export default {fetch(){return new Response("ok")}}',compatibilityDate:'2026-07-30',cf:false,host:'127.0.0.1',d1Databases:{DB:'11111111-1111-4111-8111-111111111111'},d1Persist:`${directory}/d1`,outboundService:()=>{throw new Error('no outbound');}});
   env={DB:await mf.getD1Database('DB') as D1Database,APP_ENV:'test',AUTH_MODE:'customer',APP_ORIGIN:origin,BETTER_AUTH_SECRET:'test-only-secret-never-use-in-production-123456'};
-  for(const name of (await readdir('db/migrations')).filter(n=>n.endsWith('.sql')).sort())await env.DB.batch((await readFile(`db/migrations/${name}`,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean).map(sql=>env.DB.prepare(sql)));
+  for(const name of (await readdir('db/showroom-migrations')).filter(n=>n.endsWith('.sql')).sort())await env.DB.batch((await readFile(`db/showroom-migrations/${name}`,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean).map(sql=>env.DB.prepare(sql)));
   for(const email of ['one@example.com','two@example.com','expired@example.com','mail@example.com','devices@example.com'])await env.DB.prepare('INSERT INTO auth_invites(email,created_at) VALUES (?,?)').bind(email,new Date().toISOString()).run();
 });
 afterAll(async()=>{await mf?.dispose();await rm(directory,{recursive:true,force:true});});
@@ -25,7 +25,7 @@ describe('customer authentication on isolated D1',()=>{
     const cookie=await login('one@example.com'),owner=await ownerForRequest(request('/v1/state',undefined,cookie),env);
     const replay=await customerAuth(env).handler(request('/api/auth/sign-in/email-otp',{email:'one@example.com',otp:codes.get('one@example.com')}));expect(replay.ok).toBe(false);
     expect(await ownerForRequest(request('/v1/state',undefined,cookie),env)).toBe(owner);
-    const other=await login('two@example.com');const wrong=request('/v1/capture',{text:'体重60kg'},other);wrong.headers.set('X-Lowkkey-Account',owner);
+    const other=await login('two@example.com');const wrong=request('/v1/clients/other/revoke',{text:'体重60kg'},other);wrong.headers.set('X-Lowkkey-Account',owner);
     expect((await createApi().fetch(wrong,env)).status).toBe(409);
     const signout=await customerAuth(env).handler(request('/api/auth/sign-out',{},cookie));expect(signout.ok).toBe(true);
     await expect(ownerForRequest(request('/v1/state',undefined,cookie),env)).rejects.toThrow('unauthorized');

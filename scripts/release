@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+node_binary="$project_root/.toolchain/node-v24.21.0-darwin-arm64/bin/node"
+if [ "$(uname -s)" != Darwin ]; then node_binary=$(command -v node); fi
+unset NODE_OPTIONS NODE_PATH
+if [ "$(uname -s)" = Darwin ]; then
+  exec "$project_root/scripts/fence" release "$node_binary" "$project_root/scripts/release.mjs" "$@"
+fi
+exec "$node_binary" "$project_root/scripts/release.mjs" "$@"

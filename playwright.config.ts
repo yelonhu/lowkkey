@@ -11,5 +11,5 @@ export default defineConfig({
     {name:'webkit',use:{browserName:'webkit',baseURL:'https://127.0.0.1:5175',isMobile:true,hasTouch:true}},
   ],
   // Each engine gets a fresh database, including when both projects run together.
-  webServer:[...[5174,5175].map(port=>({command:'node scripts/serve.mjs --e2e',env:{LOWKKEY_E2E_PORT:String(port),LOWKKEY_E2E_TLS:'1'},url:`https://127.0.0.1:${port}/healthz`,ignoreHTTPSErrors:true,reuseExistingServer:false,timeout:45000})),{command:'node scripts/rehearsal.mjs',env:{LOWKKEY_REHEARSAL_PORT:'5180'},url:'http://127.0.0.1:5180/status',reuseExistingServer:false,timeout:45000}],
+  webServer:[...[5174,5175].map(port=>({command:'node scripts/serve.mjs --e2e',env:{LOWKKEY_E2E_PORT:String(port),LOWKKEY_E2E_TLS:'1'},url:`https://127.0.0.1:${port}/healthz`,ignoreHTTPSErrors:true,reuseExistingServer:false,timeout:45000}))],
 });

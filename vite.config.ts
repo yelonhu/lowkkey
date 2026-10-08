@@ -10,12 +10,14 @@ const testTLS=process.env.LOWKKEY_E2E_DIR&&process.env.LOWKKEY_E2E_TLS==='1';
 
 const buildSha=process.env.CF_PAGES_COMMIT_SHA??process.env.GITHUB_SHA??(()=>{try{return execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();}catch{return 'development';}})();
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   define:{__BUILD_SHA__:JSON.stringify(buildSha)},
   envDir: '.local/config/no-env', envPrefix: 'LOWKKEY_NO_AUTO_ENV_', cacheDir: process.env.LOWKKEY_E2E_DIR?`.cache/vite-e2e-${localPort}`:'.cache/vite',
-  plugins: [react(), cloudflare({ configPath: process.env.LOWKKEY_WRANGLER_CONFIG ?? (command === 'serve' ? 'wrangler.local.json' : 'wrangler.json'), remoteBindings: false, tunnel: false, inspectorPort: false,
-    persistState: { path: process.env.LOWKKEY_E2E_DIR ?? '.data/v02' },
-    config: { vars: command === 'serve' ? { APP_ENV: 'development', APP_ORIGIN: `${testTLS?'https':'http'}://127.0.0.1:${localPort}` } : { APP_ENV: 'production' } },
+  plugins: [react(), cloudflare({ configPath: process.env.LOWKKEY_WRANGLER_CONFIG ?? 'wrangler.local.json', remoteBindings: false, tunnel: false, inspectorPort: false,
+    persistState: { path: process.env.LOWKKEY_E2E_DIR ?? '.data/showroom' },
+    config: { vars: command === 'serve' ? { APP_ENV: 'development', APP_ORIGIN: `${testTLS?'https':'http'}://127.0.0.1:${localPort}`,
+      ...(mode === 'test' && process.env.LOWKKEY_E2E_DIR && process.env.LOWKKEY_CUSTOMER_TEST === '1' ? { AUTH_MODE: 'customer', BETTER_AUTH_SECRET: 'isolated-customer-test-secret-not-for-production-12345' } : {}),
+    } : { APP_ENV: 'production' } },
   })],
   server: { ...(testTLS?{https:{key:readFileSync(`${process.env.LOWKKEY_E2E_DIR}/localhost.key`),cert:readFileSync(`${process.env.LOWKKEY_E2E_DIR}/localhost.crt`)}}:{}),host: '127.0.0.1', port: localPort, strictPort: true, open: false,
     fs: { deny: ['.env', '.env.*', '**/.git/**', '**/.data/**', '**/.logs/**', '**/.local/**', '**/.toolchain/**', '**/.artifacts/**'] },
