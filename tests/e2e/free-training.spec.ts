@@ -1,7 +1,7 @@
 import {expect,test} from '@playwright/test';
 
 test('free recording needs no plan, preserves editing during SSE and syncs physical equipment',async({page,context},info)=>{
-  await page.goto('/?viewport=1');await page.locator('.screen,.access-gate button').first().waitFor();
+  await page.goto('/');await page.locator('.screen,.access-gate button').first().waitFor();
   const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
   await expect(page.locator('[data-screen="Main"]')).toBeVisible();
   const before=await page.evaluate(async()=>await (await fetch('/v1/state')).json());

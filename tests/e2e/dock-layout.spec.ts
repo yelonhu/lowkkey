@@ -10,7 +10,7 @@ async function fullyVisible(control:Locator,bottom:number){
 
 test('cold launch ignores stale visual height; both docks stay complete above the safe area',async({page})=>{
   await page.addInitScript(()=>Object.defineProperty(window,'visualViewport',{configurable:true,value:Object.assign(new EventTarget(),{height:690,offsetTop:0,scale:1})}));
-  await page.setViewportSize({width:393,height:852});await page.goto('/?viewport=1');
+  await page.setViewportSize({width:393,height:852});await page.goto('/');
   await page.locator('.screen,.access-gate button').first().waitFor();const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
   await page.addStyleTag({content:':root{--safe-top:59px;--safe-bottom:34px}'});
   for(const [width,height] of [[375,812],[390,844],[393,852],[402,874],[430,932],[440,956],[852,393]]){
@@ -24,8 +24,6 @@ test('cold launch ignores stale visual height; both docks stay complete above th
       await fullyVisible(bottomControl,height-34);
       if(screen==='Main')await expect.poll(()=>dock.locator(':scope > :last-child').evaluate(el=>el.getBoundingClientRect().bottom)).toBe(height-34-12);
       await expect.poll(()=>board.locator('[data-page-frame]').evaluate(el=>el.firstElementChild!.getBoundingClientRect().top)).toBe(59);
-      await expect.poll(async()=>JSON.parse((await page.locator('html').getAttribute('data-viewport'))!).probes.inset.height).toBe(height);
-      await expect.poll(async()=>JSON.parse((await page.locator('html').getAttribute('data-viewport'))!).probes.dvh.height).toBe(height);
       await expect.poll(()=>dock.evaluate(el=>el.getBoundingClientRect().bottom)).toBe(height-34);
       if(screen==='Main')await fullyVisible(dock.locator('[data-training-action]'),height-34);
       expect(await page.evaluate(()=>window.scrollY)).toBe(0);
@@ -41,11 +39,4 @@ test('cold launch ignores stale visual height; both docks stay complete above th
   await input.blur();await page.evaluate(()=>{window.visualViewport!.dispatchEvent(new Event('resize'));});
   await expect(page.locator('[data-training-action]')).toBeVisible();await expect(input).toHaveValue('键盘不会改变外壳');
   await expect.poll(()=>page.locator('[data-bottom-dock]').evaluate(el=>el.getBoundingClientRect().bottom)).toBe(818);
-  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('Clipboard unavailable');}}}));
-  await page.getByRole('button',{name:'复制布局诊断'}).click();
-  const fallback=page.getByRole('textbox',{name:'布局诊断报告'});await expect(fallback).toHaveAttribute('readonly','');
-  const report=JSON.parse(await fallback.inputValue());
-  expect(report.shell.height).toBe(852);expect(report.header.top).toBe(59);expect(report.bottomControl.bottom).toBe(806);
-  expect(report.probes.inset.height).toBe(852);expect(report.probes.dvh.height).toBe(852);
-  expect(report).not.toHaveProperty('entries');expect(report).not.toHaveProperty('ownerId');
 });

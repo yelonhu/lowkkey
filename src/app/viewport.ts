@@ -48,24 +48,8 @@ export function prepareViewport(node:HTMLElement,screen:Screen){
 export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,height:number){
   let frame=0,keyboardScroll:{node:HTMLElement;top:number}[]|null=null;
   let safeBeforeKeyboard:{top:number;bottom:number;left:number;right:number}|null=null,orientationWidth=window.innerWidth;
-  const mode=new URLSearchParams(location.search).get('viewport');
-  const diagnostic=mode==='1'||(__LAYOUT_DIAGNOSTICS__&&mode!=='0');
-  // Untransformed probes share the window coordinate system. They never paint.
+  // Read env() in the window coordinate system; this node never paints.
   const safe=document.createElement('div');safe.className='viewport-safe-probe';safe.ariaHidden='true';shell.append(safe);
-  const probes=diagnostic?['dvh','inset'].map(mode=>{const node=document.createElement('div');node.className=`viewport-probe viewport-probe-${mode}`;node.ariaHidden='true';shell.append(node);return node;}):[];
-  const copy=diagnostic?document.createElement('button'):null;
-  if(copy){
-    copy.type='button';copy.className='viewport-diagnostic';copy.textContent='复制布局诊断';
-    // Preserve the keyboard and its geometry while copying a diagnostic.
-    copy.onpointerdown=event=>event.preventDefault();
-    copy.onclick=async()=>{
-      resize();
-      const report=document.documentElement.dataset.viewport??'';
-      try{await navigator.clipboard.writeText(report);copy.textContent='诊断已复制';}
-      catch{const field=document.createElement('textarea');field.className='viewport-report';field.readOnly=true;field.value=report;field.setAttribute('aria-label','布局诊断报告');shell.append(field);field.focus();field.select();field.onblur=()=>field.remove();}
-    };
-    shell.append(copy);
-  }
   const resize=()=>{
     frame=0;
     const viewport=window.visualViewport,phone=width===390,scale=phone?1:Math.min(1,window.innerWidth/width),canvas=shell.getBoundingClientRect();
@@ -99,12 +83,6 @@ export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,
       }
     }
     if(!keyboard&&keyboardScroll){for(const {node,top} of keyboardScroll)if(node.isConnected)node.scrollTop=top;keyboardScroll=null;}
-    if(diagnostic){
-      const page=host.querySelector<HTMLElement>('.screen:not(.motion-outgoing) [data-page-frame]');
-      const rect=(node:Element|null)=>node?.getBoundingClientRect().toJSON()??null;
-      const dock=page?.querySelector('[data-bottom-dock]')??null;
-      document.documentElement.dataset.viewport=JSON.stringify({version:__BUILD_SHA__,standalone:window.matchMedia('(display-mode: standalone)').matches,screen:[window.screen.width,window.screen.height],inner:[window.innerWidth,window.innerHeight],document:[document.documentElement.clientWidth,document.documentElement.clientHeight],scroll:[window.scrollX,window.scrollY],visual:viewport?{height:viewport.height,top:viewport.offsetTop,scale:viewport.scale}:null,keyboard,rawSafe,effectiveSafe:inset,visibleInCanvas:{top:visibleTop,bottom:visibleBottom},shell:rect(shell),host:rect(host),page:rect(page),header:rect(page?.firstElementChild??null),content:rect(page?.querySelector('[data-scroll-region]')??null),dock:rect(dock),bottomControl:rect(dock?.lastElementChild??null),probes:{dvh:rect(probes[0]),inset:rect(probes[1])},theme:document.documentElement.dataset.theme});
-    }
   };
   const schedule=()=>{if(!frame)frame=requestAnimationFrame(resize);};
   // Capture pre-keyboard insets at focus time, before WebKit coalesces resize frames.
@@ -117,7 +95,7 @@ export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,
   document.addEventListener('focus',focus,true);document.addEventListener('focusout',schedule);document.addEventListener('pointerdown',pointer);document.addEventListener('keydown',key);
   window.visualViewport?.addEventListener('resize',schedule);window.visualViewport?.addEventListener('scroll',schedule);
   return()=>{
-    copy?.remove();safe.remove();probes.forEach(node=>node.remove());shell.querySelector('.viewport-report')?.remove();observer.disconnect();
+    safe.remove();observer.disconnect();
     cancelAnimationFrame(frame);window.removeEventListener('resize',schedule);window.removeEventListener('pageshow',schedule);window.removeEventListener('scroll',schedule);
     document.removeEventListener('focus',focus,true);document.removeEventListener('focusout',schedule);document.removeEventListener('pointerdown',pointer);document.removeEventListener('keydown',key);
     window.visualViewport?.removeEventListener('resize',schedule);window.visualViewport?.removeEventListener('scroll',schedule);

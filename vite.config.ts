@@ -11,7 +11,7 @@ const testTLS=process.env.LOWKKEY_E2E_DIR&&process.env.LOWKKEY_E2E_TLS==='1';
 const buildSha=process.env.CF_PAGES_COMMIT_SHA??process.env.GITHUB_SHA??(()=>{try{return execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();}catch{return 'development';}})();
 
 export default defineConfig(({ command }) => ({
-  define:{__BUILD_SHA__:JSON.stringify(buildSha),__LAYOUT_DIAGNOSTICS__:JSON.stringify(process.env.LOWKKEY_LAYOUT_DIAGNOSTICS==='1')},
+  define:{__BUILD_SHA__:JSON.stringify(buildSha)},
   envDir: '.local/config/no-env', envPrefix: 'LOWKKEY_NO_AUTO_ENV_', cacheDir: process.env.LOWKKEY_E2E_DIR?`.cache/vite-e2e-${localPort}`:'.cache/vite',
   plugins: [react(), cloudflare({ configPath: process.env.LOWKKEY_WRANGLER_CONFIG ?? (command === 'serve' ? 'wrangler.local.json' : 'wrangler.json'), remoteBindings: false, tunnel: false, inspectorPort: false,
     persistState: { path: process.env.LOWKKEY_E2E_DIR ?? '.data/v02' },

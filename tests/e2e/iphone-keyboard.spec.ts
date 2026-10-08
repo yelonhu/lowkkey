@@ -4,7 +4,7 @@ import {expect,test} from '@playwright/test';
 test('training remains reachable in a keyboard-sized viewport and restores its draft',async({page},info)=>{
   await page.addInitScript(()=>Object.defineProperty(window,'visualViewport',{configurable:true,value:Object.assign(new EventTarget(),{height:852,offsetTop:0,scale:1})}));
   await page.setViewportSize({width:393,height:852});
-  await page.goto('/?viewport=1');await page.locator('.screen,.access-gate button').first().waitFor();
+  await page.goto('/');await page.locator('.screen,.access-gate button').first().waitFor();
   const login=page.getByRole('button',{name:'进入状态舱'});if(await login.isVisible())await login.click();
   await expect(page.locator('[data-screen="Main"]')).toBeVisible();
   const original=await page.evaluate(async()=>await (await fetch('/v1/state')).json());

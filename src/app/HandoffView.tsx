@@ -17,7 +17,7 @@ import { Motion, reducedMotion } from './motion.ts';
 import { applyPageTheme, observeViewport, prepareViewport } from './viewport.ts';
 
 type Chamber=ReturnType<typeof useHandoff>;
-const writes=new Set(['equipment-save','decision-accept','decision-later','set-classify','begin-arrangement','capture-submit','toast-revert','entry-revert','submission-accept','submission-skip','held-skip','start-session','end-session','complete-set','trigger-accept','trigger-later','proposal-accept','proposal-later','proposal-reject','client-revoke']);
+const writes=new Set(['equipment-save','decision-accept','decision-later','set-classify','begin-arrangement','capture-submit','toast-revert','entry-revert','submission-accept','submission-skip','held-skip','start-session','end-session','complete-set','trigger-later','proposal-later','client-revoke']);
 const focusable='button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]';
 
 export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
@@ -94,7 +94,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
       if(control instanceof HTMLInputElement&&['load-input','reps-input'].includes(action??''))control.readOnly=activeAction==='complete-set';
       if(control instanceof HTMLInputElement&&['equipment-bar','equipment-plates'].includes(action??''))control.readOnly=activeAction==='equipment-save';
       if(control instanceof HTMLAnchorElement&&!control.hasAttribute('href')){control.setAttribute('role','button');control.tabIndex=0;}
-      if(activeAction&&(writes.has(action??'')||activeAction==='equipment-save'&&action==='equipment-unit'||activeAction==='start-session'&&action==='select-exercise'||control.dataset.heldOption||action==='capture-or-voice'||activeAction==='complete-set'&&['equipment-open','set-role','set-role-option','set-details','rir-help','adopt-load','rir','reps-plus','reps-minus','load-unit','next-exercise','exercise-list','select-exercise','extra-set'].includes(action??''))){
+      if(activeAction&&(writes.has(action??'')||activeAction==='equipment-save'&&action==='equipment-unit'||activeAction==='start-session'&&action==='select-exercise'||control.dataset.heldOption||action==='capture-or-voice'||activeAction==='complete-set'&&['equipment-open','set-role-option','set-details','rir-help','adopt-load','rir','reps-plus','reps-minus','load-unit','next-exercise','exercise-list','select-exercise','extra-set'].includes(action??''))){
         control.setAttribute('aria-disabled','true');if(control instanceof HTMLButtonElement)control.disabled=true;
         if(action===activeAction){control.setAttribute('aria-busy',String(chamber.busy));if(control.childElementCount===0)control.textContent=chamber.retry?'等待重试':'正在保存…';}
       }
@@ -254,7 +254,6 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         }
         else if(action==='plan-view')openSheet({kind:'program'});
         else if(action==='free-session')openSheet({kind:'exercises',exerciseId:null});
-        else if(action==='capture-submit')run(action,submit);
         else if(action==='capture-or-voice'){if(draft.current.trim())run('capture-submit',submit);else chamber.setError('这里暂不支持语音输入，可以先用文字记下。');}
         else if(action==='toast-revert'&&chamber.toast)run(action,()=>chamber.revert(chamber.toast!));
         else if(action==='entry-revert'){const entry=state.entries.find(e=>e.id===target.closest<HTMLElement>('[data-entry-id]')?.dataset.entryId);if(entry)run(action,()=>chamber.revert(entry));}
@@ -274,11 +273,8 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='reps-minus')setReps(n=>Math.max(1,(n??actualReps??2)-1));
         else if(action==='reps-plus')setReps(n=>Math.min(100,(n??actualReps??0)+1));
         else if(action==='rir')setRir(value=>value===Number(button.dataset.value)?null:Number(button.dataset.value));
-        else if(action==='trigger-accept'&&id)run(action,()=>chamber.decideTrigger(id,'accept'));
         else if(action==='trigger-later'&&id)run(action,()=>chamber.decideTrigger(id,'later'));
-        else if(action==='proposal-accept'&&id)run(action,()=>chamber.decideProposal(id,'accept'));
         else if(action==='proposal-later'&&id)run(action,()=>chamber.decideProposal(id,'later'));
-        else if(action==='proposal-reject'&&id)run(action,()=>chamber.decideProposal(id,'reject'));
         else if(action==='external-photo'||action==='external-voice')chamber.setError(`这里暂不支持${action==='external-photo'?'照片':'语音'}输入，可以先用文字记下。`);
         else if(action==='client-revoke'&&id)run(action,()=>chamber.revokeClient(id));
         else if(action==='resume-session')go('Session');

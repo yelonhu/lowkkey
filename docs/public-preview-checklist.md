@@ -1,18 +1,23 @@
 # 公网预览验收
 
-## 本次发布边界
+## 当前状态（2026-10-08）
 
-本次更新现有 `lowkkey-preview.yelon-hu.workers.dev`，继续使用 Cloudflare Access 登录。Google、邮箱验证码、客户账户迁移和真实 AI 连接，须完成 `account-ai-rollout.md` 中的外部配置后另行验收。
+本文是当前发布与待验收事项的入口；其他分批 QA 文档保留历史证据，不代表最新版本已上线。
+
+- 主预览为 `lowkkey-preview.yelon-hu.workers.dev`，继续使用 Cloudflare Access 登录。上次核对的前端提交为 `05da8aa`，Worker 版本为 `550f34c7-5e6d-49a0-996e-95d0ed65d782`；本次清理不发布公网。
+- 之前上传的独立诊断预览仍为历史版本，见 [当时的交付记录](iphone-actions-qa.md)。本轮从源码删除临时诊断入口，未更新该云端版本；它与主站共用真实账户数据库，不用于写入测试数据。
+- Google、邮箱验证码、客户账户迁移和真实 AI 连接，须完成 [账户与 AI 授权手册](account-ai-rollout.md) 中的外部配置后另行验收。
+- iPhone 15 Pro 主屏幕模式的整屏边界、键盘与深浅切页问题尚未真机确认解决。代码整理和桌面 WebKit 通过不代表真机通过。
 
 2026-10-05 已应用增量迁移 `0003_customer_auth.sql`。没有导入本地测试记录；已有业务条目保留。发布前 Worker 版本为 `05811396-b687-4da5-ace6-ca39ca9ed51b`，数据库恢复点保存在本机 `.artifacts/releases/2026-10-05/pre-deploy.json`。
 
-## iPhone 本轮复测
+## iPhone 待验收
 
-最新动作与器械版本的真机清单见 [iPhone 外壳与动作验收](iphone-actions-qa.md)；之前批次见 [状态舱验收记录](iphone-chamber-qa.md)。本轮没有数据库迁移或认证切换。真机仍待验证，自动化通过不等于 iPhone 已通过。
+分别在 Safari 与主屏幕模式核对：冷启动首页/训练页、深浅切页、键盘开关、后台恢复和横竖屏。顶部导航应避开状态栏，底部操作完整可见；不先滚动寻找按钮来判定通过。记录设备、系统、代码版本及结果。本轮没有数据库迁移或认证切换。
 
 ## 你可以立即验证
 
-1. 在已登录的浏览器打开 `https://lowkkey-preview.yelon-hu.workers.dev/healthz`。应显示 `status: ok`，`version` 应等于 GitHub main 最新提交的完整 SHA。
+1. 在已登录的浏览器打开 `https://lowkkey-preview.yelon-hu.workers.dev/healthz`。应显示 `status: ok`，`version` 应等于此次实际部署提交的完整 SHA；本地未发布的清理提交不会自动出现在公网。
 2. GitHub 仓库 → Actions → Product checks：检查该提交是否全绿。Cloudflare → lowkkey-preview → Deployments：确认当前版本来自同一提交，构建和部署都成功。仅 Git push 成功不能证明部署完成。
 3. iPhone Safari 打开首页：已有数据正常显示，原记录没有丢失。退出后重新进入应要求有效身份。无痕窗口不能直接读取 `/v1/state`。
 4. 输入一条**真实**称重或训练记录，确认今日、体征/进步及日志同步更新；刷新页面后仍在。不需要为了测试在个人账户编造数字。若记录有误，在日志撤销，检查图表相应恢复。
