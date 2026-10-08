@@ -28,7 +28,7 @@ switch (command) {
   case 'whoami': wrangler('whoami'); break;
   case 'resources': wrangler('d1', 'list', '--json'); wrangler('kv', 'namespace', 'list'); break;
   case 'create-d1': wrangler('d1', 'create', settings.d1_databases[0].database_name, '--update-config=false'); break;
-  case 'create-kv': wrangler('kv', 'namespace', 'create', 'OAUTH_KV', '--update-config=false'); break;
+  case 'create-kv': wrangler('kv', 'namespace', 'create', 'lowkkey-showroom-beta-oauth', '--update-config=false'); break;
   case 'init-secrets': {
     if (existsSync(secretsFile)) throw new Error('Secrets file already exists; it will not be overwritten');
     writeFileSync(secretsFile, JSON.stringify({ BETTER_AUTH_SECRET: randomBytes(48).toString('base64url'), GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '' }, null, 2) + '\n', { mode: 0o600 });

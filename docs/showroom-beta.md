@@ -2,6 +2,8 @@
 
 本环境使用独立的 `lowkkey-showroom-beta` Worker、D1 和 OAuth KV。三张业务表从空库开始；不迁移或修改旧 `lowkkey-preview` 数据。业务写入只经 MCP，网页读取同一账户的事实。
 
+2026-10-08 已创建独立 D1 `lowkkey-showroom-beta`、KV `lowkkey-showroom-beta-oauth`，并完成新库迁移与首位邮箱邀请。Google 项目为 `formal-purpose-511022-e7`（显示名称 `lowkkey beta`），Web 客户端为 `lowkkey showroom beta`；凭据仅存于项目私密配置。Cloudflare 子域已核对为 `yelon-hu`。这些配置完成不等于正式客户端或手机验收通过，验收按文末清单分别记录。
+
 ## 首次发布
 
 所有命令在项目根目录运行。`scripts/release` 使用现有 Node 和依赖，凭据、日志与缓存留在项目中；只有此发布入口允许外部网络，本地开发仍仅允许 loopback。不要用旧 `wrangler.json` 执行本环境迁移或部署。

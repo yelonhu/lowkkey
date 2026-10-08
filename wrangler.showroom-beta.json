@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lowkkey-showroom-beta",
+  "account_id": "1276de4905c9ab9c808d6b45f67ffec8",
   "main": "src/server/worker.ts",
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -20,8 +21,8 @@
   "d1_databases": [{
     "binding": "DB",
     "database_name": "lowkkey-showroom-beta",
-    "database_id": "REPLACE_WITH_NEW_SHOWROOM_D1_ID",
+    "database_id": "a0fd4afa-ef78-4202-a9f6-0115912941bc",
     "migrations_dir": "db/showroom-migrations"
   }],
-  "kv_namespaces": [{"binding": "OAUTH_KV", "id": "REPLACE_WITH_NEW_SHOWROOM_KV_ID"}]
+  "kv_namespaces": [{"binding": "OAUTH_KV", "id": "659174d6c3d2424da07c70dca013766b"}]
 }
