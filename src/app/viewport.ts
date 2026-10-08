@@ -1,58 +1,27 @@
 import type { Screen } from './navigation.ts';
 
-export function applyPageTheme(screen:Screen){
+export function applyPageTheme(screen:Screen,shell?:HTMLElement|null){
   const dark=screen==='Session'||screen==='Debrief',color=dark?'#000000':'#F1F1EF';
   document.documentElement.dataset.theme=dark?'dark':'light';
+  if(shell)shell.dataset.theme=document.documentElement.dataset.theme;
   for(const node of [document.documentElement,document.body,document.getElementById('root')])if(node)node.style.backgroundColor=color;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content',color);
 }
 
-// Mark existing handoff regions. The debrief's nonvisual flex wrapper retains
-// its header, footer and original spacing while making only the middle scroll.
-export function prepareViewport(node:HTMLElement,screen:Screen){
-  const page=node.firstElementChild as HTMLElement;
-  if(screen==='Transition'||screen==='Icon')return;
-  page.dataset.pageFrame='';
-  const main=page.querySelector<HTMLElement>('main');
-  if(screen==='Ledger'){
-    main!.dataset.scrollFrame='';
-    page.querySelector<HTMLElement>('[data-bind="ledger-timeline"]')!.dataset.scrollRegion='';
-  }else if(main){
-    main.dataset.scrollRegion='';
-    if(screen==='Main'){
-      page.dataset.docked='';
-      const dock=page.lastElementChild as HTMLElement;
-      dock.dataset.bottomDock='main';
-      const action=page.querySelector<HTMLElement>('[data-bind="main-plan"]')?.lastElementChild as HTMLElement|null;
-      if(action){action.dataset.trainingAction='';dock.prepend(action);}
-    }
-  }
-  else if(screen==='Connect')(page.children[1] as HTMLElement).dataset.scrollRegion='';
-  else if(screen==='Session'){
-    const center=page.querySelector<HTMLElement>('[data-session-part="center"]')!,controls=page.querySelector<HTMLElement>('[data-session-part="controls"]')!;
-    center.dataset.sessionCenter='';controls.dataset.sessionControls='';
-    page.dataset.docked='';
-    const dock=document.createElement('div');dock.dataset.bottomDock='session';dock.dataset.nodeKey='session-dock';
-    for(const action of controls.querySelectorAll(':scope > .extra-set-button,:scope > [data-session-part="submit"]'))dock.append(action);
-    const content=document.createElement('div');content.dataset.scrollRegion='session';content.dataset.nodeKey='session-scroll';
-    while(page.children.length>1)content.append(page.children[1]);
-    page.append(content,dock);
-  }
-  else if(screen==='Debrief'){
-    const middle=document.createElement('div');middle.dataset.scrollRegion='debrief';middle.dataset.nodeKey='debrief-scroll';
-    while(page.children.length>2)middle.append(page.children[1]);
-    page.insertBefore(middle,page.lastElementChild);
-  }
-}
-
-export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,height:number){
+export function observeViewport(shell:HTMLElement,host:HTMLElement,screen:Screen){
+  const width=screen==='Transition'?1160:screen==='Icon'?512:390;
+  const height=screen==='Transition'?840:screen==='Icon'?512:844,phone=width===390;
+  host.className=`prototype-host${phone?' phone':''}`;
+  host.style.width=phone?'min(100%, 600px)':`${width}px`;
+  host.style.height=phone?'100%':`${height}px`;
+  host.style.setProperty('--page-height',phone?'100%':`${height}px`);
   let frame=0,keyboardScroll:{node:HTMLElement;top:number}[]|null=null;
   let safeBeforeKeyboard:{top:number;bottom:number;left:number;right:number}|null=null,orientationWidth=window.innerWidth;
   // Read env() in the window coordinate system; this node never paints.
   const safe=document.createElement('div');safe.className='viewport-safe-probe';safe.ariaHidden='true';shell.append(safe);
   const resize=()=>{
     frame=0;
-    const viewport=window.visualViewport,phone=width===390,scale=phone?1:Math.min(1,window.innerWidth/width),canvas=shell.getBoundingClientRect();
+    const viewport=window.visualViewport,scale=phone?1:Math.min(1,window.innerWidth/width),canvas=shell.getBoundingClientRect();
     const style=getComputedStyle(safe),rawSafe={top:parseFloat(style.paddingTop),bottom:parseFloat(style.paddingBottom),left:parseFloat(style.paddingLeft),right:parseFloat(style.paddingRight)};
     if(orientationWidth!==window.innerWidth){orientationWidth=window.innerWidth;safeBeforeKeyboard=null;}
     // Pinch zoom remains a browser operation, not a keyboard resize.
@@ -65,8 +34,8 @@ export function observeViewport(shell:HTMLElement,host:HTMLElement,width:number,
     else for(const edge of ['top','bottom','left','right'] as const)safeBeforeKeyboard[edge]=Math.max(safeBeforeKeyboard[edge],rawSafe[edge]);
     const inset=keyboard?safeBeforeKeyboard:rawSafe;
     if(keyboard&&!keyboardScroll)keyboardScroll=[...host.querySelectorAll<HTMLElement>('[data-scroll-region]')].map(node=>({node,top:node.scrollTop}));
-    host.style.width=phone?'min(100%, 600px)':`${width}px`;host.style.height=phone?'100%':`${height}px`;host.style.transform=phone?'none':`scale(${scale})`;
-    host.style.setProperty('--page-height',phone?'100%':`${height}px`);host.style.setProperty('--viewport-scale',String(scale));
+    host.style.transform=phone?'none':`scale(${scale})`;
+    host.style.setProperty('--viewport-scale',String(scale));
     // DOM rects and visualViewport offsets are layout-viewport coordinates.
     // Convert once to the canvas. Only padding changes; the page never moves.
     const clamp=(value:number)=>Math.max(0,Math.min(canvas.height,value));

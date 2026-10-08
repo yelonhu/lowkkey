@@ -43,7 +43,7 @@ test('sheets retain the real page, dismiss without writes, and restore focus and
   const dialog=page.getByRole('dialog',{name:'动作安排'});await expect(dialog).toBeVisible();
   expect(await page.locator('[data-screen="Main"]').evaluate((el,old)=>el===old,main)).toBe(true);
   await expect(page.locator('[data-screen="Main"]')).toHaveAttribute('inert','');
-  expect(await page.evaluate(()=>document.body.style.overflow)).toBe('hidden');
+  expect(await page.evaluate(()=>getComputedStyle(document.body).overflowY)).toBe('hidden');
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(trigger).toBeFocused();
   await trigger.click();await expect(dialog).toBeVisible();await page.goBack();await expect(dialog).toHaveCount(0);
   await trigger.click();await expect(dialog).toBeVisible();

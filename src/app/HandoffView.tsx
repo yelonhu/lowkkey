@@ -4,7 +4,7 @@ import type { EntryDraft, TrainingReference } from '@lowkkey/protocol';
 import { convert, openSession, trainingReference } from '@lowkkey/core';
 import { capturedClock } from '../client/offline.ts';
 import { bindHandoff, prepareHandoff } from './handoff-bindings.ts';
-import { installPrototypeStyle, prototypeScreen } from './prototype-template.ts';
+import { installPrototypeStyle, prototypeScreen, preparePageLayout } from './prototype-template.ts';
 import { navigate, screens, reviewFromHash, navigateReview } from './navigation.ts';
 import type { Screen } from './navigation.ts';
 import { trainingItems } from './training-state.ts';
@@ -14,7 +14,7 @@ import { RequestError } from './useHandoff.ts';
 import type { useHandoff } from './useHandoff.ts';
 import { patchNode } from './dom-patch.ts';
 import { Motion, reducedMotion } from './motion.ts';
-import { applyPageTheme, observeViewport, prepareViewport } from './viewport.ts';
+import { applyPageTheme, observeViewport } from './viewport.ts';
 
 type Chamber=ReturnType<typeof useHandoff>;
 const writes=new Set(['equipment-save','decision-accept','decision-later','set-classify','begin-arrangement','capture-submit','toast-revert','entry-revert','submission-accept','submission-skip','held-skip','start-session','end-session','complete-set','trigger-later','proposal-later','client-revoke']);
@@ -102,12 +102,12 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   }
   useLayoutEffect(()=>{
     if(!state||!host.current)return;
-    installPrototypeStyle();applyPageTheme(baseScreen);
+    installPrototypeStyle();applyPageTheme(baseScreen,shell.current);
     if(screen!=='Capture')shownReview.current=null;
     if(screen==='Capture'&&submissionId&&shownReview.current?.id!==submissionId)shownReview.current={id:submissionId,revision:state.revision};
     const context={state,reviewOutcome,screen:baseScreen,toast:chamber.error?null:chamber.toast,queueCount:chamber.error?0:chamber.queueCount,busy:chamber.busy,error:'',filter,answers,reviewTarget,reviewQuestions:review&&review.id===submissionId?review.questions:undefined,reviewLoading,reps:actualReps,rir,exerciseId,manualLoad,loadEdited,manualUnit,setRole,allowExtra:extraSetKey===setKey,reference:reference.current?.value,equipment:editingSet.current?editingEquipment.current??state.equipment:state.equipment};
     const target=prototypeScreen(baseScreen);prepareHandoff(target,baseScreen,state.today);bindHandoff(target,context);
-    prepareViewport(target,baseScreen);
+    preparePageLayout(target,baseScreen);
     const input=target.querySelector<HTMLInputElement>('input[data-action="capture-input"]');if(input){input.value=draft.current;const submit=target.querySelector<HTMLElement>('[data-action="capture-or-voice"]');if(submit&&draft.current.trim()){submit.textContent='提交';submit.setAttribute('aria-label','提交记录');}}
     decorate(target);
     const from=base.current?.dataset.screen as Screen|undefined;
@@ -161,22 +161,18 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
   });
   useLayoutEffect(()=>{
     if(!host.current||!shell.current)return;
-    const width=baseScreen==='Transition'?1160:baseScreen==='Icon'?512:390,height=baseScreen==='Transition'?840:baseScreen==='Icon'?512:844;
-    shell.current.dataset.theme=['Session','Debrief'].includes(baseScreen)?'dark':'light';
-    host.current.className=`prototype-host${width===390?' phone':''}`;
-    return observeViewport(shell.current,host.current,width,height);
+    return observeViewport(shell.current,host.current,baseScreen);
   },[baseScreen]);
-  useEffect(()=>{
-    if(!modalType)return;
-    const overflow=document.body.style.overflow;document.body.style.overflow='hidden';
-    return()=>{document.body.style.overflow=overflow;};
-  },[modalType]);
 
   function run(action:string,task:()=>Promise<unknown>){
     if(running.current)return;running.current=true;setActiveAction(action);setNotice('');if(action!=='capture-submit')setCaptureRetry(false);
     void task().catch(cause=>{
       if(cause instanceof RequestError&&cause.status===409){setAnswers({});setReview(null);shownReview.current=null;setReviewLoading(false);reviewSequence.current++;}
     }).finally(()=>{running.current=false;setActiveAction(null);});
+  }
+  function resetSetDraft(){
+    setManualLoad(null);setLoadEdited(false);setReps(undefined);setRir(null);
+    reference.current=null;editingSet.current=false;editingEquipment.current=null;
   }
   async function submit(retry=false){
     if(composing.current)return;
@@ -195,7 +191,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const clock=capturedClock(),current=openSession(state.entries),day=dayId===null?undefined:dayId?state.program.days.find(d=>d.id===dayId):state.program.days.find(d=>d.weekday===new Date(`${state.today}T12:00:00Z`).getUTCDay());
     const sessionId=event==='start'?crypto.randomUUID():current?.id;if(!sessionId)return;
     const entry:EntryDraft={kind:'session',event,sessionId,dayId:event==='start'?day?.id??null:null,date:clock.capturedLocalDate,dateOrigin:'device',source:{actor:'user',channel:'ui',client:'web'}};
-    await chamber.writeEntries([entry]);setRir(null);setReps(undefined);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setExerciseId(selected??null);setManualLoad(null);setLoadEdited(false);go(event==='start'?'Session':'Debrief');
+    await chamber.writeEntries([entry]);resetSetDraft();setExtraSetKey(null);setSetRole('work');setExerciseId(selected??null);go(event==='start'?'Session':'Debrief');
   }
   async function completeSet(exercise:string,load:number,unit:'kg'|'lb'){
     if(!state||actualReps==null||!Number.isInteger(actualReps)||actualReps<1||actualReps>100)return;const session=openSession(state.entries),ex=state.exercises.find(e=>e.id===exercise);if(!session||!ex)return;
@@ -204,7 +200,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
     const unitQuestion=result.held.find(item=>item.gate==='G4'&&item.drafts[0]?.kind==='set'&&item.drafts[0].unit===unit&&item.drafts[0].exerciseId===exercise&&item.drafts[0].sessionId===session.id&&item.drafts[0].load===load&&item.options.some(option=>option.id==='as_is'));
     if(unitQuestion)result=await chamber.resolve(unitQuestion,{optionId:'as_is'});
     if(!result.committed.some(item=>item.kind==='set'&&item.sessionId===session.id&&item.exerciseId===exercise)){setNotice('这组需要核对，训练结束后确认。');return;}
-    setExtraSetKey(null);setRir(null);setReps(undefined);reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);setLoadEdited(false);
+    setExtraSetKey(null);resetSetDraft();
   }
   const click=(event:React.MouseEvent<HTMLDivElement>)=>{
     const target=event.target as Element;if(!state)return;
@@ -230,7 +226,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='sheet-cancel'||action==='modal-close')dismiss();
         else if(action==='set-details'||action==='rir-help')openSheet({kind:'set-details',role:setRole,reference:reference.current?.value??null,note:currentItem?.note,help:action==='rir-help'});
         else if(action==='set-role-option'&&(button.dataset.role==='work'||button.dataset.role==='warmup')){
-          setSetRole(button.dataset.role);setManualLoad(null);setLoadEdited(false);setReps(undefined);setRir(null);reference.current=null;editingSet.current=false;editingEquipment.current=null;dismiss();
+          setSetRole(button.dataset.role);resetSetDraft();dismiss();
         }
         else if(action==='adopt-load'){
           const arranged=reference.current?.value.arrangement;if(arranged){setManualLoad(String(Number(convert(arranged.load,arranged.unit,manualUnit??arranged.unit).toFixed(2))));setLoadEdited(true);}
@@ -267,7 +263,7 @@ export function HandoffView({screen,chamber}:{screen:Screen;chamber:Chamber}){
         else if(action==='extra-set'){setExtraSetKey(setKey);setSetRole('work');}
         else if((action==='next-exercise'||action==='select-exercise')&&id){
           if(!currentSession){run('start-session',()=>writeSession('start',null,id));return;}
-          setExerciseId(id);setReps(undefined);setRir(null);setExtraSetKey(null);setSetRole('work');reference.current=null;editingSet.current=false;editingEquipment.current=null;setManualLoad(null);setLoadEdited(false);
+          setExerciseId(id);resetSetDraft();setExtraSetKey(null);setSetRole('work');
           if(sheet?.kind==='exercises')dismiss();
         }else if(action==='load-unit'){setUnits(value=>({...value,[unitKey]:(value[unitKey]??button.dataset.unitDefault)==='kg'?'lb':'kg'}));setLoadEdited(true);}
         else if(action==='reps-minus')setReps(n=>Math.max(1,(n??actualReps??2)-1));

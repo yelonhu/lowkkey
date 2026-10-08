@@ -10,7 +10,6 @@ test('free recording needs no plan, preserves editing during SSE and syncs physi
     await write('/v1/program',{...before.program,days:[]});await page.reload();
     expect(await page.evaluate(()=>getComputedStyle(document.body).position)).not.toBe('fixed');
     await expect(page.locator('.prototype-host')).toHaveCSS('transform','none');
-    await expect(page.locator('html')).toHaveAttribute('data-viewport',/standalone/);
     await page.locator('[data-action="free-session"]').click();
     const picker=page.getByRole('dialog',{name:'动作清单'});await picker.getByRole('searchbox',{name:'搜索动作'}).fill('髋内收');
     await picker.getByRole('button',{name:/髋内收/}).click();
