@@ -9,16 +9,16 @@ export function loadLabel(item: Pick<PlanItem | TrainingSet, 'load' | 'loadKind'
 export function PlanView({ plans }: { plans: Plan[] }) {
   const active = plans.filter(plan => plan.items.length);
   return <>
-    <div className="page-intro"><p className="eyebrow">01 / THE NEXT SESSION</p><h1>下一次，<br/>心中有数。</h1><p className="intro-note">去健身房前，扫一眼就好。</p></div>
-    {!active.length ? <section className="empty-state"><span className="empty-mark" aria-hidden="true">—</span><h2>下一次，从一份安排开始。</h2><p>和你的 AI 聊好训练安排，保存后会出现在这里。</p></section> :
-      <div className="plan-grid">{active.map((plan, index) => <article className="plan-card" id={'Plan-' + plan.day} key={plan.day}>
-        <header className="card-heading"><span className="eyebrow">训练日 {String(index + 1).padStart(2, '0')}</span><span className="muted">{plan.items.length} 个动作</span><h2>{plan.day}</h2></header>
+    <header className="page-intro"><h1>下次训练</h1>{active.length > 0 && <p className="intro-note">{active.length} 个训练日 · 最新安排</p>}</header>
+    {!active.length ? <section className="empty-state"><h2>还没有训练安排</h2><p>和你的 AI 聊好安排，保存后会显示在这里。</p></section> :
+      <div className="plan-grid">{active.map(plan => <article className="plan-card" id={'Plan-' + plan.day} key={plan.day}>
+        <header className="card-heading"><h2>{plan.day}</h2><span className="muted">{plan.items.length} 个动作</span></header>
         <ol className="plan-items">{plan.items.map((item, i) => <li key={i}>
-          <div className="exercise-line"><span className="exercise-name">{exerciseById(item.exerciseId).name}</span><span className="leader"/><span className="load-value">{loadLabel(item)}</span></div>
+          <div className="exercise-line"><span className="exercise-name">{exerciseById(item.exerciseId).name}</span><span className="load-value">{loadLabel(item)}</span></div>
           <div className="prescription"><span className="number">{item.sets}</span> 组 <span className="times">×</span> <span className="number">{item.repMin === item.repMax ? item.repMin : item.repMin + '–' + item.repMax}</span> 次</div>
           {item.note && <p className="item-note">{item.note}</p>}
         </li>)}</ol>
-        {plan.notes.coach && <div className="coach-note"><span className="eyebrow">教练留的话</span><p>{plan.notes.coach}</p></div>}
+        {plan.notes.coach && <div className="coach-note"><span className="note-label">教练备注</span><p>{plan.notes.coach}</p></div>}
       </article>)}</div>}
   </>;
 }

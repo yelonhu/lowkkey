@@ -28,14 +28,14 @@ test('empty showroom → four-tool writes → three screens → focus refresh �
   test.setTimeout(120000);
   const errors:string[] = []; page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/');
-  await page.getByRole('button',{name:'打开我的展厅 ↗'}).click();
-  await expect(page.getByText('下一次，从一份安排开始。')).toBeVisible();
+  await page.getByRole('button',{name:'打开我的展厅',exact:true}).click();
+  await expect(page.getByText('还没有训练安排')).toBeVisible();
   await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(3);
   await page.getByRole('link',{name:'训练展厅',exact:true}).click();
-  await expect(page.locator('.strength-card')).toHaveCount(4);
-  await expect(page.getByText('这里，留给第一篇记录。')).toBeVisible();
+  await expect(page.locator('.strength-card')).toHaveCount(0);
+  await expect(page.getByText('还没有训练记录')).toBeVisible();
   await page.getByRole('link',{name:'体重',exact:true}).click();
-  await expect(page.getByText('变化，从第一笔开始。')).toBeVisible();
+  await expect(page.getByText('还没有体重记录')).toBeVisible();
   await expect(page.locator('.chart-band')).toHaveCount(0);
   const tool = await connect(page.request,baseURL!);
   await seedShowroom(tool);
@@ -47,6 +47,9 @@ test('empty showroom → four-tool writes → three screens → focus refresh �
     await expect(page.locator('main input,main textarea,main form')).toHaveCount(0);
     await page.evaluate(()=>document.fonts.ready);
     await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/showroom-${screen}.png`,animations:'disabled'});
+    await page.setViewportSize({width:1280,height:960});
+    await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/showroom-${screen}-desktop.png`,animations:'disabled'});
+    await page.setViewportSize({width:390,height:844});
   }
   await expect(page.locator('.chart-band')).toHaveCount(1);
   await page.getByRole('link',{name:'训练展厅',exact:true}).click();
@@ -71,23 +74,45 @@ test('empty showroom → four-tool writes → three screens → focus refresh �
   await tool('log_weight',{date:'2026-10-08',lb:170});
   await page.getByRole('button',{name:'刷新',exact:true}).click();
   await expect(page.locator('.last-weight')).toContainText('170.0');
-  await tool('set_plan',{...fixturePlans[0],notes:{coach:'较长的教练备注。'.repeat(80)}});
+  await tool('set_plan',{...fixturePlans[0],day:'训练安排与恢复要点'.repeat(5),items:Array.from({length:12},(_,index)=>({...fixturePlans[0].items[index%3],note:'动作保持稳定，不急于增加重量。'.repeat(12)})),notes:{coach:'较长的教练备注。'.repeat(80)}});
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-  for (const width of [320,390,768]) {
+  // Fallback fonts must retain readable chart labels and unbroken page widths.
+  await page.route('https://fonts.googleapis.com/**',route=>route.abort());
+  await page.route('https://fonts.gstatic.com/**',route=>route.abort());
+  await page.reload();
+  for (const width of [320,390,768,1280]) {
     await page.setViewportSize({width,height:844});
     for (const label of ['下次练什么','训练展厅','体重']) {
       await page.getByRole('link',{name:label,exact:true}).click();
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+      await expect.poll(()=>page.locator('.trend-chart').evaluateAll(charts=>charts.every(chart=>{
+        const bounds=chart.getBoundingClientRect();
+        return [...chart.querySelectorAll('text')].every(text=>{
+          const label=text.getBoundingClientRect();
+          return label.height>=9 && label.left>=bounds.left-1 && label.right<=bounds.right+1;
+        });
+      }))).toBe(true);
     }
   }
-  await page.getByRole('button',{name:'打开账户'}).click();
-  await expect(page.getByRole('dialog',{name:'账户'})).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'设置'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'完成',exact:true})).toBeFocused();
+  await expect(page.locator('.showroom-content')).toHaveAttribute('inert','');
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button',{name:'退出登录',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'设置',exact:true})).toBeFocused();
+  await page.getByRole('button',{name:'设置',exact:true}).click();
   await expect(page.locator('.client-row').filter({hasText:'Showroom E2E'})).toBeVisible();
+  await expect(page.getByText('正在读取…',{exact:true})).toHaveCount(0);
+  await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/showroom-settings.png`,animations:'disabled'});
   await page.getByRole('button',{name:'撤销授权',exact:true}).click();
   await expect(page.getByText('已撤销',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'退出登录',exact:true}).click();
   await expect(page.locator('.showroom')).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'打开我的展厅 ↗'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'打开我的展厅',exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
 

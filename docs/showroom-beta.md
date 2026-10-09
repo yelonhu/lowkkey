@@ -65,7 +65,7 @@ MCP 地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。配置
 - ChatGPT：在 Plugins 中添加自定义 MCP server，填入同一地址并安装到个人账户或工作区；可用性受账户及工作区权限约束。
 - 全权限恰好四个工具；只读授权只提供 `get_brief`。无需增加 `search`、`fetch` 或审批工具。
 - 工具写入直接生效；AI 客户端自身可能要求确认，lowkkey 不添加第二层业务审批。
-- 在 lowkkey 账户面板撤销某个连接后，该连接的访问和刷新令牌都不能继续访问数据。
+- 在 lowkkey「设置」中撤销某个连接后，该连接的访问和刷新令牌都不能继续访问数据。
 
 参考：[Claude 自定义连接器](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)、[ChatGPT 自定义 MCP](https://developers.openai.com/api/docs/guides/custom-mcp-server)。
 
@@ -77,6 +77,7 @@ MCP 地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。配置
 
 - 自动化：领域、账户/API、Chromium/WebKit 三屏与深链接、OAuth 四工具、真实 Better Auth 会话 → OAuth → MCP → 同账户网页 → 撤销。账户集成测试只截获本地验证码投递；OAuth/MCP 在实际 Workers 运行时执行。
 - 自动化不能替代：真实 Google 登录、Claude/ChatGPT 官方客户端、iPhone Safari 真机回跳和跨应用刷新。
+- 已验收：2026-10-08 beta 首次部署完成，真实 Google 登录、受邀账户和三屏空状态通过；用户确认 Claude 连接成功。Claude 的四工具真实数据闭环、ChatGPT 连接和手机 Safari 真机检查仍分别待验收，连接成功不等于全部工具已实测。
 - 首次登录必须为空。只将用户提供的真实记录写入其内测账户；合成演练数据保留在临时测试库。
 - 手机检查字体、留白、长计划、长原话、图表、320px 布局及底部最近同步时间。AI 返回的链接应打开对应训练日／计划日／体重日期。
 - 发布结果应记录实际 URL、提交号、Cloudflare 版本及以上人工验收结果；未执行的项目保持“未验收”。
