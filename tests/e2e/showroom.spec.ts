@@ -63,7 +63,7 @@ test('empty → seven tools → four pages, all themes, narrow layout, refresh a
   await expect(page.locator('.lifts .open .detail')).toContainText('借力 2');
   await expect(page.locator('.lifts .open .detail')).toContainText('没做完整');
   const note = '<script>literal, never executed</script>\n'+ '保留原话与换行。'.repeat(12);
-  await tool('log_session',{...fixtureSessions.at(-1),note});
+  await tool('log_session',{...fixtureSessions.at(-1),title:'AReallyLongUnbrokenTrainingDayTitle',note});
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await expect(page.locator('.said').first()).toHaveText(note,{useInnerText:false});
   await expect(page.locator('main script')).toHaveCount(0);
@@ -77,6 +77,8 @@ test('empty → seven tools → four pages, all themes, narrow layout, refresh a
   await expect(page.locator('.items').first().locator('li')).toHaveCount(12);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.getByRole('link',{name:'recap',exact:true}).click();
+  await expect(page.locator('main')).toHaveAttribute('id','v-recap');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.locator('.lift[data-ex="back_squat"]').click();
   await expect(page.locator('.lift[data-ex="back_squat"]')).toHaveAttribute('aria-pressed','true');
   const chart=page.locator('.chartbox svg').first();
