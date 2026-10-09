@@ -89,9 +89,9 @@ MCP 地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。配置
 
 1. `./scripts/release backup-v5`：导出完整 beta D1，并核对账户、日期数量及计划星期映射。已有四个中文带星期的计划标题明确映射为原稿单字标题。
 2. `./scripts/release migrate`：只新增 0001_v5。迁移先阻止 v4 事实写入，再复制数据，保留 legacy 表供回滚；此窗口 v4 写入会报重试。
-3. `./scripts/release deploy`：切换七工具 Worker 与四页应用，OAuth KV 和 Google 身份不变。
-4. `./scripts/release import-v5 PRIVATE_HTML EMAIL`：严格核验 16 次/252 组/23 次/4 计划后，只向指定唯一账户写入；相同日期覆盖，其他日期保留。目标按原稿导入，已有身体备注保留。策展保留历史周和带日期的 next/body；计划历史从实际导入日起生效。
-5. 导入命令逐字段读回验证，写出私密证明；确认网页、MCP 和健康版本后，`./scripts/release retire-v4` 再导出一份完整备份，退役 legacy 三表及 raw_text。
+3. `./scripts/release import-v5 PRIVATE_HTML EMAIL`：严格核验 16 次/252 组/23 次/4 计划后，只向指定唯一账户写入；相同日期覆盖，其他日期保留。目标按原稿导入，已有身体备注保留。策展保留历史周和带日期的 next/body；计划历史从实际导入日起生效。导入命令逐字段读回验证，写出私密证明；此时 v4 仍被写锁保护，不与回填交错。
+4. `./scripts/release deploy`：回填核验成功后切换七工具 Worker 与四页应用，OAuth KV 和 Google 身份不变。
+5. 确认网页、MCP 和健康版本后，`./scripts/release retire-v4` 再导出一份完整备份，退役 legacy 三表及 raw_text。
 
 回滚：切换 Worker **之前** 可执行 `db/showroom-release/rollback-before-cutover.sql`，删除新克隆并解除 legacy 写锁，保留所有旧事实；本地迁移测试验证此路径。切换 **之后** 已可能产生 v5 新数据，应保留 v5 架构并修复代码；必须降级时，先备份当前库，在新的恢复 D1 中还原私密 SQL 并验证账户/数据，再显式切换绑定。不能把旧备份直接覆盖有新写入的活跃数据库。退役 SQL 不在自动迁移目录，只有导入核验成功才允许执行。
 
