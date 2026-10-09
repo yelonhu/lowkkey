@@ -81,14 +81,24 @@ test('empty → seven tools → four pages, all themes, narrow layout, refresh a
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.locator('.lift[data-ex="back_squat"]').click();
   await expect(page.locator('.lift[data-ex="back_squat"]')).toHaveAttribute('aria-pressed','true');
-  const chart=page.locator('.chartbox svg').first();
+  const chart=page.locator('.chartbox[tabindex]').first();
+  if(testInfo.project.name==='webkit')await chart.tap();else await chart.click();
+  await expect(chart).toHaveCSS('outline-style','none');
+  await expect(chart.locator('svg')).toHaveCSS('outline-style','none');
   await chart.focus(); await page.keyboard.press('ArrowRight');
   await expect(page.locator('.tip.on')).toBeVisible();
+  await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+  await expect(chart).toBeFocused();
+  await expect(chart).toHaveCSS('outline-style','solid');
   // Deleting referenced data hides the pick instead of rendering stale readings.
   await tool('delete',{kind:'session',date:fixtureToday});
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await expect(page.locator('.pick')).toHaveCount(0);
   await tool('curate',{week:fixtureWeek,recap:{picks:null},theme:null});
+  await page.route('**/api/auth/config',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({json:{...await response.json(),aiConnection:true}});
+  });
   await page.getByRole('button',{name:'lowkkey，打开设置',exact:true}).click();
   await expect(page.getByRole('dialog',{name:'设置'})).toBeVisible();
   await expect(page.getByRole('button',{name:'完成',exact:true})).toBeFocused();
@@ -100,6 +110,19 @@ test('empty → seven tools → four pages, all themes, narrow layout, refresh a
   await expect(page.getByRole('button',{name:'lowkkey，打开设置',exact:true})).toBeFocused();
   await page.getByRole('button',{name:'lowkkey，打开设置',exact:true}).click();
   await expect(page.locator('.client-row').filter({hasText:'Showroom E2E'})).toBeVisible();
+  for(const [width,height] of [[390,844],[320,568]]){
+    await page.setViewportSize({width,height});
+    const card=await page.getByRole('dialog').boundingBox();
+    expect(card!.y).toBeGreaterThanOrEqual(40);
+    expect(card!.y+card!.height).toBeLessThanOrEqual(height-40);
+    await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/settings-${width}.png`});
+  }
+  await page.getByText('连接新的 AI',{exact:true}).click();
+  await expect(page.getByRole('button',{name:'复制连接地址'})).toBeVisible();
+  await page.getByRole('button',{name:'退出登录',exact:true}).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('button',{name:'完成',exact:true})).toBeInViewport();
+  await page.getByText('连接新的 AI',{exact:true}).click();
   await page.getByRole('button',{name:'刷新',exact:true}).click();
   await expect(page.getByText('正在读取…',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'撤销授权',exact:true}).click();

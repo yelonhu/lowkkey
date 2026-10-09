@@ -27,6 +27,8 @@ h1,h2,h3,p,ul,ol,figure,dl,dd{margin:0;padding:0}
 ul,ol{list-style:none}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;-webkit-tap-highlight-color:transparent}
 a{color:inherit;text-decoration:none}
+:focus:not(:focus-visible){outline:none}
+a,summary,.chartbox,.chartbox svg{-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:4px}
 .tn{font-variant-numeric:tabular-nums}
 .u{font-size:.78em;font-weight:400;color:var(--muted);margin-left:.18em;letter-spacing:0}
@@ -44,7 +46,8 @@ a{color:inherit;text-decoration:none}
 .themes [data-t=ink]{background:linear-gradient(135deg,#FFFFFF 0 48%,#0B0B0B 52%)}
 .themes [data-t=gold]{background:linear-gradient(135deg,#FCFBF8 0 48%,#CDAE70 52%,#8F6E35)}
 .themes [data-t=pearl]{background:linear-gradient(135deg,#FAFAFB 0 48%,#8A7BD8 52%,#5B9BD5 76%,#9AA7B8)}
-.navbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border-bottom:1px solid var(--line)}
+.navbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top,0px);z-index:21;pointer-events:none;background:var(--bg)}
 .tabs{display:flex;gap:24px}
 .tabs a{position:relative;padding:12px 0 11px;font:500 15px/1 var(--font);color:var(--muted);letter-spacing:-.005em;transition:color .15s}
 .tabs a[aria-current]{color:var(--ink)}
@@ -97,7 +100,7 @@ svg text{font-family:var(--font);fill:var(--muted);font-size:10px}
 .dy[open]>summary .chev{transform:rotate(90deg)}
 .dy .items{margin-top:0;border-top:1px solid var(--line2)}
 .dy .it:last-child{border-bottom:0}
-.dy .coach{font-size:13px;color:var(--ink2);padding:12px 0 2px;line-height:1.75}
+.dy .coach.cl{font-size:13px;color:var(--ink2);margin:2px 0 16px;padding:10px 14px 10px 16px;line-height:1.8}
 
 /* ── recap ── */
 .letter h1{font:600 26px/1.35 var(--font);letter-spacing:.02em;margin-top:8px}
@@ -236,21 +239,46 @@ body,button,a{font-variant-numeric:tabular-nums}
 .wk:not(:first-child),#v-log>section+section .wk{margin-top:40px}
 .ses h3{flex-wrap:wrap}
 .empty-copy{margin-top:24px}
-.receipt-anchor{display:block;height:0;scroll-margin-top:64px}
-[id^=next-],[id^=log-],[id^=recap-],[id^=body-]{scroll-margin-top:64px}
+.receipt-anchor{display:block;height:0;scroll-margin-top:calc(64px + env(safe-area-inset-top,0px))}
+[id^=next-],[id^=log-],[id^=recap-],[id^=body-]{scroll-margin-top:calc(64px + env(safe-area-inset-top,0px))}
 .connection-notice{padding-top:12px;color:var(--muted);font-size:12px}
 .connection-notice button{text-decoration:underline;margin-left:12px}
 button:disabled{cursor:default}
 @media(max-width:350px){.it-last{grid-template-columns:auto minmax(0,1fr)}.it-last .glyph{grid-column:2;justify-self:end}.dayt{flex-wrap:wrap;gap:6px 12px}.it-h{gap:8px}.it-n{min-width:0}.sh-it{padding:12px 10px}.lift .v{font-size:28px}}
 /* Account utilities are outside the reference's four-page canvas. */
-.account-panel{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:color-mix(in srgb,var(--ink) 18%,transparent)}
-.account-drawer{width:100%;max-width:480px;max-height:calc(100dvh - 40px);overflow:auto;overscroll-behavior:contain;background:var(--bg);padding:28px 28px;border:1px solid var(--line);border-radius:14px}
-.settings-heading{display:flex;align-items:baseline;justify-content:space-between;gap:20px}.settings-heading h2{font-size:26px;font-weight:600}
-.account-drawer button{min-height:40px;font-size:12.5px;text-decoration:underline;text-underline-offset:4px;color:var(--ink2)}
-.account-drawer .close-account{text-decoration:none;color:var(--muted)}
-.settings-section{margin-top:22px;padding-top:22px;border-top:1px solid var(--line)}.settings-section h3{font-size:13px;font-weight:600}.settings-section p{font-size:12.5px;line-height:1.85;color:var(--muted);margin-top:12px;overflow-wrap:anywhere}
-.connection-address{display:block;background:var(--surf);padding:12px;margin-top:12px;overflow-wrap:anywhere;font:12px/1.8 var(--font)}
-.settings-section .settings-hint{font-size:11.5px;margin:4px 0 16px}.client-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line);font-size:13px}.client-row>div{min-width:0;overflow-wrap:anywhere}.client-row small{display:block;color:var(--muted);margin-top:6px;font-size:11px}.client-row button{flex-shrink:0}.settings-actions{display:flex;flex-wrap:wrap;gap:0 24px}.settings-status{font-size:12px;margin-top:12px}.settings-section .login-identity{color:var(--ink)}
+/* Keep the card inside the safe area, with a stable header and a shorter scroll body. */
+.account-panel{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:max(40px,calc(env(safe-area-inset-top) + 24px)) max(20px,env(safe-area-inset-right)) max(40px,calc(env(safe-area-inset-bottom) + 24px)) max(20px,env(safe-area-inset-left));background:rgba(0,0,0,.28);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
+.account-drawer{display:flex;flex-direction:column;width:100%;max-width:440px;max-height:min(680px,78svh,calc(100svh - max(40px,calc(env(safe-area-inset-top) + 24px)) - max(40px,calc(env(safe-area-inset-bottom) + 24px))));overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:18px;box-shadow:0 16px 64px rgba(0,0,0,.14)}
+.settings-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;flex:none;padding:20px 24px 16px}
+.settings-heading h2{font-size:24px;font-weight:500;letter-spacing:.02em}
+.account-drawer button{min-height:40px;font-size:12px;color:var(--ink2)}
+.account-drawer button:disabled{opacity:.5}
+.account-drawer .close-account{color:var(--muted)}
+.settings-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 24px 20px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.settings-section{padding:18px 0;border-top:1px solid var(--line)}
+.settings-section:last-of-type{padding-bottom:0}
+.settings-section h3{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.settings-section p{font-size:12px;line-height:1.85;color:var(--muted);overflow-wrap:anywhere}
+.client-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0 4px;font-size:14px}
+.client-row+.client-row{margin-top:10px;border-top:1px solid var(--line2)}
+.client-row>div{min-width:0;overflow-wrap:anywhere}
+.client-row small{display:block;color:var(--muted);margin-top:3px;font-size:11px}
+.client-row button{flex-shrink:0;color:var(--muted)}
+.connection-help{margin-top:8px}
+.connection-help>summary{display:flex;align-items:center;min-height:40px;width:fit-content;font-size:12px;color:var(--ink2);cursor:pointer;list-style:none}
+.connection-help>summary::-webkit-details-marker{display:none}
+.connection-help[open]>summary{color:var(--muted)}
+.connection-address{display:block;background:var(--surf);border-radius:6px;padding:10px 12px;margin-top:10px;overflow-wrap:anywhere;font:11px/1.8 var(--font)}
+.settings-section .settings-hint{font-size:11px;margin:4px 0 0}
+.settings-data-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:6px}
+.settings-data-row p{font-size:11px}
+.settings-section .export-records{display:block;margin-top:2px}
+.settings-actions{display:flex;flex-wrap:wrap;gap:0 20px;margin-top:4px}
+.settings-actions button{color:var(--muted)}
+.settings-status{font-size:12px;color:var(--ink2);margin-top:12px}
+.settings-status:empty{display:none}
+.settings-section .login-identity{color:var(--ink);font-size:13px;margin-top:12px}
+@media(max-width:350px){.settings-heading{padding:16px 20px 12px}.settings-content{padding:0 20px 16px}.settings-data-row{gap:8px}}
 .access-gate{max-width:420px;margin:12vh auto;padding:28px}.access-gate>div:first-child{font-size:15px;font-weight:600;margin-bottom:40px}.access-gate h1{font-size:26px;font-weight:600}.access-gate p{font-size:13px;line-height:1.9;margin:16px 0;color:var(--muted)}.access-gate button{padding:12px 20px;border:1px solid var(--ink);background:var(--ink);color:var(--bg);border-radius:8px;min-height:44px;font-size:13px;margin:8px 8px 0 0}.access-gate form{display:flex;flex-direction:column;gap:12px;margin-top:20px}.access-gate label{font-size:12px;display:flex;flex-direction:column;gap:8px}.access-gate input{font:16px var(--font);padding:12px;background:var(--surf);color:var(--ink);border:1px solid var(--line);border-radius:8px;max-width:100%}
 /* User-defined titles can exceed the reference's one-character training days. */
 .dy>summary b,.ses h3{min-width:0;overflow-wrap:anywhere}
