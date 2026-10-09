@@ -117,6 +117,9 @@ test('empty showroom → four-tool writes → three screens → focus refresh �
 });
 
 test('Google-only sign-in preserves the receipt destination and hides unavailable email input', async ({page}) => {
+  // Auth assertions must not depend on the external font service finishing a load.
+  await page.route('https://fonts.googleapis.com/**', route=>route.abort());
+  await page.route('https://fonts.gstatic.com/**', route=>route.abort());
   await page.route('**/api/auth/config', route=>route.fulfill({json:{mode:'customer',local:false,google:true,email:false,aiConnection:true}}));
   let body:Record<string,string>|undefined;
   await page.route('**/api/auth/sign-in/social',async route=>{body=route.request().postDataJSON();await route.fulfill({json:{url:'/#Login'}});});
@@ -125,6 +128,7 @@ test('Google-only sign-in preserves the receipt destination and hides unavailabl
   await expect(page.locator('input')).toHaveCount(0);
   await page.getByRole('button',{name:'使用 Google 继续'}).click();
   await expect.poll(()=>body?.callbackURL).toBe('/#Gallery?date=2026-10-08');
+  await expect(page).toHaveURL(/\/#Login$/);
   await page.goto('/?returnTo='+encodeURIComponent('/authorize?client_id=test')+'#Login');
   await page.getByRole('button',{name:'使用 Google 继续'}).click();
   await expect.poll(()=>body?.callbackURL).toBe('/authorize?client_id=test');
