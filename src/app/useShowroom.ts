@@ -7,6 +7,7 @@ export function useShowroom() {
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [syncedAt, setSyncedAt] = useState<Date | null>(null), [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
+  const [themeBusy,setThemeBusy] = useState(false);
   const clear = useCallback(() => { generation.current++; setState(null); setAuth('required'); setError(''); setSyncedAt(null); setRefreshing(false); }, []);
   const refresh = useCallback(async () => {
     const epoch = ++generation.current;
@@ -37,6 +38,11 @@ export function useShowroom() {
       document.removeEventListener('visibilitychange', resume);
     };
   }, [refresh, clear]);
+  useEffect(()=>{const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&state&&new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())!==state.today)void refresh();},60000);return()=>clearInterval(timer);},[state,refresh]);
+  async function setTheme(theme:'ink'|'gold'|'pearl') {
+    if(!state||themeBusy)return;setThemeBusy(true);
+    try {const response=await fetch('/v1/preferences/theme',{method:'POST',headers:{'Content-Type':'application/json','X-Lowkkey-Account':state.accountId},body:JSON.stringify({theme})});if(!response.ok)throw new Error();await refresh();}catch{setError('主题暂时未能保存，请重试。');}finally{setThemeBusy(false);}
+  }
   async function login() {
     if (!import.meta.env.DEV) { location.assign('/cdn-cgi/access/login'); return; }
     setBusy(true);
@@ -53,5 +59,5 @@ export function useShowroom() {
     clear(); localStorage.setItem('lowkkey-signout', String(Date.now()));
     if (result.redirect) location.assign(result.redirect);
   }
-  return { state, auth, busy, error, login, logout, refresh, syncedAt, refreshing };
+  return { state, auth, busy, error, login, logout, refresh, syncedAt, refreshing, setTheme, themeBusy };
 }

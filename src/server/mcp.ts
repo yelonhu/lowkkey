@@ -19,18 +19,23 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
     if (!principal.scopes.includes(tool.scope)) continue;
     const descriptor = mcpToolList().find(t => t.name === tool.name)!;
     server.registerTool(tool.name, {
-      title: tool.title, description: tool.description, inputSchema: tool.input, outputSchema: mcpOutput(tool.name),
+      title: tool.title, description: tool.description, inputSchema: z.looseObject({}), outputSchema: mcpOutput(tool.name),
       annotations: descriptor.annotations, _meta: descriptor._meta,
     }, async (args: unknown) => {
       try {
+        // Validate here to return structured field paths, not an SDK-only text error.
+        args = tool.input.parse(args);
         switch (tool.name) {
-          case 'log_session': { const saved = await store.logSession(db, principal.ownerId, args); return response(saved, view('Gallery', 'date', saved.date)); }
-          case 'log_weight': { const saved = await store.logWeight(db, principal.ownerId, args); return response(saved, view('Weight', 'date', saved.date)); }
-          case 'set_plan': { const saved = await store.setPlan(db, principal.ownerId, args); return response(saved, view('Plan', 'day', saved.day)); }
-          case 'get_brief': return response(await store.brief(db, principal.ownerId));
+          case 'log_session': { const saved = await store.logSession(db, principal.ownerId, args); return response(saved, view('log', 'date', saved.date)); }
+          case 'log_weight': { const saved = await store.logWeight(db, principal.ownerId, args); return response(saved, view('body', 'date', saved.date)); }
+          case 'set_plan': { const saved = await store.setPlan(db, principal.ownerId, args); return response(saved, view('next', 'title', saved?.title ?? (args as {title:string}).title)); }
+          case 'set_profile': return response(await store.setProfile(db, principal.ownerId, args),new URL(request.url).origin+'/#body');
+          case 'curate': { const saved=await store.curate(db,principal.ownerId,args); return response(saved,view('recap','week',saved.week)); }
+          case 'delete': { const saved=await store.deleteFact(db,principal.ownerId,args); return response(saved,view(saved.kind==='session'?'log':'body','date',saved.date)); }
+          case 'get_brief': return response(await store.brief(db, principal.ownerId,args));
         }
       } catch (cause) {
-        const error = cause instanceof StoreError ? { code: cause.code } : cause instanceof z.ZodError
+        const error = cause instanceof StoreError ? { code: cause.code, fields:cause.fields } : cause instanceof z.ZodError
           ? { code: 'invalid_arguments', fields: cause.issues.map(issue => ({ path: issue.path, message: issue.message })) }
           : { code: 'operation_failed' };
         return { ...response({ error }), isError: true };

@@ -1,63 +1,40 @@
-# lowkkey
+# lowkkey v5
 
-日用 AI 外挂数据底座，与私人训练成果展厅。输入和对话留在 Claude / ChatGPT；lowkkey 保存原话、真实组数据、体重和下次安排，再用确定性代码计算趋势。
+私人训练档案。输入与对话留在 Claude / ChatGPT；lowkkey 保存训练事实、体重、计划与策展，所有数字由共享领域代码计算。
 
-应用只有三个业务页面：
+四页为 `#next`、`#recap`、`#body`、`#log`。React 与 SVG 直接渲染，视觉采用用户确认的 v5 HTML 原稿：Inter / 宋体、三套深浅主题、留白和器械图。点击原位置的 `lowkkey` 品牌进入设置；四页没有现场输入、计时器或审批。
 
-- **下次练什么**：按训练日展示动作、重量、组次与教练备注。
-- **训练展厅**：四条长期 e1RM 曲线、日期倒序的原话记录和每个动作的最佳组。
-- **体重**：按自然日计算的 7 日滚动均线，以及显式设置的目标周增重参考带。
-
-没有现场打卡、计时器、输入表单、审批队列或模型手算。登录与账户管理保留。
-
-## 本地运行
+## 运行与验证
 
 ```sh
 ./scripts/bootstrap
 ./scripts/run dev
-# http://127.0.0.1:5173
-```
-
-开发数据使用独立的 `.data/showroom`，仅应用 `db/showroom-migrations`。旧 `.data/v02`、旧迁移文件和现有公网部署均不读写。空账户没有示例数据、默认个人计划或假曲线。
-
-```sh
 ./scripts/run preview:empty
-# http://127.0.0.1:5176 — 独立空账户
 ./scripts/run preview:rehearsal
-# http://127.0.0.1:5178 — 标明测试数据的工具区
-```
-
-演练通过本地 OAuth/MCP 客户端写入三周合成数据，未连接真实 AI。工具区支持直接保存训练、体重、计划和读取简报。临时库随服务正常退出清理，生产包不包含演练页面或数据。
-
-## MCP
-
-Remote MCP 使用 `/mcp`，Streamable HTTP 和 OAuth。只有四个工具：
-
-| 工具 | 权限 | 行为 |
-|---|---|---|
-| `log_session(date, raw_text, sets)` | write | 保存完整原话和有序组数据，按日期覆盖 |
-| `log_weight(date, lb)` | write | 保存磅数，按日期覆盖 |
-| `set_plan(day, items, notes)` | write | 更新一个训练日；备注省略保留、null 清空 |
-| `get_brief()` | read | 最近 30 个训练日期、当前计划、体重均线、身体备注和力量摘要 |
-
-写入立即生效。修正或补充同日训练时，AI 必须重传完整原话与组数据。具体结构、单位语义与示例见 [接口说明](docs/lowkkey-handoff/INTERFACE.md)。
-
-成功写入返回保存的数据及 `view_url`，可直接打开对应日期或训练日。简报包含生成时间、数据覆盖范围和各动作被排除组的原因；页面显示最近成功同步时间，并支持手动刷新和切回刷新。
-
-三张业务表为 `training_sessions`、`weights`、`plans`。账户和授权使用独立基础表。e1RM、均线和参考带在共享领域包现算，不作为事实存储。
-
-## 验证
-
-```sh
 ./scripts/run check
+./scripts/run protocol:emit
 ./scripts/run test
 ./scripts/run build
 ./scripts/run test:e2e
 ./scripts/run test:oauth
 ```
 
-API、账户与 OAuth 测试使用临时 D1；浏览器测试分别启动 Chromium / WebKit 的独立本地 HTTPS 服务，检查三屏、空状态、MCP 写入、焦点刷新、长文本和 320–768px 布局。截图在 `.artifacts/playwright/{chromium,webkit}/showroom-*.png`。
+开发服务使用独立 `.data/showroom`，迁移入口 `db/showroom-migrations`；旧 `db/migrations` 和旧公网库不参与。演练只写入临时 D1 的合成数据，生产包没有示例数据。私密原稿与备份不进 Git；本地原稿验收使用 `.local/v5/reference-facts.json`，CI 自动跳过这项私人数据测试。
 
-字体、留白和色阶来自 [原设计画板](docs/lowkkey-handoff/frontend/lowkkey-frontend.html)，应用通过 React 与 SVG 直接渲染；不再导入原型 HTML 或使用 DOM 绑定定位。
+## 七工具 MCP
 
-默认构建使用本地隔离配置，不绑定旧公网库。Google 邀请登录、独立内测部署、密钥配置和 AI 接入步骤见 [公网内测说明](docs/showroom-beta.md)。本地自动化与官方客户端／iPhone 真机验收分别记录。
+地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。全权限严格七项，只读只提供 `get_brief`。
+
+| 工具 | 参数与行为 |
+|---|---|
+| `log_session` | `date/title/sets/note`，整体覆盖当日；note 只保存用户的话，拒绝 raw_text |
+| `log_weight` | `date/lb`，按日期覆盖 |
+| `set_plan` | `title/weekday/items/coach`，同星期唯一，空 items 删除 |
+| `set_profile` | 目标和身体备注，省略保留、null 清空 |
+| `curate` | 周主题、周信、picks、next/body 与 log 批注；递归 patch，每次保存版本 |
+| `delete` | `kind/date`，返回删除的训练或体重 |
+| `get_brief` | 默认六次训练，可选 0–30；紧凑组、计划、领域读数、week_facts 与四周策展摘要 |
+
+写入立即生效，返回保存对象和 `view_url`。同日修正须重传完整组数据。输入先验证，D1 原子批次及版本比较防止并发 patch 丢失。网页只增加主题偏好写入接口，其余业务输入仍由 AI 完成。
+
+[协议说明](docs/lowkkey-handoff/INTERFACE.md) · [设计实现](docs/lowkkey-handoff/DESIGN.md) · [beta 发布与迁移](docs/showroom-beta.md)

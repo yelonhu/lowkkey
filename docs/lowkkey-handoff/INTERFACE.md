@@ -1,103 +1,40 @@
-# lowkkey 展厅协议 · 4.0.0
+# lowkkey protocol v5
 
-这是不兼容旧事件账本的独立数据底座。REST 保留 /v1 路径，数据结构以 4.0.0 为准。新库不迁移旧记录。
+唯一机器契约在 `packages/protocol`。运行 `./scripts/run protocol:emit` 生成本目录 `protocol/{schema,openapi,mcp-tools}.json`；CI 检查生成结果一致。旧 V1–V10、提议、审批、事件流均为历史。
 
-## 四个 MCP 工具
+## 权限与工具
 
-所有日期为真实存在的 YYYY-MM-DD，本地日期由外部对话明确提供。没有自然语言解析、模型字段推测或审批。未知字段、动作、单位、无效日期均返回错误，不进行部分写入。授权为 read / write；旧 submit / propose 不转换为 write。
+网页使用受邀账户会话。MCP 使用 OAuth `read/write`，账户来自令牌，不接受调用方指定 owner。全权限七项：`get_brief`、`log_session`、`log_weight`、`set_plan`、`set_profile`、`curate`、`delete`。没有业务审批；客户端自己的确认独立存在。
 
-### log_session(date, raw_text, sets)
+每个写工具返回 `{result: 保存后的对象, view_url}`。删除返回被删对象；不存在报错。校验失败不提交任何字段。训练和体重按日期覆盖；计划按 title 更新，weekday 0 为周日、同星期唯一，空 items 删除。
 
-按账户＋日期原子覆盖。重试同一内容不新增记录；修正、补充必须携带该日完整原话及全部组。raw_text 保留原始空白、换行与标点，展示时作为纯文本转义。允许 sets=[]，保留尚无可解析组的原话；不接受空白原话。
+训练格式为 `{date,title,sets,note?}`；拒绝 raw_text。每组使用 `ex/load/unit/kind/reps/rir/role`，可加 `cheat/partial/per`；`per:side` 为单边未知总重。`custom` 必须给 name，以名称归并。kind 为 external、assist、bodyweight；引体/双杠的 bodyweight load 是额外负重，0 即徒手。热身、递减、不完整组不参与 e1RM，降重组参与。单位可为 lb/kg；哑铃按单只。
 
-```json
-{
-  "date": "2026-10-08",
-  "raw_text": "卧推 100lb×6\n引体辅助 25kg×8",
-  "sets": [
-    {"exerciseId": "bench_press", "load": 100, "unit": "lb", "loadKind": "external", "reps": 6, "rir": 2, "setRole": "work"},
-    {"exerciseId": "pull_up", "load": 25, "unit": "kg", "loadKind": "assist", "reps": 8}
-  ]
-}
-```
+计划 items 使用 `ex/load/unit/loadKind/sets/min/max`，支持 `name/per/optional/note/restSec/targetRir/nextLoad/progressRule`；coach 省略保留、null 清空。profile 独立保存 `gain_target:{start,startLb,min,max}` 与 body_notes，省略保留、null 清空，原始目标精度不改。
 
-sets 有序，每项必须提供 exerciseId / load / unit / loadKind / reps；rir 和 setRole 可选。setRole 为 work / warmup / unknown。动作 ID 及名称列在工具说明中。保留现有通用目录，不提供修改目录或新增动作工具。
+## 策展
 
-- unit 为 lb / kg，保存器械原始读数。
-- 哑铃 load 为单只，不乘二。
-- 引体与双杠必须显式选择 assist（辅助重量）或 bodyweight（额外负重；徒手为 0）。
-- 其他动作使用 external。
-- raw_text 最长 20,000 字符；每次最多 250 组。
+`curate({week,theme?,next?,recap?,body?,log?})` 中 week 必须周一。递归合并 recap，省略保留、null 清空；log 按训练日期合并，null 删除批注。每次成功写入保存完整版本。文本以纯文本显示，不执行 HTML。
 
-### log_weight(date, lb)
+- theme 为 gold/pearl，why 必填、不超过 40 字。
+- next 必须今天或未来有计划的日期，text 不超过 120 字。
+- recap.title 12 字；letter 1–5 段、每段 240 字；sign 为 `claude · MM.DD`，省略时服务端生成。
+- picks 1–2 件，日期在指定周内且有记录；器械 picks 的动作必须当天出现。title 24 字、note 80 字。五种类型：barbell/dumbbell/assist/weight/rhythm。
+- focus 仅四个主项；body.text 160 字；log 每条 100 字且对应已有训练。
+- 策展文字拒绝 emoji、感叹号，字数按 Unicode 码点计算。
 
-保存测量日期和正数磅数。同日覆盖，相同数值重试不改变记录。不接受派生值或 kg 字段。
+MCP instructions 原样采用确认的 v5 文档，不含模型手算。`get_brief({sessions?:0..30})` 默认 6，完整数据优先，不静默截断。返回生成时间、Chicago 今天、下一安排、全部计划/profile、当前主题与本周手动选择、体重均线截止日期/样本数、四项力量、各动作最近两次紧凑记录、训练摘要、week_facts、当前策展及最近四周标题/主题。
 
-### set_plan(day, items, notes)
+## 领域计算
 
-day 是稳定的训练日名称；items 完整替换该日安排，空数组清空安排。计划按 day 排序展示，无现场采用操作。
+`packages/core` 为网页与 MCP 共用的唯一计算入口。严格次数 = 总次数 − 借力次数。Epley：1 次取净负荷，2–20 次乘 `1+次数/30`；热身、递减、不完整、单边未知总重不计算。引体与双杠只用当天或此前体重，加额外负重或减辅助；无体重不计算。
 
-```json
-{
-  "day": "胸与背",
-  "items": [
-    {"exerciseId": "bench_press", "load": 115, "unit": "lb", "loadKind": "external", "sets": 3, "repMin": 6, "repMax": 8, "note": "保持肩胛稳定。"}
-  ],
-  "notes": {
-    "coach": "先稳定完成，再考虑加重量。",
-    "body": "肩部状态平稳。",
-    "gain_target": {"start_date": "2026-10-01", "start_lb": 160, "weekly_lb_min": 0.25, "weekly_lb_max": 0.5}
-  }
-}
-```
+七日均值取 D−6..D 实际称重，至少 4 次；14 日速度对实际日期最小二乘回归乘 7，至少 8 次。今天及周界统一 America/Chicago。目标状态比较未舍入速度；派生数值通常一位，rate14 两位。未来四周带从有效当前均值出发，历史线从目标起点出发。
 
-items 使用相同重量语义；load=null 表示未安排重量。notes.coach 属于该日；body 和 gain_target 是全局上下文，取最近一次显式写入。任一备注字段省略保留，null 清空。更新别的训练日、仅改教练备注不会恢复旧身体备注或目标。
+主项 PR、杠铃一片/两片、超过体重、停滞至少三次及突破由有效事实生成。辅助最少纪录要求至少八次严格完成，同辅助选最近日期。计划历史按实际生效日保存；无历史依据不推断 missed/streak/首次完整达标。
 
-内部使用账户递增序号记录 body_revision / gain_target_revision；序号生成、可选字段合并和计划写入在同一 D1 事务内完成。无独立备注表、目标表或审批表。
+## REST 与持久化
 
-### get_brief()
+`GET /v1/state` 返回账户事实、profile、策展/批注、主题与计划历史；`POST /v1/preferences/theme` 仅供已登录网页，检查 Origin 和账户；导出、客户端授权撤销等账户接口保留。
 
-无参数，一次返回：
-
-- sessions：最近 30 个训练日期，倒序，包含完整原话与全部组。
-- plans：全部当前计划，包括已清空动作但仍承载备注的条目。
-- latest_weight：最近测量，或 null。
-- weight_mean_7d：以最近测量日为截止日期的均值、日期、实际测量日数，或 null。
-- body_notes / gain_target：按最近显式写入确定的当前上下文，或 null。
-- strength：卧推、深蹲、坐姿哑铃推肩、引体的历史最佳和最近 e1RM；包含日期、原记录中的零起始 set_index、磅数及单只标识。
-
-所有成功工具输出为 structuredContent.result，并带相同内容的文本。引用数字以代码计算结果为准，模型不得重算 e1RM 或均线。缺少依据时返回 null。
-
-## 共享计算
-
-- Epley：1 次取实际有效负荷；2–20 次为 load × (1 + reps/30)。超过 20 次、0 次或非正负荷不估算。明确热身排除；同日同动作以最高值为最佳，并列保留原顺序第一组。
-- 自由重量换算到 lb；哑铃保持单只。引体有效负荷＝当日或此前最近体重＋额外负重，或减辅助重量。没有历史体重不计算，不借未来测量。
-- 7 日均值：D−6 至 D 的实际日测量算术平均。缺测不填充；空窗口为 null。曲线在空窗口断开。
-- 增重带：start_lb + 每周增重上下限 × 距起点天数 / 7。起点之前不绘制，页面延伸至最近测量或目标起点后四周。没有目标不绘制参考带。
-
-## 网页接口
-
-网页通过现有登录会话访问；OAuth token 只用于 /mcp。
-
-| 方法 | 路径 | 功能 |
-|---|---|---|
-| GET | /v1/state | 当前账户全部三类事实，供长期历史与曲线展示 |
-| GET | /v1/account | 当前账户信息 |
-| GET | /v1/clients | AI 授权列表 |
-| POST | /v1/clients/{id}/revoke | 撤销本人授权，空 JSON 请求 |
-| GET | /v1/export | 导出 lowkkey.showroom.v1 |
-
-账户写操作检查 Origin；客户模式还要求 X-Lowkkey-Account，防止切换账户后的旧页面操作错误账户。原录入、事件流、导入、草稿、审批、提议、撤销记录 API 全部退役，返回 404。
-
-## 源码与产物
-
-唯一协议源为 packages/protocol/src。运行 ./scripts/run protocol:emit 生成 protocol/schema.json、openapi.json、mcp-tools.json。输出模式由运行 MCP 端到端测试与生成文件逐项比对。
-# 公网内测补充
-
-三个写工具保持输入参数不变，成功输出为 `{ result: 已保存的事实, view_url: 绝对地址 }`；JSON 文本与 `structuredContent` 内容一致。链接分别定位 `#Gallery?date=YYYY-MM-DD`、`#Weight?date=YYYY-MM-DD`、`#Plan?day=URL编码的训练日`。空计划可清空安排，链接仍进入计划页。
-
-`get_brief` 仍为零参数，输出 `{ result: Brief }`。Brief 新增 `generated_at`（生成时刻，不是测量日期）、`coverage.training`（全历史最早/最晚日期、总训练日期数和本次返回数）、`coverage.weight`（测量日期范围和总数）。空范围的首尾日期为 null。
-
-每项力量摘要新增 `recorded_sets` 和 `excluded_sets: [{reason,count}]`，统计全历史该动作，按每组一个原因计数：`warmup`、`reps_out_of_range`、`missing_bodyweight`、`non_positive_load`，优先级按此顺序。零记录与有记录但不能估算由此区分。次数 1–20、引体当天或此前体重、单只哑铃等原公式口径不变。
-
-部署与真实客户端接入见 [公网内测说明](../showroom-beta.md)。
+v5 使用 showroom_sessions/showroom_weights/showroom_plans、profiles、preferences、curations、curation_versions、annotations、plan_history。所有表按 owner 隔离。用户修正或删除事实后派生值立即重算；失效 picks 在网页跳过。迁移及备份见 `../showroom-beta.md`。

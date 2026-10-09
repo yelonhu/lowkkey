@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { environment, root } from './environment.mjs';
 import { rehearsalClient } from './rehearsal/client.mjs';
-import { seedShowroom, fixturePlans, fixtureSessions } from './rehearsal/fixtures.mjs';
+import { seedShowroom, fixturePlans, fixtureSessions, fixtureToday } from './rehearsal/fixtures.mjs';
 
 const port = Number(process.env.LOWKKEY_REHEARSAL_PORT ?? 5178), appPort = port + 1;
 if (!Number.isInteger(port) || port < 1024 || port > 65534) throw new Error('Invalid local port');
@@ -28,10 +28,10 @@ async function reset() {
 async function perform(task) {
   switch (task) {
     case 'reset': await reset(); return '已重置独立演练库。';
-    case 'plan': await client.tool('set_plan',{...fixturePlans[0],notes:{coach:'演练更新：稳定完成三组，再考虑加重量。'}}); return '计划已直接更新。';
-    case 'session': await client.tool('log_session',{...fixtureSessions.at(-1),date:'2026-10-08',raw_text:'演练新记录：今天完成训练，最后一组稳稳做完。'}); return '训练已保存，重复点击不会增加第二条。';
-    case 'weight': await client.tool('log_weight',{date:'2026-10-08',lb:162}); return '体重已保存，均线由领域代码更新。';
-    case 'brief': { const brief = await client.tool('get_brief',{}); return '简报：'+brief.sessions.length+' 个训练日；7 日均值 '+(brief.weight_mean_7d?.lb?.toFixed(1) ?? '—')+' lb。'; }
+    case 'plan': await client.tool('set_plan',{...fixturePlans[0],coach:'演练更新：稳定完成三组，再考虑加重量。'}); return '计划已直接更新。';
+    case 'session': await client.tool('log_session',{...fixtureSessions.at(-1),date:fixtureToday,note:'演练新记录：今天完成训练，最后一组稳稳做完。'}); return '训练已保存，重复点击不会增加第二条。';
+    case 'weight': await client.tool('log_weight',{date:fixtureToday,lb:162}); return '体重已保存，均线由领域代码更新。';
+    case 'brief': { const brief = await client.tool('get_brief',{}); return '简报：'+brief.sessions.length+' 个训练日；7 日均值 '+(brief.weight.mean7?.lb?.toFixed(1) ?? '—')+' lb。'; }
     default: throw new Error('Unknown action');
   }
 }

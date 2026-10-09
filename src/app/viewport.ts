@@ -1,4 +1,4 @@
 export function applyPageTheme() {
-  document.documentElement.style.colorScheme = 'light';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#F1F1EF');
+  document.documentElement.style.colorScheme='light dark';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
 }

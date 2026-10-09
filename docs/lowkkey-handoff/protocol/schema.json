@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lowkkey protocol",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "$defs": {
     "TrainingSession": {
       "type": "object",
@@ -11,10 +11,9 @@
           "format": "date",
           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
         },
-        "raw_text": {
+        "title": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 20000
+          "minLength": 1
         },
         "sets": {
           "maxItems": 250,
@@ -22,6 +21,9 @@
           "items": {
             "$ref": "#/$defs/TrainingSet"
           }
+        },
+        "note": {
+          "type": "string"
         },
         "updated_at": {
           "type": "string",
@@ -31,7 +33,7 @@
       },
       "required": [
         "date",
-        "raw_text",
+        "title",
         "sets",
         "updated_at"
       ],
@@ -40,9 +42,10 @@
     "TrainingSet": {
       "type": "object",
       "properties": {
-        "exerciseId": {
+        "ex": {
           "type": "string",
           "enum": [
+            "custom",
             "bench_press",
             "incline_db_press",
             "dip",
@@ -66,8 +69,19 @@
             "seated_leg_curl",
             "leg_extension",
             "hip_adduction",
-            "calf_raise"
+            "calf_raise",
+            "db_row",
+            "chest_supported_row",
+            "smith_bench",
+            "smith_squat",
+            "incline_bench",
+            "hammer_curl",
+            "rear_delt_fly"
           ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
         },
         "load": {
           "type": "number",
@@ -81,7 +95,11 @@
             "kg"
           ]
         },
-        "loadKind": {
+        "per": {
+          "type": "string",
+          "const": "side"
+        },
+        "kind": {
           "type": "string",
           "enum": [
             "external",
@@ -95,6 +113,7 @@
           "maximum": 100
         },
         "rir": {
+          "default": null,
           "anyOf": [
             {
               "type": "integer",
@@ -106,21 +125,34 @@
             }
           ]
         },
-        "setRole": {
+        "role": {
+          "default": "work",
           "type": "string",
           "enum": [
             "work",
             "warmup",
+            "backoff",
+            "drop",
             "unknown"
           ]
+        },
+        "cheat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "partial": {
+          "type": "boolean"
         }
       },
       "required": [
-        "exerciseId",
+        "ex",
         "load",
         "unit",
-        "loadKind",
-        "reps"
+        "kind",
+        "reps",
+        "rir",
+        "role"
       ],
       "additionalProperties": false
     },
@@ -153,10 +185,20 @@
     "Plan": {
       "type": "object",
       "properties": {
-        "day": {
+        "title": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 80
+          "minLength": 1
+        },
+        "weekday": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "coach": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "items": {
           "maxItems": 50,
@@ -165,90 +207,27 @@
             "$ref": "#/$defs/PlanItem"
           }
         },
-        "notes": {
-          "type": "object",
-          "properties": {
-            "coach": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 4000
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "body": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 4000
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "gain_target": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/GainTarget"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          },
-          "additionalProperties": false
-        },
         "updated_at": {
           "type": "string",
           "format": "date-time",
           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-        },
-        "body_revision": {
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "gain_target_revision": {
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
-        "day",
+        "title",
+        "weekday",
         "items",
-        "notes",
-        "updated_at",
-        "body_revision",
-        "gain_target_revision"
+        "updated_at"
       ],
       "additionalProperties": false
     },
     "PlanItem": {
       "type": "object",
       "properties": {
-        "exerciseId": {
+        "ex": {
           "type": "string",
           "enum": [
+            "custom",
             "bench_press",
             "incline_db_press",
             "dip",
@@ -272,8 +251,19 @@
             "seated_leg_curl",
             "leg_extension",
             "hip_adduction",
-            "calf_raise"
+            "calf_raise",
+            "db_row",
+            "chest_supported_row",
+            "smith_bench",
+            "smith_squat",
+            "incline_bench",
+            "hammer_curl",
+            "rear_delt_fly"
           ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
         },
         "load": {
           "anyOf": [
@@ -294,6 +284,10 @@
             "kg"
           ]
         },
+        "per": {
+          "type": "string",
+          "const": "side"
+        },
         "loadKind": {
           "type": "string",
           "enum": [
@@ -307,61 +301,85 @@
           "minimum": 1,
           "maximum": 20
         },
-        "repMin": {
+        "min": {
           "type": "integer",
           "minimum": 1,
           "maximum": 100
         },
-        "repMax": {
+        "max": {
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "optional": {
+          "type": "boolean"
         },
         "note": {
+          "type": "string"
+        },
+        "restSec": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1800
+        },
+        "targetRir": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "nextLoad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "progressRule": {
           "type": "string",
-          "maxLength": 2000
+          "enum": [
+            "all_sets_reach_max",
+            "top_set_reach_max"
+          ]
         }
       },
       "required": [
-        "exerciseId",
+        "ex",
         "load",
         "unit",
         "loadKind",
         "sets",
-        "repMin",
-        "repMax"
+        "min",
+        "max"
       ],
       "additionalProperties": false
     },
     "GainTarget": {
       "type": "object",
       "properties": {
-        "start_date": {
+        "start": {
           "type": "string",
           "format": "date",
           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
         },
-        "start_lb": {
+        "startLb": {
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1500
         },
-        "weekly_lb_min": {
+        "min": {
           "type": "number",
           "minimum": 0,
           "maximum": 20
         },
-        "weekly_lb_max": {
+        "max": {
           "type": "number",
           "minimum": 0,
           "maximum": 20
         }
       },
       "required": [
-        "start_date",
-        "start_lb",
-        "weekly_lb_min",
-        "weekly_lb_max"
+        "start",
+        "startLb",
+        "min",
+        "max"
       ],
       "additionalProperties": false
     },
@@ -373,125 +391,27 @@
           "format": "date-time",
           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
         },
-        "coverage": {
+        "today": {
           "type": "object",
           "properties": {
-            "training": {
-              "type": "object",
-              "properties": {
-                "first_date": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "last_date": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "total_dates": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "returned_dates": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "first_date",
-                "last_date",
-                "total_dates",
-                "returned_dates"
-              ],
-              "additionalProperties": false
+            "date": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
             },
-            "weight": {
-              "type": "object",
-              "properties": {
-                "first_date": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "last_date": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "total_dates": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "first_date",
-                "last_date",
-                "total_dates"
-              ],
-              "additionalProperties": false
+            "weekday": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             }
           },
           "required": [
-            "training",
-            "weight"
+            "date",
+            "weekday"
           ],
           "additionalProperties": false
         },
-        "sessions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/TrainingSession"
-          }
-        },
-        "plans": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Plan"
-          }
-        },
-        "latest_weight": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Weight"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "weight_mean_7d": {
+        "next": {
           "anyOf": [
             {
               "type": "object",
@@ -501,22 +421,17 @@
                   "format": "date",
                   "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                 },
-                "lb": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
+                "rel": {
+                  "type": "string"
                 },
-                "samples": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
+                "title": {
+                  "type": "string"
                 }
               },
               "required": [
                 "date",
-                "lb",
-                "samples"
+                "rel",
+                "title"
               ],
               "additionalProperties": false
             },
@@ -525,30 +440,264 @@
             }
           ]
         },
-        "body_notes": {
-          "type": [
-            "string",
-            "null"
-          ]
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Plan"
+          }
         },
-        "gain_target": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/GainTarget"
+        "profile": {
+          "$ref": "#/$defs/Profile"
+        },
+        "theme_state": {
+          "$ref": "#/$defs/ThemeState"
+        },
+        "weight": {
+          "type": "object",
+          "properties": {
+            "latest": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "lb": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1500
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "lb"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
-            {
-              "type": "null"
+            "mean7": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "lb": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "n": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "lb",
+                    "n"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rate14": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "above",
+                    "within",
+                    "below"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
-          ]
+          },
+          "required": [
+            "latest",
+            "mean7",
+            "rate14",
+            "status"
+          ],
+          "additionalProperties": false
         },
         "strength": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "exerciseId": {
+              "ex": {
                 "type": "string",
                 "enum": [
+                  "back_squat",
+                  "bench_press",
+                  "db_shoulder_press",
+                  "pull_up"
+                ]
+              },
+              "best": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "e1rm": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "date",
+                      "e1rm"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "latest": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "e1rm": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "date",
+                      "e1rm"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "e1rm": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "date",
+                      "e1rm"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rel_bw": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "assistance": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "kg": {
+                        "type": "number"
+                      },
+                      "reps": {
+                        "type": "number"
+                      },
+                      "self_percent": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "date",
+                      "kg",
+                      "reps",
+                      "self_percent"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "ex",
+              "best",
+              "latest",
+              "first",
+              "rel_bw",
+              "assistance"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "exercises": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ex": {
+                "type": "string",
+                "enum": [
+                  "custom",
                   "bench_press",
                   "incline_db_press",
                   "dip",
@@ -572,138 +721,904 @@
                   "seated_leg_curl",
                   "leg_extension",
                   "hip_adduction",
-                  "calf_raise"
+                  "calf_raise",
+                  "db_row",
+                  "chest_supported_row",
+                  "smith_bench",
+                  "smith_squat",
+                  "incline_bench",
+                  "hammer_curl",
+                  "rear_delt_fly"
                 ]
               },
               "name": {
                 "type": "string"
               },
-              "per_hand": {
-                "type": "boolean"
+              "last": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "compact": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "date",
+                  "compact"
+                ],
+                "additionalProperties": false
               },
-              "unit": {
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "compact": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "date",
+                      "compact"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "ex",
+              "name",
+              "last",
+              "prev"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
                 "type": "string",
-                "const": "lb"
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
               },
-              "best": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "date": {
-                        "type": "string",
-                        "format": "date",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                      },
-                      "lb": {
-                        "type": "number"
-                      },
-                      "set_index": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "date",
-                      "lb",
-                      "set_index"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+              "title": {
+                "type": "string"
               },
-              "latest": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "date": {
-                        "type": "string",
-                        "format": "date",
-                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                      },
-                      "lb": {
-                        "type": "number"
-                      },
-                      "set_index": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "date",
-                      "lb",
-                      "set_index"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+              "note": {
+                "type": "string"
               },
-              "recorded_sets": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 9007199254740991
+              "compact_by_ex": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
-              "excluded_sets": {
+              "prs": {
                 "type": "array",
                 "items": {
-                  "type": "object",
-                  "properties": {
-                    "reason": {
-                      "type": "string",
-                      "enum": [
-                        "warmup",
-                        "reps_out_of_range",
-                        "missing_bodyweight",
-                        "non_positive_load"
-                      ]
-                    },
-                    "count": {
-                      "type": "integer",
-                      "exclusiveMinimum": 0,
-                      "maximum": 9007199254740991
-                    }
-                  },
-                  "required": [
-                    "reason",
-                    "count"
-                  ],
-                  "additionalProperties": false
+                  "type": "string",
+                  "enum": [
+                    "custom",
+                    "bench_press",
+                    "incline_db_press",
+                    "dip",
+                    "pec_deck",
+                    "cable_fly",
+                    "pull_up",
+                    "lat_pulldown",
+                    "seated_row",
+                    "barbell_row",
+                    "face_pull",
+                    "db_shoulder_press",
+                    "lateral_raise",
+                    "ez_curl",
+                    "db_curl",
+                    "skull_crusher",
+                    "triceps_pushdown",
+                    "back_squat",
+                    "hack_squat",
+                    "leg_press",
+                    "romanian_deadlift",
+                    "seated_leg_curl",
+                    "leg_extension",
+                    "hip_adduction",
+                    "calf_raise",
+                    "db_row",
+                    "chest_supported_row",
+                    "smith_bench",
+                    "smith_squat",
+                    "incline_bench",
+                    "hammer_curl",
+                    "rear_delt_fly"
+                  ]
                 }
               }
             },
             "required": [
-              "exerciseId",
-              "name",
-              "per_hand",
-              "unit",
-              "best",
-              "latest",
-              "recorded_sets",
-              "excluded_sets"
+              "date",
+              "title",
+              "compact_by_ex",
+              "prs"
             ],
             "additionalProperties": false
           }
+        },
+        "week_facts": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "pr"
+                  },
+                  "ex": {
+                    "type": "string",
+                    "enum": [
+                      "back_squat",
+                      "bench_press",
+                      "db_shoulder_press",
+                      "pull_up"
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "e1rm": {
+                    "type": "number"
+                  },
+                  "prev_e1rm": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ex",
+                  "date",
+                  "e1rm",
+                  "prev_e1rm"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "threshold"
+                  },
+                  "ex": {
+                    "type": "string",
+                    "enum": [
+                      "back_squat",
+                      "bench_press",
+                      "db_shoulder_press",
+                      "pull_up"
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "what": {
+                    "type": "string",
+                    "enum": [
+                      "一片",
+                      "两片",
+                      "超过体重"
+                    ]
+                  },
+                  "load": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ex",
+                  "date",
+                  "what",
+                  "load"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "stall"
+                  },
+                  "ex": {
+                    "type": "string",
+                    "enum": [
+                      "back_squat",
+                      "bench_press",
+                      "db_shoulder_press",
+                      "pull_up"
+                    ]
+                  },
+                  "sessions": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ex",
+                  "sessions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "unstuck"
+                  },
+                  "ex": {
+                    "type": "string",
+                    "enum": [
+                      "back_squat",
+                      "bench_press",
+                      "db_shoulder_press",
+                      "pull_up"
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "after_sessions": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ex",
+                  "date",
+                  "after_sessions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "first"
+                  },
+                  "ex": {
+                    "type": "string",
+                    "enum": [
+                      "custom",
+                      "bench_press",
+                      "incline_db_press",
+                      "dip",
+                      "pec_deck",
+                      "cable_fly",
+                      "pull_up",
+                      "lat_pulldown",
+                      "seated_row",
+                      "barbell_row",
+                      "face_pull",
+                      "db_shoulder_press",
+                      "lateral_raise",
+                      "ez_curl",
+                      "db_curl",
+                      "skull_crusher",
+                      "triceps_pushdown",
+                      "back_squat",
+                      "hack_squat",
+                      "leg_press",
+                      "romanian_deadlift",
+                      "seated_leg_curl",
+                      "leg_extension",
+                      "hip_adduction",
+                      "calf_raise",
+                      "db_row",
+                      "chest_supported_row",
+                      "smith_bench",
+                      "smith_squat",
+                      "incline_bench",
+                      "hammer_curl",
+                      "rear_delt_fly"
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "what": {
+                    "type": "string",
+                    "enum": [
+                      "徒手",
+                      "不借力做满"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ex",
+                  "date",
+                  "what"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "streak"
+                  },
+                  "weeks": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "kind",
+                  "weeks"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "weight"
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "above",
+                          "within",
+                          "below"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "rate14": {
+                    "type": "number"
+                  },
+                  "mean7": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "status",
+                  "rate14",
+                  "mean7"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "missed"
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "date",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "curation": {
+          "type": "object",
+          "properties": {
+            "current": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Curation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "history": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "week": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "theme": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "week",
+                  "title",
+                  "theme"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "current",
+            "history"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "generated_at",
-        "coverage",
-        "sessions",
+        "today",
+        "next",
         "plans",
-        "latest_weight",
-        "weight_mean_7d",
-        "body_notes",
+        "profile",
+        "theme_state",
+        "weight",
+        "strength",
+        "exercises",
+        "sessions",
+        "week_facts",
+        "curation"
+      ],
+      "additionalProperties": false
+    },
+    "Profile": {
+      "type": "object",
+      "properties": {
+        "gain_target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GainTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "body_notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
         "gain_target",
-        "strength"
+        "body_notes"
+      ],
+      "additionalProperties": false
+    },
+    "Preferences": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": [
+            "ink",
+            "gold",
+            "pearl"
+          ]
+        },
+        "manual_week": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "theme",
+        "manual_week"
+      ],
+      "additionalProperties": false
+    },
+    "Curation": {
+      "type": "object",
+      "properties": {
+        "week": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        },
+        "theme": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "gold",
+                    "pearl"
+                  ]
+                },
+                "why": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "id",
+                "why"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "next": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "date",
+                "text"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recap": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "letter": {
+                  "anyOf": [
+                    {
+                      "minItems": 1,
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sign": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^claude · \\d{2}\\.\\d{2}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "picks": {
+                  "anyOf": [
+                    {
+                      "minItems": 1,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "barbell",
+                              "dumbbell",
+                              "assist",
+                              "weight",
+                              "rhythm"
+                            ]
+                          },
+                          "ex": {
+                            "type": "string",
+                            "enum": [
+                              "custom",
+                              "bench_press",
+                              "incline_db_press",
+                              "dip",
+                              "pec_deck",
+                              "cable_fly",
+                              "pull_up",
+                              "lat_pulldown",
+                              "seated_row",
+                              "barbell_row",
+                              "face_pull",
+                              "db_shoulder_press",
+                              "lateral_raise",
+                              "ez_curl",
+                              "db_curl",
+                              "skull_crusher",
+                              "triceps_pushdown",
+                              "back_squat",
+                              "hack_squat",
+                              "leg_press",
+                              "romanian_deadlift",
+                              "seated_leg_curl",
+                              "leg_extension",
+                              "hip_adduction",
+                              "calf_raise",
+                              "db_row",
+                              "chest_supported_row",
+                              "smith_bench",
+                              "smith_squat",
+                              "incline_bench",
+                              "hammer_curl",
+                              "rear_delt_fly"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "date": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "note": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "date",
+                          "title",
+                          "note"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "focus": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ex": {
+                          "type": "string",
+                          "enum": [
+                            "back_squat",
+                            "bench_press",
+                            "db_shoulder_press",
+                            "pull_up"
+                          ]
+                        },
+                        "why": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "ex",
+                        "why"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "date",
+                "text"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "log": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "week",
+        "updated_at",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "PlanHistory": {
+      "type": "object",
+      "properties": {
+        "effective_date": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Plan"
+          }
+        }
+      },
+      "required": [
+        "effective_date",
+        "revision",
+        "plans"
+      ],
+      "additionalProperties": false
+    },
+    "ThemeState": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string",
+          "enum": [
+            "ink",
+            "gold",
+            "pearl"
+          ]
+        },
+        "active": {
+          "type": "string",
+          "enum": [
+            "ink",
+            "gold",
+            "pearl"
+          ]
+        },
+        "manual_this_week": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "user",
+        "active",
+        "manual_this_week"
       ],
       "additionalProperties": false
     },
@@ -728,6 +1643,35 @@
             "$ref": "#/$defs/Plan"
           }
         },
+        "profile": {
+          "$ref": "#/$defs/Profile"
+        },
+        "preferences": {
+          "$ref": "#/$defs/Preferences"
+        },
+        "curations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Curation"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "plan_history": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PlanHistory"
+          }
+        },
         "accountId": {
           "type": "string",
           "minLength": 1,
@@ -735,15 +1679,30 @@
         },
         "protocol": {
           "type": "string",
-          "const": "4.0.0"
+          "const": "5.0.0"
+        },
+        "today": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        },
+        "theme_state": {
+          "$ref": "#/$defs/ThemeState"
         }
       },
       "required": [
         "sessions",
         "weights",
         "plans",
+        "profile",
+        "preferences",
+        "curations",
+        "annotations",
+        "plan_history",
         "accountId",
-        "protocol"
+        "protocol",
+        "today",
+        "theme_state"
       ],
       "additionalProperties": false
     },
@@ -777,7 +1736,7 @@
       "properties": {
         "format": {
           "type": "string",
-          "const": "lowkkey.showroom.v1"
+          "const": "lowkkey.showroom.v5"
         },
         "exportedAt": {
           "type": "string",

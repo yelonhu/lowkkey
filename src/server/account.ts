@@ -3,7 +3,7 @@ import type { Identity } from './auth.ts';
 import { subjectKey } from './auth.ts';
 
 export class StoreError extends Error {
-  constructor(readonly code: string, readonly status = 400) { super(code); }
+  constructor(readonly code: string, readonly status = 400, readonly fields?: {path:(string|number)[];message:string}[]) { super(code); }
 }
 
 export async function accountFor(db: D1Database, identity: Identity): Promise<string> {

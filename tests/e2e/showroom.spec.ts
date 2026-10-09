@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { createHash, randomBytes } from 'node:crypto';
-import { seedShowroom, fixturePlans, fixtureSessions } from '../../scripts/rehearsal/fixtures.mjs';
+import { seedShowroom, fixturePlans, fixtureSessions, fixtureToday, fixtureWeek } from '../../scripts/rehearsal/fixtures.mjs';
 
 async function connect(request: APIRequestContext, origin: string) {
   const verifier = randomBytes(48).toString('base64url'), redirect = origin + '/test-callback';
@@ -24,78 +24,70 @@ async function connect(request: APIRequestContext, origin: string) {
   return (name:string,args:unknown) => rpc('tools/call',{name,arguments:args}).then(value=>value.structuredContent.result);
 }
 
-test('empty showroom → four-tool writes → three screens → focus refresh → account', async ({page,baseURL},testInfo) => {
-  test.setTimeout(120000);
+test('empty → seven tools → four pages, all themes, narrow layout, refresh and settings', async ({page,baseURL},testInfo) => {
+  test.setTimeout(150000);
   const errors:string[] = []; page.on('pageerror',error=>errors.push(error.message));
+  await page.route('https://fonts.googleapis.com/**',route=>route.abort());
+  await page.route('https://fonts.gstatic.com/**',route=>route.abort());
   await page.goto('/');
   await page.getByRole('button',{name:'打开我的展厅',exact:true}).click();
-  await expect(page.getByText('还没有训练安排')).toBeVisible();
-  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(3);
-  await page.getByRole('link',{name:'训练展厅',exact:true}).click();
-  await expect(page.locator('.strength-card')).toHaveCount(0);
-  await expect(page.getByText('还没有训练记录')).toBeVisible();
-  await page.getByRole('link',{name:'体重',exact:true}).click();
-  await expect(page.getByText('还没有体重记录')).toBeVisible();
-  await expect(page.locator('.chart-band')).toHaveCount(0);
+  await expect(page.getByText('还没有训练安排。和 Claude 聊好之后，会出现在这里。')).toBeVisible();
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4);
+  await page.getByRole('link',{name:'log',exact:true}).click();
+  await expect(page.getByText('还没有训练记录。')).toBeVisible();
+  await page.getByRole('link',{name:'body',exact:true}).click();
+  await expect(page.getByText('还没有体重记录。')).toBeVisible();
   const tool = await connect(page.request,baseURL!);
   await seedShowroom(tool);
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-  await expect(page.locator('.weight-number')).not.toContainText('—');
-  for (const [screen,label] of [['Plan','下次练什么'],['Gallery','训练展厅'],['Weight','体重']]) {
-    await page.getByRole('link',{name:label,exact:true}).click();
-    await expect(page.locator('main')).toHaveAttribute('data-screen',screen);
-    await expect(page.locator('main input,main textarea,main form')).toHaveCount(0);
-    await page.evaluate(()=>document.fonts.ready);
-    await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/showroom-${screen}.png`,animations:'disabled'});
-    await page.setViewportSize({width:1280,height:960});
-    await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/showroom-${screen}-desktop.png`,animations:'disabled'});
-    await page.setViewportSize({width:390,height:844});
-  }
-  await expect(page.locator('.chart-band')).toHaveCount(1);
-  await page.getByRole('link',{name:'训练展厅',exact:true}).click();
-  await expect(page.locator('.session-entry')).toHaveCount(9);
-  await expect(page.locator('.strength-card .chart-line')).toHaveCount(4);
-  await expect(page.locator('.best-label')).toHaveCount(36);
-  await page.locator('.session-entry').first().scrollIntoViewIfNeeded();
-  await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/showroom-records.png`,animations:'disabled'});
-  const raw = '  <script>literal, never executed</script>\n'+ '保留原话与换行。'.repeat(100);
-  await tool('log_session',{...fixtureSessions[0],date:'2026-10-08',raw_text:raw});
-  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-  await expect(page.locator('.raw-text').first()).toHaveText(raw,{useInnerText:false});
-  expect(await page.locator('.raw-text').first().textContent()).toBe(raw);
-  await expect(page.locator('main script')).toHaveCount(0);
-  await page.goto('/#Gallery?date=2026-10-08');
-  await expect(page.locator('[id="Gallery-2026-10-08"]')).toBeInViewport();
-  await page.goto('/#Plan?day='+encodeURIComponent(fixturePlans[0].day));
-  await expect(page.locator('.plan-card').filter({hasText:fixturePlans[0].day}).first()).toBeInViewport();
-  await page.goto('/#Weight?date=2026-10-01');
-  await expect(page.locator('.receipt-note')).toContainText('2026-10-01');
-  await expect(page.locator('.sync-status time')).toBeVisible();
-  await tool('log_weight',{date:'2026-10-08',lb:170});
-  await page.getByRole('button',{name:'刷新',exact:true}).click();
-  await expect(page.locator('.last-weight')).toContainText('170.0');
-  await tool('set_plan',{...fixturePlans[0],day:'训练安排与恢复要点'.repeat(5),items:Array.from({length:12},(_,index)=>({...fixturePlans[0].items[index%3],note:'动作保持稳定，不急于增加重量。'.repeat(12)})),notes:{coach:'较长的教练备注。'.repeat(80)}});
-  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-  // Fallback fonts must retain readable chart labels and unbroken page widths.
-  await page.route('https://fonts.googleapis.com/**',route=>route.abort());
-  await page.route('https://fonts.gstatic.com/**',route=>route.abort());
-  await page.reload();
-  for (const width of [320,390,768,1280]) {
-    await page.setViewportSize({width,height:844});
-    for (const label of ['下次练什么','训练展厅','体重']) {
-      await page.getByRole('link',{name:label,exact:true}).click();
-      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-      await expect.poll(()=>page.locator('.trend-chart').evaluateAll(charts=>charts.every(chart=>{
-        const bounds=chart.getBoundingClientRect();
-        return [...chart.querySelectorAll('text')].every(text=>{
-          const label=text.getBoundingClientRect();
-          return label.height>=9 && label.left>=bounds.left-1 && label.right<=bounds.right+1;
-        });
-      }))).toBe(true);
+  await expect(page.locator('.bw')).toBeVisible();
+  for (const colorScheme of ['light','dark'] as const) {
+    await page.emulateMedia({colorScheme});
+    for (const theme of ['ink','gold','pearl']) {
+      await page.locator(`[data-t="${theme}"]`).click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
+      for (const width of [320,390,1280]) {
+        await page.setViewportSize({width,height:844});
+        for (const screen of ['next','recap','body','log']) {
+          await page.getByRole('link',{name:screen,exact:true}).click();
+          await expect(page.locator('main')).toHaveAttribute('id','v-'+screen);
+          await expect(page.locator('main input,main textarea,main form')).toHaveCount(0);
+          expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),`${theme} ${screen} ${width}`).toBe(true);
+          await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/${screen}-${theme}-${colorScheme}-${width}.png`,animations:'disabled'});
+        }
+      }
     }
   }
-  await page.setViewportSize({width:390,height:844});
-  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await expect(page.locator('.ses')).toHaveCount(9);
+  await page.locator('.lifts .row').first().click();
+  await expect(page.locator('.lifts .open .detail')).toContainText('借力 2');
+  await expect(page.locator('.lifts .open .detail')).toContainText('没做完整');
+  const note = '<script>literal, never executed</script>\n'+ '保留原话与换行。'.repeat(12);
+  await tool('log_session',{...fixtureSessions.at(-1),note});
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('.said').first()).toHaveText(note,{useInnerText:false});
+  await expect(page.locator('main script')).toHaveCount(0);
+  await page.goto('/#Gallery?date='+fixtureToday);
+  await expect(page.locator('[id="log-'+fixtureToday+'"]').first()).toBeInViewport();
+  await page.goto('/#Plan?day='+encodeURIComponent(fixturePlans[1].title));
+  await expect(page.locator('details').filter({hasText:fixturePlans[1].title}).first()).toHaveAttribute('open','');
+  await tool('set_plan',{...fixturePlans[0],items:Array.from({length:12},(_,index)=>({...fixturePlans[0].items[index%3],note:'动作保持稳定，不急于增加重量。'.repeat(12)})),coach:'较长的教练备注。'.repeat(80)});
+  await page.setViewportSize({width:320,height:844});
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('.items').first().locator('li')).toHaveCount(12);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.getByRole('link',{name:'recap',exact:true}).click();
+  await page.locator('.lift[data-ex="back_squat"]').click();
+  await expect(page.locator('.lift[data-ex="back_squat"]')).toHaveAttribute('aria-pressed','true');
+  const chart=page.locator('.chartbox svg').first();
+  await chart.focus(); await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.tip.on')).toBeVisible();
+  // Deleting referenced data hides the pick instead of rendering stale readings.
+  await tool('delete',{kind:'session',date:fixtureToday});
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('.pick')).toHaveCount(0);
+  await tool('curate',{week:fixtureWeek,recap:{picks:null},theme:null});
+  await page.getByRole('button',{name:'lowkkey，打开设置',exact:true}).click();
   await expect(page.getByRole('dialog',{name:'设置'})).toBeVisible();
   await expect(page.getByRole('button',{name:'完成',exact:true})).toBeFocused();
   await expect(page.locator('.showroom-content')).toHaveAttribute('inert','');
@@ -103,15 +95,15 @@ test('empty showroom → four-tool writes → three screens → focus refresh �
   await expect(page.getByRole('button',{name:'退出登录',exact:true})).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'设置',exact:true})).toBeFocused();
-  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await expect(page.getByRole('button',{name:'lowkkey，打开设置',exact:true})).toBeFocused();
+  await page.getByRole('button',{name:'lowkkey，打开设置',exact:true}).click();
   await expect(page.locator('.client-row').filter({hasText:'Showroom E2E'})).toBeVisible();
+  await page.getByRole('button',{name:'刷新',exact:true}).click();
   await expect(page.getByText('正在读取…',{exact:true})).toHaveCount(0);
-  await page.screenshot({path:`.artifacts/playwright/${testInfo.project.name}/showroom-settings.png`,animations:'disabled'});
   await page.getByRole('button',{name:'撤销授权',exact:true}).click();
   await expect(page.getByText('已撤销',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'退出登录',exact:true}).click();
-  await expect(page.locator('.showroom')).toHaveCount(0);
+  await expect(page.locator('.showroom-content')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'打开我的展厅',exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });

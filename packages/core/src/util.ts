@@ -4,3 +4,9 @@ export const addDays = (date: LocalDate, days: number): LocalDate => new Date((d
 export const diffDays = (a: LocalDate, b: LocalDate) => dayIndex(a) - dayIndex(b);
 export const toLb = (load: number, unit: Unit) => unit === 'kg' ? load * LB_PER_KG : load;
 export const round = (value: number, digits = 1) => Math.round(value * 10 ** digits) / 10 ** digits;
+export const weekday = (date: string) => new Date(date+'T00:00:00Z').getUTCDay();
+export const monday = (date: string) => addDays(date,-((weekday(date)+6)%7));
+export const localToday = (now = new Date()) => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+export const md = (date:string) => date.slice(5).replace('-','.');
+export const fmt = (n:number) => Number.isInteger(round(n)) ? String(round(n)) : round(n).toFixed(1);
+export const relativeDay = (date:string,today:string) => ({0:'今天',1:'明天',2:'后天'}[diffDays(date,today)] ?? '周'+'日一二三四五六'[weekday(date)]);

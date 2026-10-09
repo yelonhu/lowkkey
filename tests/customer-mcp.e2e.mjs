@@ -44,8 +44,8 @@ try {
   let token = await tokenResponse.json(), sequence = 0;
   const rpc = (method, params) => fetch(origin + '/mcp', { method: 'POST', headers: { Authorization: 'Bearer ' + token.access_token, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': '2025-06-18' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++sequence, method, params }) });
   const initialized = await (await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'customer-test', version: '1' } })).json();
-  assert.ok(initialized.result.instructions.includes('完整原话'));
-  for (const [name, args] of [['log_weight', { date: '2026-10-08', lb: 160 }], ['log_session', { date: '2026-10-08', raw_text: 'Private original\n  line two', sets: [] }], ['set_plan', { day: 'A & B', items: [], notes: { body: 'Private note' } }]]) {
+  assert.ok(initialized.result.instructions.includes('数字只引用 get_brief'));
+  for (const [name, args] of [['log_weight', { date: '2026-10-08', lb: 160 }], ['log_session', { date: '2026-10-08', title:'A & B',note: 'Private original\n  line two', sets: [] }], ['set_plan', { title: 'A & B',weekday:1,items:[{ex:'bench_press',load:100,unit:'lb',loadKind:'external',sets:3,min:6,max:8}]}], ['set_profile', {body_notes:'Private note'}]]) {
     const response = await rpc('tools/call', { name, arguments: args }); assert.equal(response.status, 200);
     const value = (await response.json()).result; assert.notEqual(value.isError, true); assert.equal(new URL(value.structuredContent.view_url).origin, origin);
   }
@@ -54,12 +54,12 @@ try {
   assert.notEqual(other.accountId, owner); assert.equal(other.sessions.length, 0); assert.equal(other.weights.length, 0); assert.equal(other.plans.length, 0);
   const refreshed = await exchange({ grant_type: 'refresh_token', refresh_token: token.refresh_token }); assert.equal(refreshed.status, 200); token = await refreshed.json();
   const brief = (await (await rpc('tools/call', { name: 'get_brief', arguments: {} })).json()).result.structuredContent.result;
-  assert.equal(brief.body_notes, 'Private note'); assert.equal(brief.sessions[0].raw_text, 'Private original\n  line two');
+  assert.equal(brief.profile.body_notes, 'Private note'); assert.equal(brief.sessions[0].note, 'Private original\n  line two');
   const clients = await (await user('/v1/clients')).json();
   assert.equal((await user('/v1/clients/' + clients[0].id + '/revoke', cookie, {}, owner)).status, 200);
   assert.equal((await rpc('tools/list', {})).status, 401);
   assert.equal((await exchange({ grant_type: 'refresh_token', refresh_token: token.refresh_token })).ok, false);
   await DB.prepare('UPDATE auth_session SET expiresAt=0 WHERE userId IN (SELECT id FROM auth_user WHERE email=?)').bind('mcp@example.com').run();
   assert.equal((await user('/v1/state')).status, 401);
-  console.log('Customer session → OAuth → four MCP tools → same-owner website → revocation passed');
+  console.log('Customer session → OAuth → seven MCP tools → same-owner website → revocation passed');
 } finally { await runtime.dispose(); }

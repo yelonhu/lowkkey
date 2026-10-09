@@ -24,7 +24,7 @@ async function authorize(request:Request,env:OAuthEnv):Promise<Response>{
       const grant=await oauth.beginConsent(auth);
       const redirectHost=new URL(auth.redirectUri).hostname;
       const source=auth.clientId.startsWith('https://')?new URL(auth.clientId).hostname:'self-registered client';
-      const permissionLabels:Record<string,string>={read:'读取我的记录与计划',write:'直接写入记录与计划（同日覆盖）'};
+      const permissionLabels:Record<string,string>={read:'读取我的记录与计划',write:'直接写入、修改和删除记录、计划与策展'};
       const checks=auth.scope.filter(scope=>scopes.includes(scope)).map(scope=>`<label><input type="checkbox" name="scope" value="${escape(scope)}" checked> ${escape(permissionLabels[scope])}</label>`).join('<br>');
       const html=`<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>授权连接</title><main style="max-width:440px;margin:10vh auto;padding:24px;font:16px system-ui;line-height:1.6"><h1>连接 ${escape(client.clientName??client.clientId)}？</h1><p>客户端来源：${escape(source)}<br>授权将发送到：<strong>${escape(redirectHost)}</strong></p>${/^(localhost|127\.\d+\.\d+\.\d+)$/.test(redirectHost)?'<p>此地址位于你的电脑。请确认是你刚刚发起的连接。</p>':''}<form method="post"><input type="hidden" name="owner" value="${escape(ownerId)}"><input type="hidden" name="handle" value="${escape(grant.handle)}">${checks}<p><button name="decision" value="approve">授权</button> <button name="decision" value="deny">拒绝</button></p></form></main></html>`;
       grant.headers.set('Content-Type','text/html; charset=utf-8');grant.headers.set('Cache-Control','no-store');

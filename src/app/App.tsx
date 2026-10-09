@@ -1,45 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { currentContext, strengthSeries } from '@lowkkey/core';
-import { screenFromHash, screens, targetFromHash } from './navigation.ts';
+import { useEffect,useRef,useState } from 'react';
+import { screenFromHash,screens,targetFromHash } from './navigation.ts';
 import { useShowroom } from './useShowroom.ts';
-import { LoginGate, CustomerAccount } from './CustomerAccount.tsx';
 import { PlanView } from './PlanView.tsx';
-import { GalleryView } from './GalleryView.tsx';
+import { RecapView,themeNames } from './RecapView.tsx';
 import { WeightView } from './WeightView.tsx';
+import { LogView } from './LogView.tsx';
+import { CustomerAccount,LoginGate } from './CustomerAccount.tsx';
 import { applyPageTheme } from './viewport.ts';
-import { installPressFeedback } from './press-feedback.ts';
-
-const labels = { Plan: '下次练什么', Gallery: '训练展厅', Weight: '体重' };
-export function App() {
-  const chamber = useShowroom(), [screen, setScreen] = useState(screenFromHash), [accountOpen, setAccountOpen] = useState(false);
-  const settingsTrigger = useRef<HTMLButtonElement>(null);
-  const [target, setTarget] = useState(targetFromHash);
-  const series = useMemo(() => chamber.state ? strengthSeries(chamber.state) : [], [chamber.state]);
-  const context = useMemo(() => currentContext(chamber.state?.plans ?? []), [chamber.state]);
-  useEffect(() => { applyPageTheme(); return installPressFeedback(document.getElementById('root')!); }, []);
-  useEffect(() => {
-    const change = () => { setScreen(screenFromHash()); setTarget(targetFromHash()); window.scrollTo({ top: 0 }); };
-    window.addEventListener('hashchange', change);
-    return () => window.removeEventListener('hashchange', change);
-  }, []);
-  useEffect(() => {
-    if (chamber.auth !== 'ready' || !target) return;
-    document.getElementById(target)?.scrollIntoView({ block: 'start' });
-  }, [chamber.auth, screen, target]);
-  if (chamber.auth !== 'ready' || !chamber.state) return <LoginGate chamber={chamber}/>;
-  return <div className="showroom">
-    <div className="showroom-content" inert={accountOpen}>
-    <header className="masthead"><div className="masthead-top"><a className="wordmark" href="#Plan">lowkkey<span className="brand-dot">.</span></a><span className="masthead-caption">私人训练档案</span><button ref={settingsTrigger} className="account-link" onClick={() => setAccountOpen(true)} aria-haspopup="dialog" aria-expanded={accountOpen}>设置</button></div>
-      <nav aria-label="主导航">{screens.map(key => <a key={key} href={'#' + key} aria-current={screen === key ? 'page' : undefined}>{labels[key]}</a>)}</nav>
-    </header>
-    {chamber.error && <div className="connection-notice" role="alert">{chamber.error}<button onClick={() => void chamber.refresh()}>重试</button></div>}
-    <main key={chamber.state.accountId + screen} className="canvas" data-screen={screen}>
-      {screen === 'Plan' && <PlanView plans={chamber.state.plans}/>}
-      {screen === 'Gallery' && <GalleryView facts={chamber.state} series={series}/>}
-      {screen === 'Weight' && <WeightView weights={chamber.state.weights} target={context.gain_target}/>}
-    </main>
-    <footer className="colophon"><span>lowkkey.</span><div className="sync-status"><span aria-live="polite">{chamber.syncedAt && <>最近同步 <time dateTime={chamber.syncedAt.toISOString()}>{chamber.syncedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</time></>}</span><button onClick={() => void chamber.refresh()} disabled={chamber.refreshing}>{chamber.refreshing ? '同步中…' : '刷新'}</button></div></footer>
-    </div>
-    {accountOpen && <CustomerAccount chamber={chamber} onClose={() => setAccountOpen(false)} returnFocusTo={settingsTrigger.current}/>}
-  </div>;
+export function App(){
+  const chamber=useShowroom(),[screen,setScreen]=useState(screenFromHash),[settings,setSettings]=useState(location.hash==='#settings'),[target,setTarget]=useState(targetFromHash),[focus,setFocus]=useState<string|null>(null),trigger=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{const route=()=>{setScreen(screenFromHash());setTarget(targetFromHash());if(location.hash==='#settings')setSettings(true);window.scrollTo({top:0});};window.addEventListener('hashchange',route);return()=>window.removeEventListener('hashchange',route);},[]);
+  useEffect(()=>{document.documentElement.dataset.theme=chamber.state?.theme_state.active??'ink';applyPageTheme();const media=matchMedia('(prefers-color-scheme:dark)');media.addEventListener('change',applyPageTheme);return()=>media.removeEventListener('change',applyPageTheme);},[chamber.state?.theme_state.active]);
+  useEffect(()=>{if(!target||!chamber.state)return;const element=document.getElementById(target);if(element instanceof HTMLDetailsElement)element.open=true;element?.scrollIntoView({block:'start'});},[target,screen,chamber.state]);
+  if(chamber.auth!=='ready'||!chamber.state)return <LoginGate chamber={chamber}/>;
+  const facts=chamber.state,today=facts.today;
+  return <><div className="showroom-content" inert={settings}><div className="wrap brandrow"><button ref={trigger} className="brand" aria-label="lowkkey，打开设置" aria-haspopup="dialog" aria-expanded={settings} onClick={()=>setSettings(true)}>lowkkey</button><div className="themes" role="group" aria-label="主题">{(['ink','gold','pearl'] as const).map((theme,i)=><button key={theme} data-t={theme} title={themeNames[theme]+' · '+['日常','庆祝','突破'][i]} aria-label={themeNames[theme]+' · '+['日常','庆祝','突破'][i]} aria-pressed={facts.theme_state.active===theme} disabled={chamber.themeBusy} onClick={()=>void chamber.setTheme(theme)}/>)}</div></div><div className="navbar"><nav className="wrap tabs" aria-label="页面">{screens.map(key=><a key={key} href={'#'+key} aria-current={screen===key?'page':undefined}>{key}</a>)}</nav></div>{chamber.error&&<div className="wrap connection-notice" role="alert">{chamber.error}<button onClick={()=>void chamber.refresh()}>重试</button></div>}<main className={'wrap pg'+(screen==='next'?' next':'')} id={'v-'+screen}>{screen==='next'?<PlanView facts={facts} today={today}/>:screen==='recap'?<RecapView facts={facts} today={today} focus={focus} setFocus={setFocus} setTheme={theme=>void chamber.setTheme(theme)}/>:screen==='body'?<WeightView facts={facts} today={today}/>:<LogView facts={facts}/>}</main></div>{settings&&<CustomerAccount chamber={chamber} onClose={()=>setSettings(false)} returnFocusTo={trigger.current}/>}</>;
 }

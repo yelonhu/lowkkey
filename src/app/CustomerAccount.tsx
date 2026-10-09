@@ -14,7 +14,7 @@ const labels: Record<string,string> = { INVITATION_REQUIRED: '目前仅向受邀
 function returnPath() {
   const path = new URLSearchParams(location.search).get('returnTo');
   if (path?.startsWith('/authorize?')) return path;
-  return ['Plan','Gallery','Weight'].includes(location.hash.slice(1).split('?')[0]) ? '/' + location.hash : '/#Plan';
+  return ['Plan','Gallery','Weight'].includes(location.hash.slice(1).split('?')[0]) ? '/' + location.hash : '/#next';
 }
 export function LoginGate({ chamber }: { chamber: ReturnType<typeof useShowroom> }) {
   const [config,setConfig] = useState<AuthConfig | null>(null), [email,setEmail] = useState(''), [otp,setOtp] = useState(''), [sent,setSent] = useState(false), [busy,setBusy] = useState(false), [error,setError] = useState('');
@@ -71,16 +71,16 @@ export function CustomerAccount({ chamber,onClose,returnFocusTo }: { chamber: Re
   return <div className="account-panel"><section ref={dialog} className="account-drawer" role="dialog" aria-modal="true" aria-label="设置">
     <header className="settings-heading"><h2>设置</h2><button className="close-account" onClick={onClose}>完成</button></header>
     {(config?.aiConnection || clients.length > 0) && <section className="settings-section"><h3>AI 连接</h3>
-      {config?.aiConnection && <><p>在 Claude 或其他支持 MCP 的 AI 中添加此地址，登录后即可连接。</p><code className="connection-address">{location.origin}/mcp</code><button disabled={busy} onClick={() => void run(async () => { await navigator.clipboard.writeText(location.origin + '/mcp'); setMessage('连接地址已复制。'); })}>复制连接地址</button><p className="settings-hint">写入授权允许 AI 直接保存记录与计划，同日记录会覆盖更新。</p></>}
+      {config?.aiConnection && <><p>在 Claude 或其他支持 MCP 的 AI 中添加此地址，登录后即可连接。</p><code className="connection-address">{location.origin}/mcp</code><button disabled={busy} onClick={() => void run(async () => { await navigator.clipboard.writeText(location.origin + '/mcp'); setMessage('连接地址已复制。'); })}>复制连接地址</button><p className="settings-hint">写入授权允许 AI 直接保存、修改和删除记录、计划与策展。</p></>}
       {clients.map(client => <div className="client-row" key={client.id}><div><span>{client.name}</span><small>{client.status === 'revoked' ? '已撤销' : client.scopes.map(scope => scope === 'write' ? '直接写入' : '读取').join(' · ')}</small></div>
         {client.status === 'active' && <button disabled={busy} onClick={() => void run(async () => { await call('/v1/clients/' + client.id + '/revoke',{},owner); setClients(await call('/v1/clients')); })}>撤销授权</button>}</div>)}
     </section>}
-    <section className="settings-section"><h3>数据</h3><p>下载训练、体重与计划的完整记录。</p>
-      <button disabled={busy} onClick={() => void run(async () => { const result = await call('/v1/export'), url = URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'})), link = document.createElement('a'); link.href = url; link.download = 'lowkkey-showroom.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000); })}>导出我的记录</button>
+    <section className="settings-section"><h3>数据</h3><p>{chamber.syncedAt && <>最近同步 {chamber.syncedAt.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</>} <button disabled={chamber.refreshing} onClick={()=>void chamber.refresh()}>{chamber.refreshing?'同步中…':'刷新'}</button></p><p>下载训练、体重与计划的完整记录。</p>
+      <button disabled={busy} onClick={() => void run(async () => { const result = await call('/v1/export'), url = URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'})), link = document.createElement('a'); link.href = url; link.download = 'lowkkey-v5.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000); })}>导出我的记录</button>
     </section>
     <section className="settings-section"><h3>登录</h3><p className="login-identity">{account?.email ?? '正在读取…'}</p><div className="settings-actions">
       {account?.mode === 'customer' && <><button disabled={busy} onClick={() => void run(async () => { await call('/api/auth/revoke-other-sessions',{}); setMessage('其他设备已退出。'); })}>退出其他设备</button>
-        {config?.google && config.email && <button disabled={busy} onClick={() => void run(async () => { const result = await call('/api/auth/link-social',{ provider:'google',callbackURL:'/#Plan' }); location.assign(result.url); })}>绑定 Google 登录</button>}</>}
+        {config?.google && config.email && <button disabled={busy} onClick={() => void run(async () => { const result = await call('/api/auth/link-social',{ provider:'google',callbackURL:'/#next' }); location.assign(result.url); })}>绑定 Google 登录</button>}</>}
       <button disabled={busy} onClick={() => void run(async () => { await chamber.logout(); onClose(); })}>退出登录</button>
     </div></section><p role="status" className="settings-status">{message}</p>
   </section></div>;

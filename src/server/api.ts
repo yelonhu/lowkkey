@@ -47,11 +47,12 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
     await next();
   });
   app.get('/v1/state', async c => c.json(await store.state(c.env.DB, c.get('ownerId'))));
+  app.post('/v1/preferences/theme', async c => { if (c.req.header('Content-Type')?.split(';')[0] !== 'application/json') throw new StoreError('JSON_REQUIRED'); const body = await c.req.text(); if (body.length > 1024) throw new StoreError('BODY_TOO_LARGE',413); let value:unknown; try { value=JSON.parse(body); } catch { throw new StoreError('INVALID_JSON'); } return c.json(await store.setTheme(c.env.DB,c.get('ownerId'),value)); });
   app.get('/v1/account', async c => {
     const user = await c.env.DB.prepare('SELECT email FROM users WHERE id=?').bind(c.get('ownerId')).first<{ email: string }>();
     return c.json({ accountId: c.get('ownerId'), email: user?.email, mode: c.env.AUTH_MODE ?? 'access' });
   });
-  app.get('/v1/export', async c => c.json({ format: 'lowkkey.showroom.v1', exportedAt: new Date().toISOString(), snapshot: await store.state(c.env.DB, c.get('ownerId')) }));
+  app.get('/v1/export', async c => c.json({ format: 'lowkkey.showroom.v5', exportedAt: new Date().toISOString(), snapshot: await store.state(c.env.DB, c.get('ownerId')) }));
   app.get('/v1/clients', async c => c.json(await store.listClients(c.env.DB, c.get('ownerId'))));
   app.post('/v1/clients/:id/revoke', async c => {
     if (c.req.header('Content-Type')?.split(';')[0] !== 'application/json') throw new StoreError('JSON_REQUIRED');
@@ -70,7 +71,7 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
     const code = error instanceof StoreError ? error.code : error instanceof ZodError ? 'invalid_arguments' : 'internal';
     if (status === 500) console.error('REQUEST_FAILED');
     c.header('Cache-Control', 'no-store');
-    return Response.json({ error: { code, fields: error instanceof ZodError ? error.issues.map(issue => ({ path: issue.path, message: issue.message })) : undefined } }, { status, headers: { 'Cache-Control': 'no-store' } });
+    return Response.json({ error: { code, fields: error instanceof ZodError ? error.issues.map(issue => ({ path: issue.path, message: issue.message })) : error instanceof StoreError ? error.fields : undefined } }, { status, headers: { 'Cache-Control': 'no-store' } });
   });
   app.notFound(c => c.json({ error: { code: 'NOT_FOUND' } }, 404));
   return app;
