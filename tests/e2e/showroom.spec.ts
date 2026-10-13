@@ -64,13 +64,14 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   for (const colorScheme of ['light','dark'] as const) {
     await page.emulateMedia({colorScheme});
     for (const theme of ['ink','gold','pearl']) {
-      await page.locator(`[data-t="${theme}"]`).click();
+      await tool('curate',{week:fixtureWeek,theme:{id:theme,why:'主题验收'}});
+      await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
       await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
       for (const width of [320,390,1280]) {
         await page.setViewportSize({width,height:844});
         for (const screen of ['next','recap','body','log']) {
           await page.getByRole('link',{name:screen,exact:true}).click();
-          await expect(page.locator('main')).toHaveAttribute('id','v-'+screen);
+          await expect(page.locator('main:visible')).toHaveAttribute('id','v-'+screen);
           await expect(page.locator('main input,main textarea,main form')).toHaveCount(0);
           expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),`${theme} ${screen} ${width}`).toBe(true);
           await page.screenshot({animations:'disabled',path:`.artifacts/playwright/${testInfo.project.name}/${screen}-${theme}-${colorScheme}-${width}.png`});
@@ -97,16 +98,16 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   await expect(page.locator('.items').first().locator('li')).toHaveCount(12);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.getByRole('link',{name:'recap',exact:true}).click();
-  await expect(page.locator('main')).toHaveAttribute('id','v-recap');
+  await expect(page.locator('main:visible')).toHaveAttribute('id','v-recap');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.locator('.lift[data-ex="back_squat"]').click();
   await expect(page.locator('.lift[data-ex="back_squat"]')).toHaveAttribute('aria-pressed','true');
-  const chart=page.locator('.chartbox[tabindex]').first();
+  const chart=page.locator('main:visible .chartbox[tabindex]').first();
   if(testInfo.project.name==='webkit')await chart.tap();else await chart.click();
   await expect(chart).toHaveCSS('outline-style','none');
   await expect(chart.locator('svg')).toHaveCSS('outline-style','none');
   await chart.focus(); await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.tip.on')).toBeVisible();
+  await expect(page.locator('main:visible .tip.on')).toBeVisible();
   await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
   await expect(chart).toBeFocused();
   await expect(chart).toHaveCSS('outline-style','solid');
@@ -129,7 +130,7 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'lowkkey，打开设置',exact:true})).toBeFocused();
   await page.getByRole('button',{name:'lowkkey，打开设置',exact:true}).click();
-  await expect(page.locator('.client-row').filter({hasText:'Showroom E2E'})).toBeVisible();
+  await expect(page.locator('.connection-group').filter({hasText:'Showroom E2E'})).toBeVisible();
   for(const [width,height] of [[390,844],[320,568]]){
     await page.setViewportSize({width,height});
     const card=await page.getByRole('dialog').boundingBox();
@@ -145,8 +146,9 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   await page.getByText('连接新的 AI',{exact:true}).click();
   await page.getByRole('button',{name:'刷新',exact:true}).click();
   await expect(page.getByText('正在读取…',{exact:true})).toHaveCount(0);
-  await page.getByRole('button',{name:'撤销授权',exact:true}).click();
-  await expect(page.getByText('已撤销',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'断开全部授权（1）',exact:true}).click();
+  await page.locator('.connection-history summary').click();
+  await expect(page.locator('.connection-history summary')).toHaveText('已撤销的连接（1）');await expect(page.locator('.connection-group')).toHaveCount(0);
   await page.getByRole('button',{name:'退出登录',exact:true}).click();
   await expect(page.locator('.showroom-content')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'打开我的展厅',exact:true})).toBeVisible();
@@ -214,9 +216,9 @@ test('welcome, public privacy and consent recovery preserve the authorization de
   await policy.close();await page.bringToFront();
   await expect(login).toBeVisible();
   await page.route('**/v1/state',route=>route.fulfill({status:403,json:{error:{code:'privacy_required'}}}));
-  await page.route('**/v1/account',route=>route.fulfill({json:{accountId:'consent-owner',email:'invited@example.com',mode:'customer',timezone:'America/Chicago',timezoneInitialized:true,providers:['google'],fresh:true,privacy:{version:'2026-10-12-notes',acceptedAt:null}}}));
+  await page.route('**/v1/account',route=>route.fulfill({json:{accountId:'consent-owner',email:'invited@example.com',mode:'customer',timezone:'America/Chicago',timezoneInitialized:true,providers:['google'],fresh:true,privacy:{version:'2026-10-13-notes-write',acceptedAt:null}}}));
   let accepted=false;
-  await page.route('**/v1/account/consent',route=>{expect(route.request().headers()['x-lowkkey-account']).toBe('consent-owner');expect(route.request().postDataJSON()).toEqual({version:'2026-10-12-notes',accepted:true});accepted=true;return route.fulfill({json:{version:'2026-10-12-notes',acceptedAt:new Date().toISOString()}});});
+  await page.route('**/v1/account/consent',route=>{expect(route.request().headers()['x-lowkkey-account']).toBe('consent-owner');expect(route.request().postDataJSON()).toEqual({version:'2026-10-13-notes-write',accepted:true});accepted=true;return route.fulfill({json:{version:'2026-10-13-notes-write',acceptedAt:new Date().toISOString()}});});
   await page.route('**/authorize?client_id=test',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><meta charset="utf-8"><h1>继续原授权</h1>'}));
   await page.goto('/?returnTo='+encodeURIComponent('/authorize?client_id=test')+'#consent');
   await expect(page.getByRole('button',{name:'同意并继续'})).toBeDisabled();

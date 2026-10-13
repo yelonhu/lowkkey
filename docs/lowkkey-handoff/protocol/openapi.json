@@ -517,7 +517,8 @@
               "type": "string",
               "enum": [
                 "read",
-                "write"
+                "write",
+                "notes:write"
               ]
             }
           },
@@ -1793,12 +1794,34 @@
           },
           "manual_this_week": {
             "type": "boolean"
+          },
+          "source_week": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "user",
           "active",
-          "manual_this_week"
+          "manual_this_week",
+          "source_week",
+          "reason"
         ],
         "additionalProperties": false
       },
@@ -2008,6 +2031,16 @@
         },
         "parameters": [
           {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
             "name": "from",
             "in": "query",
             "required": false,
@@ -2042,7 +2075,6 @@
             "in": "query",
             "required": false,
             "schema": {
-              "default": 30,
               "type": "integer",
               "minimum": 1,
               "maximum": 30
@@ -2173,7 +2205,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "const": "2026-10-12-notes"
+                      "const": "2026-10-13-notes-write"
                     },
                     "contact": {
                       "type": [
@@ -2254,7 +2286,7 @@
                 "properties": {
                   "version": {
                     "type": "string",
-                    "const": "2026-10-12-notes"
+                    "const": "2026-10-13-notes-write"
                   },
                   "accepted": {
                     "type": "boolean",
@@ -2289,7 +2321,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "const": "2026-10-12-notes"
+                      "const": "2026-10-13-notes-write"
                     },
                     "acceptedAt": {
                       "anyOf": [
@@ -2333,7 +2365,7 @@
                 "properties": {
                   "version": {
                     "type": "string",
-                    "const": "2026-10-12-notes"
+                    "const": "2026-10-13-notes-write"
                   },
                   "accepted": {
                     "type": "boolean",
@@ -2440,13 +2472,18 @@
                           "name": {
                             "type": "string"
                           },
+                          "source": {
+                            "default": "来源未知",
+                            "type": "string"
+                          },
                           "scopes": {
                             "type": "array",
                             "items": {
                               "type": "string",
                               "enum": [
                                 "read",
-                                "write"
+                                "write",
+                                "notes:write"
                               ]
                             }
                           },
@@ -2502,6 +2539,7 @@
                         "required": [
                           "id",
                           "name",
+                          "source",
                           "scopes",
                           "status",
                           "createdAt",
@@ -2651,13 +2689,18 @@
                           "name": {
                             "type": "string"
                           },
+                          "source": {
+                            "default": "来源未知",
+                            "type": "string"
+                          },
                           "scopes": {
                             "type": "array",
                             "items": {
                               "type": "string",
                               "enum": [
                                 "read",
-                                "write"
+                                "write",
+                                "notes:write"
                               ]
                             }
                           },
@@ -2713,6 +2756,7 @@
                         "required": [
                           "id",
                           "name",
+                          "source",
                           "scopes",
                           "status",
                           "createdAt",
@@ -3004,61 +3048,6 @@
         }
       }
     },
-    "/v1/preferences/theme": {
-      "post": {
-        "operationId": "theme",
-        "summary": "保存本周手动主题",
-        "x-scopes": [
-          "user"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Preferences"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "theme": {
-                    "type": "string",
-                    "enum": [
-                      "ink",
-                      "gold",
-                      "pearl"
-                    ]
-                  }
-                },
-                "required": [
-                  "theme"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/state": {
       "get": {
         "operationId": "state",
@@ -3211,13 +3200,18 @@
                       "name": {
                         "type": "string"
                       },
+                      "source": {
+                        "default": "来源未知",
+                        "type": "string"
+                      },
                       "scopes": {
                         "type": "array",
                         "items": {
                           "type": "string",
                           "enum": [
                             "read",
-                            "write"
+                            "write",
+                            "notes:write"
                           ]
                         }
                       },
@@ -3273,6 +3267,7 @@
                     "required": [
                       "id",
                       "name",
+                      "source",
                       "scopes",
                       "status",
                       "createdAt",

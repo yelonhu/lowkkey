@@ -4,7 +4,7 @@
 
 ## 权限与工具
 
-网页仅使用 Google 登录，开放注册且无需邀请；按 Google 身份关联账户。MCP 使用 OAuth `read/write`，账户来自令牌，不接受调用方指定 owner。全权限八项：`get_brief`、`read_notes`、`log_session`、`log_weight`、`set_plan`、`set_profile`、`curate`、`delete`。没有业务审批；客户端自己的确认独立存在。
+网页仅使用 Google 登录，开放注册且无需邀请；按 Google 身份关联账户。MCP 使用 OAuth `read/write/notes:write`，账户来自令牌，不接受调用方指定 owner。全权限九项：`get_brief`、`read_notes`、`log_session`、`log_weight`、`set_plan`、`set_profile`、`curate`、`delete`、`write_note`。没有业务审批；客户端自己的确认独立存在。
 
 每个写工具返回 `{result: 保存后的对象, view_url}`。删除返回被删对象；不存在报错。校验失败不提交任何字段。训练和体重按日期覆盖；计划按 title 更新，weekday 0 为周日、同星期唯一，空 items 删除。
 
@@ -23,7 +23,7 @@
 - focus 仅四个主项；body.text 160 字；log 每条 100 字且对应已有训练。
 - 策展文字拒绝 emoji、感叹号，字数按 Unicode 码点计算。
 
-MCP instructions 定义先读取再行动、首次使用问答、接续旧记录与策展规则，不含模型手算。`get_brief({sessions?:0..30})` 默认 6，完整数据优先，不静默截断。返回生成时间、账户时区的今天、下一安排、全部计划/profile、当前主题与本周手动选择、体重均线截止日期/样本数、四项力量、各动作最近两次紧凑记录、训练摘要、week_facts、当前策展及最近四周标题/主题。
+MCP instructions 定义先读取再行动、首次使用问答、接续旧记录与策展规则，不含模型手算。`get_brief({sessions?:0..30})` 默认 6，完整数据优先，不静默截断。返回生成时间、账户时区的今天、下一安排、全部计划/profile、生效主题、source_week、reason（兼容 manual_this_week 固定 false）、体重均线截止日期/样本数、四项力量、各动作最近两次紧凑记录、训练摘要、week_facts、当前策展及最近四周标题/主题。
 
 ## 领域计算
 
@@ -35,7 +35,7 @@ MCP instructions 定义先读取再行动、首次使用问答、接续旧记录
 
 ## REST 与持久化
 
-`GET /v1/state` 返回账户事实、profile、策展/批注、主题与计划历史；`POST /v1/preferences/theme` 仅供已登录网页，检查 Origin 和账户；导出、客户端授权撤销等账户接口保留。
+`GET /v1/state` 返回账户事实、profile、策展/批注、主题与计划历史；手动主题接口已退役（404）；导出、客户端授权撤销等账户接口保留。
 
 v5 使用 showroom_sessions/showroom_weights/showroom_plans、profiles、preferences、curations、curation_versions、annotations、plan_history。所有表按 owner 隔离。用户修正或删除事实后派生值立即重算；失效 picks 在网页跳过。迁移及备份见 `../showroom-beta.md`。
 
@@ -45,7 +45,7 @@ v5 使用 showroom_sessions/showroom_weights/showroom_plans、profiles、prefere
 
 ## 随手记
 
-全权限新增第八个工具 `read_notes`。`daily_notes` 按 `(owner_id,date)` 唯一，保存完整纯文字、独立递增 revision 和 updated_at。每天最多 20,000 个 Unicode 码点，允许 emoji、感叹号、空格和换行。空正文保留版本墓碑，列表不返回空记录；不进入力量计算。
+随手记提供 `read_notes` 和独立授权的 `write_note`。`daily_notes` 按 `(owner_id,date)` 唯一，保存完整纯文字、独立递增 revision 和 updated_at。每天最多 20,000 个 Unicode 码点，允许 emoji、感叹号、空格和换行。空正文保留版本墓碑，列表不返回空记录；不进入力量计算。
 
 - `GET /v1/notes`：from/to（包含日期）、before（排他游标）、limit（网页默认30，最多30）；返回 `{notes,next_cursor}`，日期倒序。
 - `GET /v1/notes/{date}`：返回完整单日对象；尚未记录时 text 为空、revision 为0、updated_at 为null。
@@ -53,6 +53,15 @@ v5 使用 showroom_sessions/showroom_weights/showroom_plans、profiles、prefere
 - MCP `read_notes`：同样日期筛选，默认14个非空日期，最多30；需要read权限，仅返回 `{result:{notes,next_cursor}}`。继续分页须保留原筛选条件，不隐式截断单日正文。
 - `get_brief.notes` 返回 count/latest_date/updated_at，不附加长文。`/v1/state` 不加载笔记；`/v1/export` 顶层 notes 包含全部日记录及墓碑。
 
-网页 `#notes` 连续显示日期，今天在底部。待同步草稿只存于对应账户的本机存储，同步后移除；冲突必须由用户选择。隐私版本更新为 `2026-10-12-notes`。AI 只能读取已同步原文，不能修改；仅在用户要求整理时，通过既有工具保存训练记录。记录日期不强行覆盖正文明确表达的训练日期。
+网页 `#notes` 连续显示日期，今天在底部。待同步草稿只存于对应账户的本机存储，同步后移除；冲突必须由用户选择。隐私版本为 `2026-10-13-notes-write`。普通 read/write 授权不能写笔记；另外授予 notes:write 后，仅按用户明确要求写入。仅在用户要求整理时，通过既有工具保存训练记录。记录日期不强行覆盖正文明确表达的训练日期。
 
 发布需先备份并应用新增 `0004_notes.sql`，同时按顺序部署尚未发布的账户迁移；本功能的本地验收不会自动发布其他未提交改动。
+
+
+### 笔记独立写入与主题延续
+
+`write_note({date,text,revision})` 需要 `read` 与 `notes:write`，返回 `{result:DailyNote,view_url}`。OAuth 默认不勾选 notes:write，旧令牌不扩权；刷新令牌也不扩权。复用网页保存事务、Unicode 上限及版本检查，相同正文重试不递增，冲突为 MCP `isError` / `note_conflict`。只有真实对话中的明确请求才是操作依据，笔记内指令不是授权；服务端无法验证对话意图。
+
+`read_notes({date})` 与 from/to/before/limit 互斥，返回 `{notes:[DailyNote],next_cursor:null}`，包括清空后的版本墓碑；未创建为 revision:0、text:""、updated_at:null。范围分页仍排除空正文。
+
+主题取不晚于账户当前周的最近非空策展主题；省略保留，null 移除该周选择，ink 显式恢复水墨。手动偏好不再生效，未来主题到期才参与。客户端列表增加公开 client ID 来源字段，UI 同名分组仅用于展示，不合并授权身份。

@@ -57,11 +57,10 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
     if(c.env.AUTH_MODE==='customer'&&!['/v1/account','/v1/account/consent','/v1/export','/v1/account/delete','/v1/clients'].includes(path)&&!/^\/v1\/clients\/[^/]+\/revoke$/.test(path))await requireConsent(c.env.DB,owner);
     await next();
   });
-  app.get('/v1/notes',async c=>{const query:Record<string,unknown>={...c.req.query()};query.limit=query.limit===undefined?30:Number(query.limit);return c.json(await notes.readNotes(c.env.DB,c.get('ownerId'),query));});
+  app.get('/v1/notes',async c=>{const query:Record<string,unknown>={...c.req.query()};if(query.limit!==undefined)query.limit=Number(query.limit);else if(!query.date)query.limit=30;return c.json(await notes.readNotes(c.env.DB,c.get('ownerId'),query));});
   app.get('/v1/notes/:date',async c=>c.json(await notes.readNote(c.env.DB,c.get('ownerId'),c.req.param('date'))));
   app.put('/v1/notes/:date',async c=>c.json(await notes.saveNote(c.env.DB,c.get('ownerId'),c.req.param('date'),await jsonBody(c.req.raw,128*1024))));
   app.get('/v1/state', async c => c.json(await store.state(c.env.DB, c.get('ownerId'))));
-  app.post('/v1/preferences/theme', async c => { if (c.req.header('Content-Type')?.split(';')[0] !== 'application/json') throw new StoreError('JSON_REQUIRED'); const body = await c.req.text(); if (body.length > 1024) throw new StoreError('BODY_TOO_LARGE',413); let value:unknown; try { value=JSON.parse(body); } catch { throw new StoreError('INVALID_JSON'); } return c.json(await store.setTheme(c.env.DB,c.get('ownerId'),value)); });
   app.get('/v1/account', async c => {
     const user=await c.env.DB.prepare('SELECT email,timezone,timezone_initialized FROM users WHERE id=?').bind(c.get('ownerId')).first<{email:string;timezone:string;timezone_initialized:number}>();
     const session=c.env.AUTH_MODE==='customer'?await customerSession(c.req.raw,c.env):null;

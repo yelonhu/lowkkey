@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { MCP_INSTRUCTIONS, MCP_TOOLS, mcpToolList, mcpOutput, PROTOCOL_VERSION } from '@lowkkey/protocol';
 import type { D1Database } from '@cloudflare/workers-types';
 import * as store from './store.ts';
-import { readNotes } from './notes.ts';
+import { readNotes, saveNote } from './notes.ts';
 import { toolSuccess,event } from './lifecycle.ts';
 import { StoreError } from './account.ts';
 
@@ -19,10 +19,10 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
     try { await toolSuccess(db,principal.ownerId,principal.clientId,name,url,activates); } catch { console.error('MCP_PROGRESS_FAILED'); }
     return response(value,url);
   };
-  const server = new McpServer({ name: 'lowkkey', version: PROTOCOL_VERSION }, { instructions: MCP_INSTRUCTIONS });
+  const server = new McpServer({ name: 'lowkkey', version: PROTOCOL_VERSION }, { instructions: MCP_INSTRUCTIONS, capabilities:{tools:{}} });
   const view = (screen: string, key: string, value: string) => `${new URL(request.url).origin}/#${screen}?${key}=${encodeURIComponent(value)}`;
   for (const tool of MCP_TOOLS) {
-    if (!principal.scopes.includes(tool.scope)) continue;
+    if (!principal.scopes.includes(tool.scope)||(tool.scope==='notes:write'&&!principal.scopes.includes('read'))) continue;
     const descriptor = mcpToolList().find(t => t.name === tool.name)!;
     server.registerTool(tool.name, {
       title: tool.title, description: tool.description, inputSchema: z.looseObject({}), outputSchema: mcpOutput(tool.name),
@@ -38,8 +38,9 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
           case 'set_profile': return success(tool.name,await store.setProfile(db, principal.ownerId, args),new URL(request.url).origin+'/#body');
           case 'curate': { const saved=await store.curate(db,principal.ownerId,args); return success(tool.name,saved,view('recap','week',saved.week)); }
           case 'delete': { const saved=await store.deleteFact(db,principal.ownerId,args); return success(tool.name,saved,view(saved.kind==='session'?'log':'body','date',saved.date)); }
+          case 'write_note': { const input=args as {date:string;text:string;revision:number};const saved=await saveNote(db,principal.ownerId,input.date,{text:input.text,revision:input.revision});return success(tool.name,saved,view('notes','date',saved.date),!!saved.text); }
           case 'read_notes': return success(tool.name,await readNotes(db,principal.ownerId,args));
-          case 'get_brief': return success(tool.name,await store.brief(db,principal.ownerId,args,new Date(),principal.scopes.filter((s):s is 'read'|'write'=>s==='read'||s==='write')));
+          case 'get_brief': return success(tool.name,await store.brief(db,principal.ownerId,args,new Date(),principal.scopes.filter((s):s is 'read'|'write'|'notes:write'=>s==='read'||s==='write'||s==='notes:write')));
         }
       } catch (cause) {
         const error = cause instanceof StoreError ? { code: cause.code, fields:cause.fields } : cause instanceof z.ZodError
@@ -51,7 +52,7 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
     });
   }
   server.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: mcpToolList()
-    .filter(tool => principal.scopes.includes(MCP_TOOLS.find(item => item.name === tool.name)!.scope))
+    .filter(tool => principal.scopes.includes(MCP_TOOLS.find(item => item.name === tool.name)!.scope)&&(tool.name!=='write_note'||principal.scopes.includes('read')))
     .map(tool => ({ ...tool, inputSchema: tool.inputSchema as Tool['inputSchema'], outputSchema: tool.outputSchema as Tool['outputSchema'] })) }));
   const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
   await server.connect(transport);

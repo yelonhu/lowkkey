@@ -27,6 +27,7 @@ test('free writing: IME, autosave, route changes, offline draft recovery and con
   await page.goto('/#start');await page.getByRole('button',{name:'先随手记',exact:true}).click();await expect(page.locator('#v-notes')).toBeVisible();
   const text='  深蹲 空杆 × 10\n135lb * 8，今天状态不错 🙂！\n\n<script>只当原文</script>  ';
   let writes=0;page.on('request',r=>{if(r.method()==='PUT'&&r.url().includes('/v1/notes/'))writes++;});
+  await editor.click();await expect(editor).toHaveCSS('outline-style','none');await expect(editor).toHaveCSS('box-shadow','none');
   await editor.dispatchEvent('compositionstart');await editor.fill(text);
   await page.waitForTimeout(1100);expect(writes).toBe(0);
   await editor.dispatchEvent('compositionend');
@@ -58,9 +59,12 @@ test('continuous pages, theme layouts, clear history and rollover without moving
   await page.reload();await expect(page.getByRole('button',{name:'更早的记录'})).toBeVisible();
   await page.getByRole('button',{name:'更早的记录'}).click();await expect(page.getByRole('button',{name:'更早的记录'})).toHaveCount(0);
   await expect(page.locator('.note-day')).toHaveCount(34);
+  const linkedDate=await page.locator('.note-day').first().locator('time').getAttribute('datetime');
+  await page.goto('/#notes?date='+linkedDate);await page.reload();await expect(page.locator('[id="notes-'+linkedDate+'"]')).toBeInViewport();
+  await page.getByRole('button',{name:'更早的记录'}).click();await expect(page.locator('.note-day')).toHaveCount(34);
   const old=page.locator('.note-text').first();await old.fill('');await old.blur();await expect(page.locator('.note-day').first()).toBeHidden();
   for(const colorScheme of ['light','dark'] as const){await page.emulateMedia({colorScheme});for(const theme of ['ink','gold','pearl']){
-    await page.locator(`[data-t="${theme}"]`).click();
+    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
     for(const width of [320,390,1280]){await page.setViewportSize({width,height:844});await page.getByRole('textbox',{name:date+' 随手记',exact:true}).scrollIntoViewIfNeeded();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
     await page.setViewportSize({width:390,height:844});await page.locator('.note-day').nth(31).scrollIntoViewIfNeeded();await page.screenshot({path:`.artifacts/playwright/${info.project.name}/notes-${theme}-${colorScheme}.png`});
   }}
@@ -74,7 +78,7 @@ test('pending notes remain visible when logout is cancelled',async({page})=>{
   const {editor,section}=await openNotes(page);
   await page.route('**/v1/notes/*',r=>r.request().method()==='PUT'?r.abort():r.continue());await editor.fill('离线草稿，不能退出时丢失');await expect(section.getByRole('status')).toContainText('未能同步');
   await page.getByRole('button',{name:'lowkkey，打开设置'}).click();await page.getByRole('button',{name:'退出登录',exact:true}).click();
-  const warning=page.getByRole('region',{name:'未同步的随手记'});await expect(warning).toBeVisible();await warning.getByRole('button',{name:'取消',exact:true}).click();await page.getByRole('button',{name:'完成',exact:true}).click();await expect(editor).toHaveValue('离线草稿，不能退出时丢失');
+  const warning=page.getByRole('region',{name:'未同步的随手记'});await expect(warning).toBeVisible();await warning.getByRole('button',{name:'取消',exact:true}).click();await page.getByRole('button',{name:'完成',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(editor).toHaveValue('离线草稿，不能退出时丢失');
   await page.context().unroute('**/v1/notes/*');await page.unroute('**/v1/notes/*');await page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect(section.getByRole('status')).toHaveText('已保存');
   await page.route('**/v1/notes/*',r=>r.request().method()==='PUT'?r.fulfill({status:503,json:{error:{code:'offline'}}}):r.continue());await editor.fill('导出后安全退出');await expect(section.getByRole('status')).toContainText('未能同步');
   await page.getByRole('button',{name:'lowkkey，打开设置'}).click();await page.getByRole('button',{name:'退出登录',exact:true}).click();

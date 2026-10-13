@@ -28,7 +28,10 @@ export function upcoming(facts:{plans:Plan[];sessions:TrainingSession[]},today:s
 export function currentCuration(facts:Facts,today:string){return facts.curations.find(c=>c.week===monday(today))??null;}
 export function latestRecap(facts:Facts,today:string){return [...facts.curations].filter(c=>c.week<=monday(today)&&c.recap?.letter?.length).sort((a,b)=>b.week.localeCompare(a.week))[0]??null;}
 export function datedCuration(facts:Facts,field:'next'|'body',today:string){const value=[...facts.curations].sort((a,b)=>b.revision-a.revision).find(c=>Object.hasOwn(c,field))?.[field];return value&&value.date<=addDays(today,field==='next'?6:0)&&value.date>=addDays(today,field==='body'?-6:0)?value:null;}
-export function themeState(facts:Facts,today:string){const current=currentCuration(facts,today),manual=facts.preferences.manual_week===monday(today);return {user:facts.preferences.theme,active:!manual&&current?.theme?current.theme.id:facts.preferences.theme,manual_this_week:manual};}
+export function themeState(facts:Facts,today:string){
+  const source=facts.curations.filter(c=>c.week<=monday(today)&&c.theme).sort((a,b)=>b.week.localeCompare(a.week))[0];
+  return {user:'ink' as const,active:source?.theme?.id??'ink' as const,manual_this_week:false,source_week:source?.week??null,reason:source?.theme?.why??null};
+}
 export function weightSeries(weights:Weight[]){return [...weights].sort((a,b)=>a.date.localeCompare(b.date)).map(w=>weightMean(weights,w.date));}
 export function weeklyWeights(weights:Weight[],zero?:string){if(!weights.length)return [];const start=monday(zero??[...weights].sort((a,b)=>a.date.localeCompare(b.date))[0].date);const weeks=new Map<string,Weight[]>();for(const w of weights){const key=monday(w.date);weeks.set(key,[...(weeks.get(key)??[]),w]);}return [...weeks].sort(([a],[b])=>a.localeCompare(b)).map(([week,rows])=>({week,index:Math.floor(diffDays(week,start)/7)+1,n:rows.length,mean:rows.reduce((n,w)=>n+w.lb,0)/rows.length}));}
 export function planOn(facts:Facts,date:string):Plan[]{return [...facts.plan_history].filter(h=>h.effective_date<=date).sort((a,b)=>a.effective_date.localeCompare(b.effective_date)||a.revision-b.revision).at(-1)?.plans??[];}

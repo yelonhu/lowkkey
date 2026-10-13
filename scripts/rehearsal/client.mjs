@@ -33,5 +33,5 @@ export async function rehearsalClient(port, scopes = ['read','write']) {
   };
   await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'local-showroom-rehearsal',version:'1'}});
   const tool = async (name,args) => { const value = await rpc('tools/call',{name,arguments:args}); if (value.isError) throw new Error(JSON.stringify(value)); return value.structuredContent.result; };
-  return { state:()=>user('/v1/state',undefined,'GET'), user, tool, rpc, raw, token, registered, origin, headers };
+  return { consentHtml:html, state:()=>user('/v1/state',undefined,'GET'), user, tool, rpc, raw, token, registered, origin, headers };
 }

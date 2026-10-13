@@ -1,4 +1,4 @@
-import { DailyNote, NOTE_LIMIT, NotesPage } from '@lowkkey/protocol';
+import { DailyNote, LocalDate, NOTE_LIMIT, NotesPage } from '@lowkkey/protocol';
 import type { NotesPage as Page } from '@lowkkey/protocol';
 
 export type NoteEntry={server:DailyNote;text:string;dirty:boolean;composing:boolean;saving:boolean;error:string;localError:boolean;conflict:DailyNote|null;recovered:Draft[]};
@@ -108,6 +108,11 @@ export class NotesModel {
       this.loaded=true;this.error='';this.emit();this.flush(true);
     }catch{if(!this.disposed)this.error='暂时无法同步。文字保留在这里，请重试。';}
     finally{this.refreshing=false;this.loading=false;this.emit();}
+  }
+  async loadDate(date:string){
+    if(this.disposed||this.entries.has(date))return;
+    try{LocalDate.parse(date);this.absorb(DailyNote.parse(await this.request('/v1/notes/'+date)));this.emit();}
+    catch{if(!this.disposed){this.error='暂时无法读取链接中的那一天，请稍后重新打开链接。';this.emit();}}
   }
   async earlier():Promise<Page|null>{
     if(!this.cursor||this.loading)return null;this.loading=true;this.emit();

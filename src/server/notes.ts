@@ -8,11 +8,13 @@ export async function readNote(db:D1Database,owner:string,date:string):Promise<D
   return row?DailyNote.parse(row):{date,text:'',revision:0,updated_at:null};
 }
 export async function readNotes(db:D1Database,owner:string,args:unknown={}):Promise<NotesPage> {
-  const input=ReadNotesInput.parse(args),where=["owner_id=?","text<>''","owner_id IN (SELECT id FROM users WHERE lifecycle='active')"],values:(string|number)[]=[owner];
+  const input=ReadNotesInput.parse(args);
+  if(input.date)return {notes:[await readNote(db,owner,input.date)],next_cursor:null};
+  const limit=input.limit??14,where=["owner_id=?","text<>''","owner_id IN (SELECT id FROM users WHERE lifecycle='active')"],values:(string|number)[]=[owner];
   for(const [key,op] of [['from','>='],['to','<='],['before','<']] as const)if(input[key]){where.push('date'+op+'?');values.push(input[key]);}
-  const rows=await db.prepare('SELECT date,text,revision,updated_at FROM daily_notes WHERE '+where.join(' AND ')+' ORDER BY date DESC LIMIT ?').bind(...values,input.limit+1).all();
-  const notes=rows.results.slice(0,input.limit).map(row=>DailyNote.parse(row));
-  return {notes,next_cursor:rows.results.length>input.limit?notes.at(-1)!.date:null};
+  const rows=await db.prepare('SELECT date,text,revision,updated_at FROM daily_notes WHERE '+where.join(' AND ')+' ORDER BY date DESC LIMIT ?').bind(...values,limit+1).all();
+  const notes=rows.results.slice(0,limit).map(row=>DailyNote.parse(row));
+  return {notes,next_cursor:rows.results.length>limit?notes.at(-1)!.date:null};
 }
 export async function saveNote(db:D1Database,owner:string,date:string,value:unknown):Promise<DailyNote> {
   LocalDate.parse(date);const input=NoteInput.parse(value),now=new Date().toISOString();

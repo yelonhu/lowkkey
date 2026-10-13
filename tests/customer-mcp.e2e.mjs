@@ -21,7 +21,7 @@ try {
   const params = new URLSearchParams({ response_type: 'code', client_id: registered.client_id, redirect_uri: redirect, scope: 'read write', state: 'customer-test', code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256', resource: origin + '/mcp' });
   assert.equal((await user('/authorize?' + params, '')).status, 302);
   const pendingPrivacy=await user('/authorize?'+params);assert.equal(pendingPrivacy.status,302);assert.equal(new URL(pendingPrivacy.headers.get('Location')).hash,'#consent');
-  for(const session of [cookie,otherCookie]){const account=await (await user('/v1/account',session)).json();assert.equal((await user('/v1/account/consent',session,{version:'2026-10-12-notes',accepted:true},account.accountId)).status,200);}
+  for(const session of [cookie,otherCookie]){const account=await (await user('/v1/account',session)).json();assert.equal((await user('/v1/account/consent',session,{version:'2026-10-13-notes-write',accepted:true},account.accountId)).status,200);}
   assert.equal((await user('/v1/state')).status,200);
   const switchConsent=await user('/authorize?'+params,otherCookie),switchHtml=await switchConsent.text();
   assert.ok(switchHtml.includes('other@example.com'));assert.ok(switchHtml.includes('换一个账户'));
@@ -50,7 +50,7 @@ try {
   await DB.prepare('DELETE FROM privacy_consents WHERE owner_id=?').bind(owner).run();
   assert.equal((await rpc('tools/list',{})).status,403);
   assert.equal((await user('/v1/export')).status,200);
-  assert.equal((await user('/v1/account/consent',cookie,{version:'2026-10-12-notes',accepted:true},owner)).status,200);
+  assert.equal((await user('/v1/account/consent',cookie,{version:'2026-10-13-notes-write',accepted:true},owner)).status,200);
   assert.equal((await (await user('/v1/onboarding')).json()).clients[0].firstReadAt,null);
   const noteResponse=await fetch(origin+'/v1/notes/2026-10-12',{method:'PUT',headers:{Cookie:cookie,Origin:origin,'Content-Type':'application/json','X-Lowkkey-Account':owner},body:JSON.stringify({text:'来自网页的随手记\n  自由书写 🙂',revision:0})});
   assert.equal(noteResponse.status,200);

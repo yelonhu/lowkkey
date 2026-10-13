@@ -1,6 +1,6 @@
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
-import { BriefInput, Curation, CurationInput, DeleteInput, Plan, PlanInput, Profile, ProfileInput, Preferences, SessionInput, TrainingSession, Weight, WeightInput, ClientPublic, PROTOCOL_VERSION, ThemeInput, type StateResponse, type Facts, exerciseById } from '@lowkkey/protocol';
-import { addDays, getBrief, localToday, mergeCuration, monday, themeState, weekday } from '@lowkkey/core';
+import { BriefInput, Curation, CurationInput, DeleteInput, Plan, PlanInput, Profile, ProfileInput, Preferences, SessionInput, TrainingSession, Weight, WeightInput, ClientPublic, PROTOCOL_VERSION, type StateResponse, type Facts, exerciseById } from '@lowkkey/protocol';
+import { addDays, getBrief, localToday, mergeCuration, themeState, weekday } from '@lowkkey/core';
 import { notesSummary } from './notes.ts';
 import { onboarding } from './lifecycle.ts';
 import { StoreError } from './account.ts';
@@ -17,10 +17,10 @@ async function snapshot(db:D1Database,owner:string,now=new Date()) {
   const timezone=String(rows[0].results[0].timezone),today=localToday(now,timezone);return {facts,revision:Number(rows[0].results[0].data_revision),today,timezone};
 }
 export async function state(db:D1Database,owner:string,now=new Date()):Promise<StateResponse>{const {facts,today,timezone}=await snapshot(db,owner,now);return {...facts,accountId:owner,protocol:PROTOCOL_VERSION,today,timezone,theme_state:themeState(facts,today)};}
-export async function brief(db:D1Database,owner:string,args:unknown={},now=new Date(),permissions:('read'|'write')[]=['read','write']){
+export async function brief(db:D1Database,owner:string,args:unknown={},now=new Date(),permissions:('read'|'write'|'notes:write')[]=['read','write']){
   const {sessions,session_date}=BriefInput.parse(args),facts=await state(db,owner,now),setup=await onboarding(db,owner);
   return {...getBrief(facts,now.toISOString(),sessions,facts.timezone),timezone:facts.timezone,permissions,notes:await notesSummary(db,owner),
-    onboarding:{completed:!!setup.completedAt||setup.hasContent,entry:setup.entry,next_step:!permissions.includes('write')?'当前只读。可以分析已有内容；需要保存时请用户重新授权写入。':setup.hasContent?'读取 training_context 并接续已有事实，不重复初始化。让安排适应用户表达的生活限制；修改旧训练前用 session_date 读取该日全部组。':setup.entry==='existing'?'请用户发送已有计划或记录，澄清关键歧义后保存。':'接续用户已表达的意图：有资料就整理；希望开始则一次问一个必要问题，了解目标、经验、时间与器械，共同确定可执行的第一步后保存。'},
+    onboarding:{completed:!!setup.completedAt||setup.hasContent,entry:setup.entry,next_step:!permissions.includes('write')?(permissions.includes('notes:write')?'训练档案只读；可按明确要求写随手记。保存训练需要另外授权 write。':'当前只读。可以分析已有内容；需要保存时请用户重新授权写入。'):setup.hasContent?'读取 training_context 并接续已有事实，不重复初始化。让安排适应用户表达的生活限制；修改旧训练前用 session_date 读取该日全部组。':setup.entry==='existing'?'请用户发送已有计划或记录，澄清关键歧义后保存。':'接续用户已表达的意图：有资料就整理；希望开始则一次问一个必要问题，了解目标、经验、时间与器械，共同确定可执行的第一步后保存。'},
     ...(session_date?{session:facts.sessions.find(s=>s.date===session_date)??null}:{})};
 }
 function field(path:(string|number)[],message:string):never {throw new StoreError('invalid_arguments',400,[{path,message}]);}
@@ -39,7 +39,6 @@ export async function setPlan(db:D1Database,owner:string,value:unknown,now=new D
   const plans=facts.plans.filter(p=>p.title!==input.title);if(saved)plans.push(saved);
   return {result:saved,statements:[saved?db.prepare('INSERT INTO showroom_plans(owner_id,title,weekday,coach,items_json,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(owner_id,title) DO UPDATE SET weekday=excluded.weekday,coach=excluded.coach,items_json=excluded.items_json,updated_at=excluded.updated_at').bind(owner,saved.title,saved.weekday,saved.coach??null,JSON.stringify(saved.items),saved.updated_at):db.prepare('DELETE FROM showroom_plans WHERE owner_id=? AND title=?').bind(owner,input.title),db.prepare('INSERT INTO plan_history(owner_id,revision,effective_date,plans_json) VALUES (?,?,?,?)').bind(owner,revision,today,JSON.stringify(plans))]};},now);}
 export async function setProfile(db:D1Database,owner:string,value:unknown){const input=ProfileInput.parse(value);return mutate(db,owner,facts=>{const saved={...facts.profile,...input};return {result:saved,statements:[db.prepare('INSERT INTO profiles(owner_id,body_notes,gain_target_json,training_context) VALUES (?,?,?,?) ON CONFLICT(owner_id) DO UPDATE SET body_notes=excluded.body_notes,gain_target_json=excluded.gain_target_json,training_context=excluded.training_context').bind(owner,saved.body_notes,saved.gain_target?JSON.stringify(saved.gain_target):null,saved.training_context)]};});}
-export async function setTheme(db:D1Database,owner:string,value:unknown,now=new Date()){const input=ThemeInput.parse(value);return mutate(db,owner,(_facts,_revision,today)=>{const saved={theme:input.theme,manual_week:monday(today)};return {result:saved,statements:[db.prepare('INSERT INTO preferences(owner_id,theme,manual_week) VALUES (?,?,?) ON CONFLICT(owner_id) DO UPDATE SET theme=excluded.theme,manual_week=excluded.manual_week').bind(owner,saved.theme,saved.manual_week)]};},now);}
 export async function deleteFact(db:D1Database,owner:string,value:unknown){const input=DeleteInput.parse(value);return mutate(db,owner,facts=>{const deleted=(input.kind==='session'?facts.sessions:facts.weights).find(x=>x.date===input.date);if(!deleted)throw new StoreError('not_found',404);const table=input.kind==='session'?'showroom_sessions':'showroom_weights';return {result:{...input,deleted},statements:[db.prepare(`DELETE FROM ${table} WHERE owner_id=? AND date=?`).bind(owner,input.date),...(input.kind==='session'?[db.prepare('DELETE FROM annotations WHERE owner_id=? AND date=?').bind(owner,input.date)]:[])]};});}
 export async function curate(db:D1Database,owner:string,value:unknown,now=new Date()){const input=CurationInput.parse(value);return mutate(db,owner,(facts,revision,today)=>{
   if(input.next&&(input.next.date<today||!facts.plans.some(p=>p.weekday===weekday(input.next!.date)&&p.items.length)))field(['next','date'],'必须是今天或之后有计划的日期');
@@ -61,12 +60,13 @@ export async function curate(db:D1Database,owner:string,value:unknown,now=new Da
 },now);}
 export async function listClients(db: D1Database, owner: string) {
   const rows = await db.prepare('SELECT * FROM oauth_clients WHERE owner_id=? ORDER BY created_at DESC,id').bind(owner).all<{
-    id: string; name: string; scopes_json: string; status: string; created_at: string; last_used_at: string | null; first_read_at:string|null;first_write_at:string|null;
+    id: string; name: string; oauth_client_id:string; scopes_json: string; status: string; created_at: string; last_used_at: string | null; first_read_at:string|null;first_write_at:string|null;
   }>();
-  return rows.results.map(row => ClientPublic.parse({ id: row.id, name: row.name, scopes: JSON.parse(row.scopes_json), status: row.status, createdAt: row.created_at, lastUsedAt: row.last_used_at,firstReadAt:row.first_read_at,firstWriteAt:row.first_write_at }));
+  return rows.results.map(row => ClientPublic.parse({ id: row.id, name: row.name, source: row.oauth_client_id, scopes: JSON.parse(row.scopes_json), status: row.status, createdAt: row.created_at, lastUsedAt: row.last_used_at,firstReadAt:row.first_read_at,firstWriteAt:row.first_write_at }));
 }
 export async function registerOAuthClient(db: D1Database, owner: string, oauthId: string, name: string, scopes: string[], id: string) {
-  if (!scopes.length || !scopes.every(scope => ['read', 'write'].includes(scope))) throw new StoreError('invalid_scope');
+  if (!scopes.length || !scopes.every(scope => ['read', 'write', 'notes:write'].includes(scope))) throw new StoreError('invalid_scope');
+  if(scopes.some(s=>s==='write'||s==='notes:write')&&!scopes.includes('read'))throw new StoreError('invalid_scope');
   await db.prepare("INSERT INTO oauth_clients(id,owner_id,oauth_client_id,name,scopes_json,status,created_at) VALUES (?,?,?,?,?,'active',?)")
     .bind(id, owner, oauthId, name, JSON.stringify(scopes), new Date().toISOString()).run();
   return id;

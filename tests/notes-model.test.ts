@@ -58,3 +58,10 @@ it('does not recreate or send a draft after export-and-leave discards it',async(
  expect(model.hasPending()).toBe(false);expect(model.entry(date).text).toBe('');
  await vi.advanceTimersByTimeAsync(1000);expect(model.hasPending()).toBe(false);
 });
+
+it('loads a linked historical day without disturbing current typing',async()=>{
+ const past={date:'2025-01-01',text:'历史原文',revision:4,updated_at:new Date().toISOString()};
+ intercept=path=>path.endsWith(past.date)?Promise.resolve(Response.json(past)):undefined;
+ model.edit(date,'正在输入');await model.loadDate(past.date);
+ expect(model.entry(past.date).text).toBe(past.text);expect(model.entry(date).text).toBe('正在输入');expect(model.entry(date).dirty).toBe(true);
+});

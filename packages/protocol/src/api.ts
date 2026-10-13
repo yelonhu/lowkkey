@@ -1,14 +1,14 @@
 import { z } from 'zod';
-import { DailyNote, NoteInput, ReadNotesInput, NotesPage, ClientPublic, Facts, ThemeInput, ThemeState, Preferences, OnboardingInput, OnboardingState, AccountPreferencesInput, AccountPublic, AccountDeleteInput, ProductEventInput, ConsentInput, ConsentStatus, PrivacyInfo } from './entities.ts';
+import { DailyNote, NoteInput, ReadNotesInput, NotesPage, ClientPublic, Facts, ThemeState, OnboardingInput, OnboardingState, AccountPreferencesInput, AccountPublic, AccountDeleteInput, ProductEventInput, ConsentInput, ConsentStatus, PrivacyInfo } from './entities.ts';
 import { Id, Instant, LocalDate, PROTOCOL_VERSION } from './primitives.ts';
-export const Scope = z.enum(['read', 'write']);
+export const Scope = z.enum(['read', 'write', 'notes:write']);
 export type Scope = z.infer<typeof Scope>;
 export const StateResponse = Facts.extend({ accountId: Id, protocol: z.literal(PROTOCOL_VERSION), today: LocalDate, timezone: z.string().default('America/Chicago'), theme_state: ThemeState });
 export type StateResponse = z.infer<typeof StateResponse>;
 export const ApiError = z.object({ error: z.object({ code: z.string(), fields: z.array(z.unknown()).optional() }) });
 export const Backup = z.object({ format: z.literal('lowkkey.showroom.v5'), exportedAt: Instant, snapshot: StateResponse, notes:z.array(DailyNote) });
 export const ROUTES = {
-  notes:{method:'GET',path:'/v1/notes',scope:'user',summary:'分页读取随手记',request:ReadNotesInput.safeExtend({limit:z.number().int().min(1).max(30).default(30)}),response:NotesPage},
+  notes:{method:'GET',path:'/v1/notes',scope:'user',summary:'分页读取随手记',request:ReadNotesInput,response:NotesPage},
   note:{method:'GET',path:'/v1/notes/{date}',scope:'user',summary:'读取某日随手记及版本',response:DailyNote},
   saveNote:{method:'PUT',path:'/v1/notes/{date}',scope:'user',summary:'按预期版本保存随手记，冲突返回409',request:NoteInput,response:DailyNote},
   privacy:{method:'GET',path:'/api/privacy',scope:'public',summary:'读取隐私政策版本与联系信息',response:PrivacyInfo},
@@ -19,7 +19,6 @@ export const ROUTES = {
   preferences: { method:'POST',path:'/v1/account/preferences',scope:'user',summary:'保存账户时区',request:AccountPreferencesInput,response:z.object({ok:z.literal(true)}) },
   deleteAccount: { method:'POST',path:'/v1/account/delete',scope:'user',summary:'注销账户',request:AccountDeleteInput,response:z.object({ok:z.literal(true)}) },
   productEvent: { method:'POST',path:'/v1/onboarding/events',scope:'user',summary:'记录首次使用事件',request:ProductEventInput,response:z.object({ok:z.literal(true)}) },
-  theme: { method: 'POST', path: '/v1/preferences/theme', scope: 'user', summary: '保存本周手动主题', request: ThemeInput, response: Preferences, ConsentInput, ConsentStatus, PrivacyInfo },
   state: { method: 'GET', path: '/v1/state', scope: 'user', summary: '读取展厅事实', response: StateResponse },
   account: { method: 'GET', path: '/v1/account', scope: 'user', summary: '读取账户', response: AccountPublic },
   clients: { method: 'GET', path: '/v1/clients', scope: 'user', summary: '读取 AI 授权', response: z.array(ClientPublic) },

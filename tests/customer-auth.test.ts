@@ -87,15 +87,15 @@ describe('privacy belongs to an authenticated account',()=>{
     expect((await app.fetch(request('/v1/export',undefined,cookie),env)).status).toBe(200);
     const post=(body:unknown,owner=account.accountId,originValue=origin)=>{const req=request('/v1/account/consent',body,cookie);req.headers.set('X-Lowkkey-Account',owner);req.headers.set('Origin',originValue);return app.fetch(req,env);};
     expect((await post({accepted:true,version:'old'})).status).toBe(400);
-    expect((await post({accepted:false,version:'2026-10-12-notes'})).status).toBe(400);
-    expect((await post({accepted:true,version:'2026-10-12-notes'},'wrong')).status).toBe(409);
-    expect((await post({accepted:true,version:'2026-10-12-notes'},account.accountId,'https://foreign.invalid')).status).toBe(403);
-    const first=await (await post({accepted:true,version:'2026-10-12-notes'})).json();
-    expect(await (await post({accepted:true,version:'2026-10-12-notes'})).json()).toEqual(first);
+    expect((await post({accepted:false,version:'2026-10-13-notes-write'})).status).toBe(400);
+    expect((await post({accepted:true,version:'2026-10-13-notes-write'},'wrong')).status).toBe(409);
+    expect((await post({accepted:true,version:'2026-10-13-notes-write'},account.accountId,'https://foreign.invalid')).status).toBe(403);
+    const first=await (await post({accepted:true,version:'2026-10-13-notes-write'})).json();
+    expect(await (await post({accepted:true,version:'2026-10-13-notes-write'})).json()).toEqual(first);
     expect((await app.fetch(request('/v1/state',undefined,cookie),env)).status).toBe(200);
   });
   it('carries a one-use pre-login intent across the callback, without consenting a second account',async()=>{
-    const app=createApi(),intent=await app.fetch(request('/api/privacy/intent',{accepted:true,version:'2026-10-12-notes'}),env);
+    const app=createApi(),intent=await app.fetch(request('/api/privacy/intent',{accepted:true,version:'2026-10-13-notes-write'}),env);
     expect(intent.status).toBe(200);expect(intent.headers.get('Set-Cookie')).toContain('HttpOnly');
     const token=intent.headers.get('Set-Cookie')!.split(';')[0],one=await login('two@example.com');
     const first=await (await app.fetch(request('/v1/account',undefined,one+'; '+token),env)).json() as {privacy:{acceptedAt:string|null}};
@@ -104,7 +104,7 @@ describe('privacy belongs to an authenticated account',()=>{
     const another=await login('mail@example.com');
     const second=await (await app.fetch(request('/v1/account',undefined,another+'; '+token),env)).json() as {privacy:{acceptedAt:string|null}};
     expect(second.privacy.acceptedAt).toBeNull();
-    const expired=await app.fetch(request('/api/privacy/intent',{accepted:true,version:'2026-10-12-notes'}),env);
+    const expired=await app.fetch(request('/api/privacy/intent',{accepted:true,version:'2026-10-13-notes-write'}),env);
     await env.DB.prepare("UPDATE privacy_intents SET expires_at='2000-01-01'").run();
     const third=await (await app.fetch(request('/v1/account',undefined,another+'; '+expired.headers.get('Set-Cookie')!.split(';')[0]),env)).json() as {privacy:{acceptedAt:string|null}};
     expect(third.privacy.acceptedAt).toBeNull();

@@ -1,3 +1,4 @@
+import { mcpResponse } from '../src/server/mcp.ts';
 import { afterAll,beforeAll,describe,expect,it } from 'vitest';
 import { Miniflare } from 'miniflare';
 import { readFile,readdir,rm } from 'node:fs/promises';
@@ -22,9 +23,9 @@ describe('v5 account-isolated transactional storage',()=>{
  it('stores curation snapshots and deep merges recap and annotations',async()=>{await store.curate(db,owner,{week:'2026-10-05',theme:{id:'gold',why:'完成门槛'},recap:{title:'这一周。',letter:['正文'],picks:[{kind:'barbell',date:'2026-10-08',ex:'bench_press',title:'记录',note:'批注'}]},next:{date:'2026-10-09',text:'下一次练胸'},log:{'2026-10-08':'这次的批注'}},now);await Promise.all([store.curate(db,owner,{week:'2026-10-05',recap:{title:'新标题'}},now),store.curate(db,owner,{week:'2026-10-05',body:{date:'2026-10-08',text:'体重批注'}},now)]);const state=await store.state(db,owner,now);expect(state.curations[0].recap).toMatchObject({title:'新标题',letter:['正文']});expect(state.curations[0].body?.text).toBe('体重批注');expect(state.annotations['2026-10-08']).toBe('这次的批注');expect(state.theme_state.active).toBe('gold');const count=await db.prepare('SELECT count(*) n FROM curation_versions WHERE owner_id=?').bind(owner).first<{n:number}>();expect(count?.n).toBe(3);});
  it('rejects curation reference and text errors with no partial writes',async()=>{const before=await store.state(db,owner,now);for(const input of [{theme:{id:'pearl',why:'好！'}},{next:{date:'2026-10-07',text:'过去'}},{next:{date:'2026-10-10',text:'没有计划'}},{recap:{picks:[{kind:'barbell',date:'2026-10-08',ex:'back_squat',title:'无效',note:''}]}},{log:{'2026-01-01':'无记录'}}])await expect(store.curate(db,owner,{week:'2026-10-05',...input},now)).rejects.toThrow();expect((await store.state(db,owner,now)).curations).toEqual(before.curations);});
  it('clears nested fields and annotations explicitly',async()=>{await store.curate(db,owner,{week:'2026-10-05',recap:{title:null},log:{'2026-10-08':null},body:null},now);const state=await store.state(db,owner,now);expect(state.curations[0].recap?.title).toBeNull();expect(state.annotations).toEqual({});expect(state.curations[0].body).toBeNull();});
- it('persists manual theme per owner and only blocks the current week',async()=>{await store.setTheme(db,owner,{theme:'pearl'},now);expect((await store.state(db,owner,now)).theme_state).toEqual({user:'pearl',active:'pearl',manual_this_week:true});expect((await store.state(db,other,now)).theme_state.active).toBe('ink');expect((await store.state(db,owner,new Date('2026-10-12T15:00:00Z'))).theme_state.manual_this_week).toBe(false);});
+ it('ignores historical manual preferences and removes manual mutation',async()=>{await db.prepare("INSERT INTO preferences(owner_id,theme,manual_week) VALUES (?,'pearl','2026-10-05')").bind(owner).run();expect((await store.state(db,owner,now)).theme_state).toMatchObject({user:'ink',active:'gold',manual_this_week:false,source_week:'2026-10-05',reason:'完成门槛'});expect((await store.state(db,other,now)).theme_state.active).toBe('ink');expect((await store.state(db,owner,new Date('2026-10-12T15:00:00Z'))).theme_state.active).toBe('gold');});
  it('isolates reads and deletion; returns deleted contents',async()=>{await expect(store.deleteFact(db,other,{kind:'session',date:'2026-10-08'})).rejects.toThrow('not_found');const result=await store.deleteFact(db,owner,{kind:'session',date:'2026-10-08'});expect(result.deleted).toMatchObject({title:'胸'});expect((await store.state(db,owner)).sessions).toEqual([]);await expect(store.deleteFact(db,owner,{kind:'session',date:'2026-10-08'})).rejects.toThrow('not_found');expect((await store.state(db,other)).weights).toEqual([]);});
- it('protects the only new website write with origin and account checks',async()=>{expect((await call('/v1/preferences/theme','POST','one',{theme:'ink'},{Origin:'https://foreign.invalid'})).status).toBe(403);expect((await call('/v1/preferences/theme','POST','one',{theme:'ink'},{'X-Lowkkey-Account':other})).status).toBe(409);expect((await call('/v1/preferences/theme','POST','one',{theme:'ink'})).status).toBe(200);expect((await call('/v1/preferences/theme','POST','one',{theme:'bad'})).status).toBe(400);expect((await (await call('/v1/export')).json() as {format:string}).format).toBe('lowkkey.showroom.v5');});
+ it('retires the theme endpoint and keeps origin and account checks',async()=>{expect((await call('/v1/preferences/theme','POST','one',{theme:'ink'},{Origin:'https://foreign.invalid'})).status).toBe(403);expect((await call('/v1/preferences/theme','POST','one',{theme:'ink'},{'X-Lowkkey-Account':other})).status).toBe(409);expect((await call('/v1/preferences/theme','POST','one',{theme:'ink'})).status).toBe(404);expect((await call('/v1/preferences/theme','POST','one',{theme:'bad'})).status).toBe(404);expect((await (await call('/v1/export')).json() as {format:string}).format).toBe('lowkkey.showroom.v5');});
  it('retains authorization revocation and rejects old scopes and business routes',async()=>{await store.registerOAuthClient(db,owner,'oauth','test',['read','write'],'client');await expect(store.registerOAuthClient(db,owner,'old','old',['submit'],'old')).rejects.toThrow('invalid_scope');await expect(store.revokeClient(db,other,'client')).rejects.toThrow('not_found');expect((await call('/v1/clients/client/revoke','POST','one',{})).status).toBe(200);expect((await store.oauthClient(db,owner,'client'))?.status).toBe('revoked');for(const path of ['/v1/capture','/v1/entries','/v1/proposals','/v1/events'])expect((await call(path)).status).toBe(404);});
 });
 
@@ -62,5 +63,25 @@ describe('daily notes',()=>{
   expect((await call('/v1/notes?from=2026-10-15&to=2026-01-01')).status).toBe(400);
   expect((await call('/v1/notes?limit=31')).status).toBe(400);
   expect((await call('/v1/notes/2026-10-15','PUT','one',{text:'🙂'.repeat(20000),revision:0})).status).toBe(200);
+ });
+});
+
+
+describe('MCP note writing with separate consent',()=>{
+ const rpc=async(scopes:string[],name:string,args:unknown,who=owner)=>{
+  const response=await mcpResponse(new Request(origin+'/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})}),db,{ownerId:who,clientId:'test-notes',scopes});
+  return (await response.json() as {result:{isError?:boolean;structuredContent:{result:Record<string,unknown>;view_url?:string}}}).result??{isError:true,structuredContent:{result:{}}};
+ };
+ it('rejects legacy writes, isolates owners, and shares web revisions',async()=>{
+  const args={date:'2026-08-01',text:'  转录原话\n🙂  ',revision:0};
+  for(const scopes of [['read'],['read','write'],['notes:write']])expect((await rpc(scopes,'write_note',args)).isError).toBe(true);
+  const saved=await rpc(['read','notes:write'],'write_note',args);expect(saved.isError).not.toBe(true);expect(saved.structuredContent.view_url).toBe(origin+'/#notes?date='+args.date);
+  expect(await (await call('/v1/notes/'+args.date)).json()).toMatchObject({text:args.text,revision:1});
+  expect((await rpc(['read'],'read_notes',{date:args.date},other)).structuredContent.result).toMatchObject({notes:[{text:'',revision:0}]});
+  await call('/v1/notes/'+args.date,'PUT','one',{text:'手机编辑',revision:1});
+  const stale=await rpc(['read','notes:write'],'write_note',{...args,text:'过时转录',revision:1});expect(stale.isError).toBe(true);expect(stale.structuredContent.result.error).toMatchObject({code:'note_conflict'});
+  expect((await rpc(['read'],'read_notes',{date:args.date,limit:1})).isError).toBe(true);
+  expect((await rpc(['read','notes:write'],'write_note',{date:args.date,text:'🙂'.repeat(20001),revision:2})).isError).toBe(true);
+  expect(await (await call('/v1/notes/'+args.date)).json()).toMatchObject({text:'手机编辑',revision:2});
  });
 });

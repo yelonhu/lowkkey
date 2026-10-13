@@ -28,7 +28,6 @@ export const ProfileInput = Profile.partial().extend({training_context:text(4000
 export const Theme = z.enum(['ink','gold','pearl']);
 export const Preferences = z.strictObject({theme:Theme,manual_week:LocalDate.nullable()});
 export type Preferences = z.infer<typeof Preferences>;
-export const ThemeInput = z.strictObject({theme:Theme});
 export const SessionInput = z.strictObject({date:LocalDate,title:text(40).trim().min(1),sets:z.array(TrainingSet).max(250),note:text(200).optional()});
 export const WeightInput = z.strictObject({date:LocalDate,lb:z.number().positive().max(1500)});
 export const PlanInput = z.strictObject({title:text(40).trim().min(1),weekday:z.number().int().min(0).max(6),coach:prose(4000).nullable().optional(),items:z.array(PlanItem).max(50)});
@@ -50,8 +49,8 @@ export const PlanHistory = z.strictObject({effective_date:LocalDate,revision:z.n
 export type PlanHistory = z.infer<typeof PlanHistory>;
 export const Facts = z.strictObject({sessions:z.array(TrainingSession),weights:z.array(Weight),plans:z.array(Plan),profile:Profile,preferences:Preferences,curations:z.array(Curation),annotations:z.record(LocalDate,z.string()),plan_history:z.array(PlanHistory)});
 export type Facts = z.infer<typeof Facts>;
-export const ThemeState = z.strictObject({user:Theme,active:Theme,manual_this_week:z.boolean()});
-export const ClientPublic = z.strictObject({id:Id,name:z.string(),scopes:z.array(z.enum(['read','write'])),status:z.enum(['active','revoked']),createdAt:Instant,lastUsedAt:Instant.nullable(),firstReadAt:Instant.nullable(),firstWriteAt:Instant.nullable()});
+export const ThemeState = z.strictObject({user:Theme,active:Theme,manual_this_week:z.boolean(),source_week:LocalDate.nullable().default(null),reason:z.string().nullable().default(null)});
+export const ClientPublic = z.strictObject({id:Id,name:z.string(),source:z.string().default('来源未知'),scopes:z.array(z.enum(['read','write','notes:write'])),status:z.enum(['active','revoked']),createdAt:Instant,lastUsedAt:Instant.nullable(),firstReadAt:Instant.nullable(),firstWriteAt:Instant.nullable()});
 export type ClientPublic = z.infer<typeof ClientPublic>;
 export const DeleteInput = z.strictObject({kind:z.enum(['session','weight']),date:LocalDate});
 export const Deleted = DeleteInput.extend({deleted:z.union([TrainingSession,Weight])});
@@ -77,13 +76,15 @@ export const NOTE_LIMIT = 20_000;
 export const DailyNote = z.strictObject({date:LocalDate,text:text(NOTE_LIMIT),revision:z.number().int().nonnegative(),updated_at:Instant.nullable()});
 export type DailyNote = z.infer<typeof DailyNote>;
 export const NoteInput = z.strictObject({text:text(NOTE_LIMIT),revision:z.number().int().nonnegative()});
-export const ReadNotesInput = z.strictObject({from:LocalDate.optional(),to:LocalDate.optional(),before:LocalDate.optional(),limit:z.number().int().min(1).max(30).default(14)})
+export const WriteNoteInput = NoteInput.extend({date:LocalDate});
+export const ReadNotesInput = z.strictObject({date:LocalDate.optional(),from:LocalDate.optional(),to:LocalDate.optional(),before:LocalDate.optional(),limit:z.number().int().min(1).max(30).optional()})
+  .refine(v=>!v.date||[v.from,v.to,v.before,v.limit].every(x=>x===undefined),{path:['date'],message:'单日读取不能同时传分页参数'})
   .refine(v=>!v.from||!v.to||v.from<=v.to,{path:['to'],message:'结束日期不能早于开始日期'});
 export const NotesPage = z.strictObject({notes:z.array(DailyNote),next_cursor:LocalDate.nullable()});
 export type NotesPage = z.infer<typeof NotesPage>;
 export const NotesSummary = z.strictObject({count:z.number().int().nonnegative(),latest_date:LocalDate.nullable(),updated_at:Instant.nullable()});
 
-export const Brief = z.strictObject({generated_at:Instant,notes:NotesSummary.optional(),timezone:z.string().optional(),permissions:z.array(z.enum(['read','write'])).optional(),onboarding:z.object({completed:z.boolean(),entry:z.enum(['start','existing']).nullable(),next_step:z.string()}).optional(),session:TrainingSession.nullable().optional(),today:z.object({date:LocalDate,weekday:z.number().int()}),next:z.object({date:LocalDate,rel:z.string(),title:z.string()}).nullable(),plans:z.array(Plan),profile:Profile,theme_state:ThemeState,
+export const Brief = z.strictObject({generated_at:Instant,notes:NotesSummary.optional(),timezone:z.string().optional(),permissions:z.array(z.enum(['read','write','notes:write'])).optional(),onboarding:z.object({completed:z.boolean(),entry:z.enum(['start','existing']).nullable(),next_step:z.string()}).optional(),session:TrainingSession.nullable().optional(),today:z.object({date:LocalDate,weekday:z.number().int()}),next:z.object({date:LocalDate,rel:z.string(),title:z.string()}).nullable(),plans:z.array(Plan),profile:Profile,theme_state:ThemeState,
   weight:z.object({latest:WeightInput.nullable(),mean7:WeightMean.nullable(),rate14:z.number().nullable(),status:z.enum(['above','within','below']).nullable()}),
   strength:z.array(z.object({ex:MainExercise,best:briefPoint.nullable(),latest:briefPoint.nullable(),first:briefPoint.nullable(),rel_bw:z.number().nullable(),assistance:z.object({date:LocalDate,kg:z.number(),reps:z.number(),self_percent:z.number().nullable()}).nullable()})),
   exercises:z.array(z.object({ex:ExerciseId,name:z.string(),last:z.object({date:LocalDate,compact:z.string()}),prev:z.object({date:LocalDate,compact:z.string()}).nullable()})),
@@ -101,7 +102,7 @@ export const AccountPublic = z.object({accountId:Id,email:z.string(),mode:z.stri
 export const AccountDeleteInput = z.strictObject({confirm:z.literal('DELETE')});
 export const ProductEventInput = z.strictObject({event:z.enum(['returned','connection_help','connection_timeout','copy_failed'])});
 
-export const PRIVACY_VERSION = "2026-10-12-notes";
+export const PRIVACY_VERSION = "2026-10-13-notes-write";
 export const ConsentInput = z.strictObject({version:z.literal(PRIVACY_VERSION),accepted:z.literal(true)});
 export const ConsentStatus = z.object({version:z.literal(PRIVACY_VERSION),acceptedAt:Instant.nullable()});
 

@@ -79,7 +79,7 @@ describe('product onboarding and continuity',()=>{
     const brief=Brief.parse((await rpc('tools/call',{name:'get_brief',arguments:{}},['read'])).result.structuredContent.result);
     expect(brief.permissions).toEqual(['read']);expect(brief.onboarding?.next_step).toContain('只读');
   });
-  it('preserves training background on partial updates and allows all three themes with manual priority',async()=>{
+  it('preserves training background on partial updates and allows all three AI themes',async()=>{
     await store.setProfile(db,owner,{training_context:'每周两次；忙时缩短训练'});
     await store.setProfile(db,owner,{body_notes:'用户明确提供的备注'});
     expect((await store.brief(db,owner,{},stamp)).profile.training_context).toBe('每周两次；忙时缩短训练');
@@ -88,7 +88,7 @@ describe('product onboarding and continuity',()=>{
       await store.curate(db,owner,{week,theme:{id,why:'用户希望本周用这个主题'}});
       expect((await store.state(db,owner,stamp)).theme_state.active).toBe(id);
     }
-    await store.setTheme(db,owner,{theme:'ink'},stamp);
+    await store.curate(db,owner,{week,theme:{id:'ink',why:'回到水墨'}},stamp);
     expect((await store.state(db,owner,stamp)).theme_state.active).toBe('ink');
     await store.setProfile(db,owner,{training_context:null});
     expect((await store.brief(db,owner,{},stamp)).profile.training_context).toBeNull();
