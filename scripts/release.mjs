@@ -1,6 +1,6 @@
 import { spawnSync, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, chmodSync, mkdirSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { environment, root } from './environment.mjs';
 
 process.chdir(root);
@@ -49,6 +49,31 @@ switch (command) {
     console.log('Created ignored, private secrets file. Fill Google credentials locally; do not paste them into chat.');
     break;
   }
+  case 'backup':
+  case 'verify-backup': {
+    provisioned();
+    const facts=['showroom_sessions','showroom_weights','showroom_plans','profiles','curations','curation_versions','annotations','plan_history'];
+    const fingerprints={};
+    for(const table of facts){const rows=privateQuery('SELECT * FROM '+table)[0].results.map(row=>JSON.stringify(row)).sort();fingerprints[table]={count:rows.length,sha256:createHash('sha256').update(JSON.stringify(rows)).digest('hex')};}
+    const providers=privateQuery("SELECT providerId,count(*) AS accounts FROM auth_account GROUP BY providerId")[0].results;
+    const unlinked=privateQuery("SELECT count(*) AS count FROM auth_user u WHERE NOT EXISTS (SELECT 1 FROM auth_account a WHERE a.userId=u.id AND a.providerId='google')")[0].results[0].count;
+    if(command==='backup'){
+      const stamp=new Date().toISOString().replaceAll(':','-');const output=privateDirectory+'/before-open-google-'+stamp+'.sql';
+      privateExport(output);chmodSync(output,0o600);
+      writeFileSync(privateDirectory+'/open-google-backup.json',JSON.stringify({output,created_at:stamp,sha:git('rev-parse','HEAD'),fingerprints,providers,unlinked},null,2),{mode:0o600});
+      console.log('Private backup saved:',output);
+    }else{
+      const previous=JSON.parse(readFileSync(privateDirectory+'/open-google-backup.json','utf8'));
+      // The additive product migration adds one nullable profile field.
+      if(previous.fingerprints.profiles.sha256!==fingerprints.profiles.sha256){const rows=privateQuery('SELECT * FROM profiles')[0].results.map(value=>{const row={...value};delete row.training_context;return JSON.stringify(row);}).sort();fingerprints.profiles.sha256=createHash('sha256').update(JSON.stringify(rows)).digest('hex');}
+      if(JSON.stringify(previous.fingerprints)!==JSON.stringify(fingerprints))throw new Error('Business data changed since backup; inspect before continuing');
+      console.log('Existing business data matches backup.');
+    }
+    console.log('Account providers:',providers,'Accounts without Google:',unlinked);
+    console.log('Business row counts:',Object.fromEntries(Object.entries(fingerprints).map(([table,value])=>[table,value.count])));
+    if(unlinked)throw new Error('Non-Google accounts need individual review before release');
+    break;
+  }
   case 'backup-v5': {
     provisioned();
     const stamp=new Date().toISOString().replaceAll(':','-');
@@ -95,14 +120,10 @@ switch (command) {
     wrangler('d1','execute','DB','--remote','--file','db/showroom-release/retire-v4.sql','--yes');break;
   }
   case 'migrate': provisioned(); wrangler('d1', 'migrations', 'apply', 'DB', '--remote'); break;
-  case 'invite': {
-    provisioned();
-    if (args.length !== 1) throw new Error('Usage: ./scripts/release invite EMAIL');
-    run(['scripts/invite.mjs', 'add', args[0], config, '--remote']); break;
-  }
   case 'build': run(['node_modules/vite/bin/vite.js', 'build']); break;
   case 'deploy': {
     provisioned();
+    if(!settings.vars.PRIVACY_CONTACT_EMAIL)throw new Error('Configure the public privacy contact first');
     if (git('status', '--porcelain')) throw new Error('Commit the release before deployment so /healthz identifies the exact source');
     if (!existsSync(secretsFile)) throw new Error('Run init-secrets and configure Google credentials first');
     const secrets = JSON.parse(readFileSync(secretsFile, 'utf8'));
@@ -123,5 +144,5 @@ switch (command) {
     }
     break;
   }
-  default: console.log('Usage: ./scripts/release login|whoami|resources|create-d1|create-kv|init-secrets|backup-v5|migrate|import-v5 PRIVATE_HTML EMAIL|retire-v4|invite EMAIL|build|deploy|status');
+  default: console.log('Usage: ./scripts/release login|whoami|resources|create-d1|create-kv|init-secrets|backup|verify-backup|backup-v5|migrate|import-v5 PRIVATE_HTML EMAIL|retire-v4|build|deploy|status');
 }

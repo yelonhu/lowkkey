@@ -1,61 +1,48 @@
+import { clearPendingNotes,downloadPendingNotes,hasPendingNotes } from './notes-model.ts';
+import { PRIVACY_VERSION } from '@lowkkey/protocol';
+import { Welcome } from './Welcome.tsx';
 import { useEffect, useRef, useState } from 'react';
 import type { ClientPublic } from '@lowkkey/protocol';
 import type { useShowroom } from './useShowroom.ts';
-type AuthConfig = { mode: string; local: boolean; google: boolean; email: boolean; aiConnection?: boolean };
-async function call(path: string, body?: unknown, owner?: string) {
-  const response = await fetch(path, { method: body ? 'POST' : 'GET', credentials: 'same-origin',
-    headers: body ? { 'Content-Type': 'application/json', ...(owner ? { 'X-Lowkkey-Account': owner } : {}) } : {},
-    body: body ? JSON.stringify(body) : undefined });
-  const value = await response.json();
-  if (!response.ok) throw new Error(value.code ?? value.error?.code ?? 'REQUEST_FAILED');
-  return value;
+import {call,errorLabel,returnPath,type AuthConfig,type Account} from './customer-api.ts';
+export function LoginGate({ chamber,preview=false }: { chamber: ReturnType<typeof useShowroom>;preview?:false } | { chamber?:never;preview:true }) {
+  const isPreview=import.meta.env.DEV&&preview;
+  const [config,setConfig]=useState<AuthConfig|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  useEffect(()=>{
+    if(isPreview){setConfig({mode:'customer',local:false,google:true,email:false});return;}
+    const params=new URLSearchParams(location.search);
+    if(params.has('deleted'))setError('账户已停用，资料清理已安排。清理完成后可以重新注册空档案。');
+    if(params.has('authError'))setError(params.has('error')?errorLabel(params.get('error')!):'登录未完成，你可以重新选择账户。');
+    void call('/api/auth/config').then(setConfig).catch(()=>setError('暂时无法连接，请重试。'));
+  },[isPreview]);
+  async function perform(task:()=>Promise<void>){if(busy)return;setBusy(true);setError('');try{await task();}catch(cause){setError(errorLabel((cause as Error).message));}finally{setBusy(false);}}
+  async function intent(){await call('/api/privacy/intent',{version:PRIVACY_VERSION,accepted:true});}
+  const privacyNotice=<p className="login-privacy" id="login-privacy">继续即代表同意<a href="/privacy" target="_blank" rel="noreferrer">《隐私政策》</a></p>;
+  return <Welcome variant="login" action={isPreview?<span className="preview-label">设计预览</span>:undefined}><h1 className="welcome-title">每一次训练，<br/>都有下文。</h1><p className="journey-copy">和你熟悉的 AI 聊训练。<br/>计划、记录与变化，在这里接着写。</p>
+    {config?.mode==='customer'?<div className="welcome-login">
+      {config.google&&<button className="journey-primary google-signin" aria-describedby="login-privacy" disabled={busy} onClick={()=>{void perform(async()=>{if(isPreview){setError('这是登录页设计预览，不会发起 Google 登录或创建账户。');return;}await intent();const result=await call('/api/auth/sign-in/social',{provider:'google',callbackURL:returnPath(),errorCallbackURL:'/?authError=1&returnTo='+encodeURIComponent(returnPath())+'#Login'});location.assign(result.url);});}}><img src="/brands/google.png" width="20" height="20" alt=""/><span>{busy?'请稍候…':'使用 Google 继续'}</span></button>}
+      {config.google&&privacyNotice}
+      {!config.google&&<p>登录暂时不可用，请稍后重试。</p>}
+    </div>:config?<button className="journey-primary" disabled={!chamber||chamber.busy} onClick={()=>void chamber?.login()}>打开我的展厅</button>:<p className="journey-hint">正在准备登录…</p>}
+    {(error||chamber?.error)&&<p className="journey-status" role="alert">{error||chamber?.error}</p>}{!config&&error&&<button className="journey-quiet" disabled={busy} onClick={()=>void perform(async()=>setConfig(await call('/api/auth/config')))}>重试登录</button>}
+  </Welcome>;
 }
-const labels: Record<string,string> = { INVITATION_REQUIRED: '目前仅向受邀用户开放。请使用受邀邮箱。', INVALID_OTP: '验证码不正确，请重试。', OTP_EXPIRED: '验证码已过期，请重新获取。', MAIL_UNAVAILABLE: '邮件暂时未能发出，请稍后重试。', ACCOUNT_NOT_LINKED: '请先用邮箱验证码登录，再在设置中绑定 Google。' };
-function returnPath() {
-  const path = new URLSearchParams(location.search).get('returnTo');
-  if (path?.startsWith('/authorize?')) return path;
-  return ['Plan','Gallery','Weight'].includes(location.hash.slice(1).split('?')[0]) ? '/' + location.hash : '/#next';
-}
-export function LoginGate({ chamber }: { chamber: ReturnType<typeof useShowroom> }) {
-  const [config,setConfig] = useState<AuthConfig | null>(null), [email,setEmail] = useState(''), [otp,setOtp] = useState(''), [sent,setSent] = useState(false), [busy,setBusy] = useState(false), [error,setError] = useState('');
-  useEffect(() => {
-    if (new URLSearchParams(location.search).has('authError')) setError('登录未完成。请使用受邀 Google 邮箱重试。');
-    void call('/api/auth/config').then(setConfig).catch(() => setError('暂时无法连接，请重试。'));
-  }, []);
-  async function perform(task: () => Promise<void>) {
-    if (busy) return; setBusy(true); setError('');
-    try { await task(); } catch (cause) { setError(labels[(cause as Error).message] ?? '暂时未能完成，请重试。'); } finally { setBusy(false); }
-  }
-  return <main className="access-gate"><div>lowkkey.</div><h1>{chamber.auth === 'loading' ? '正在打开你的档案。' : '欢迎回来。'}</h1>
-    {config?.mode === 'customer' ? <><p>使用受邀邮箱，打开你的训练档案。</p>
-      {config.google && <button disabled={busy} onClick={() => void perform(async () => { const result = await call('/api/auth/sign-in/social', { provider: 'google', callbackURL: returnPath(), errorCallbackURL:'/?authError=1#Login' }); location.assign(result.url); })}>使用 Google 继续</button>}
-      {config.email && <form onSubmit={event => { event.preventDefault(); void perform(async () => {
-        if (sent) { await call('/api/auth/sign-in/email-otp', { email,otp }); location.assign(returnPath()); }
-        else { await call('/api/auth/email-otp/send-verification-otp', { email,type:'sign-in' }); setSent(true); }
-      }); }}>
-        <label>邮箱<input type="email" autoComplete="email" required value={email} disabled={busy || sent} onChange={event => setEmail(event.target.value)}/></label>
-        {sent && <label>验证码<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={otp} onChange={event => setOtp(event.target.value)}/></label>}
-        <button disabled={busy || !config.email}>{busy ? '请稍候…' : sent ? '登录' : '获取验证码'}</button>
-        {sent && <button type="button" disabled={busy} onClick={() => { setSent(false); setOtp(''); }}>重新获取或更换邮箱</button>}
-      </form>}
-      {!config.email && !config.google && <p>登录暂时不可用，请稍后重试。</p>}</> : <><p>训练安排、记录与长期趋势。</p>{chamber.auth === 'required' && <button disabled={chamber.busy} onClick={() => void chamber.login()}>打开我的展厅</button>}</>}
-    {(error || chamber.error) && <p role="alert">{error || chamber.error}</p>}
-    {chamber.auth === 'loading' && chamber.error && <button onClick={() => void chamber.refresh()}>重试</button>}
-  </main>;
-}
-export function CustomerAccount({ chamber,onClose,returnFocusTo }: { chamber: ReturnType<typeof useShowroom>; onClose: () => void; returnFocusTo: HTMLButtonElement | null }) {
-  const [account,setAccount] = useState<{email: string; mode: string} | null>(null), [config,setConfig] = useState<AuthConfig | null>(null);
+export function CustomerAccount({ chamber,onClose,returnFocusTo,onConnect,accountId }: { chamber: ReturnType<typeof useShowroom>; onClose: () => void; returnFocusTo: HTMLButtonElement | null;onConnect:()=>void;accountId?:string }) {
+  const [account,setAccount] = useState<Account | null>(null), [config,setConfig] = useState<AuthConfig | null>(null);
   const [clients,setClients] = useState<ClientPublic[]>([]), [message,setMessage] = useState(''), [busy,setBusy] = useState(false);
-  const dialog = useRef<HTMLElement>(null), owner = chamber.state!.accountId;
+  const [pendingLeave,setPendingLeave]=useState<(()=>Promise<void>)|null>(null);
+  const [zone,setZone]=useState(''),[deleting,setDeleting]=useState(false),[confirmation,setConfirmation]=useState('');
+  const dialog = useRef<HTMLElement>(null), owner = accountId??chamber.state!.accountId;
   useEffect(() => {
-    void Promise.all([call('/v1/account').then(setAccount), call('/api/auth/config').then(setConfig), call('/v1/clients').then(setClients)]).catch(() => setMessage('暂时无法读取账户。'));
+    if(new URLSearchParams(location.search).has('authError'))setMessage(errorLabel(new URLSearchParams(location.search).get('error')??'REQUEST_FAILED'));
+    void Promise.all([call('/v1/account').then(value=>{setAccount(value);setZone(value.timezone);}), call('/api/auth/config').then(setConfig), call('/v1/clients').then(setClients)]).catch(() => setMessage('暂时无法读取账户。'));
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
     const keys = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); onClose(); }
       if (event.key === 'Tab') {
-        const nodes = [...dialog.current!.querySelectorAll<HTMLElement>('button:not(:disabled),summary,a[href]')].filter(node => node.getClientRects().length);
+        const nodes = [...dialog.current!.querySelectorAll<HTMLElement>('button:not(:disabled),summary,a[href],input:not(:disabled),select:not(:disabled)')].filter(node => node.getClientRects().length);
         const first = nodes[0], last = nodes.at(-1);
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -66,24 +53,30 @@ export function CustomerAccount({ chamber,onClose,returnFocusTo }: { chamber: Re
   }, []);
   async function run(task: () => Promise<void>) {
     if (busy) return; setBusy(true); setMessage('');
-    try { await task(); } catch { setMessage('操作未完成，请重试。'); } finally { setBusy(false); }
+    try { await task(); } catch(cause) { if((cause as Error).message==='notes_pending'){setPendingLeave(()=>task);return;}if((cause as Error).message==='reauth_required')setAccount(value=>value?{...value,fresh:false}:value);setMessage(errorLabel((cause as Error).message)); } finally { setBusy(false); }
   }
+  async function reauthenticate(){if(hasPendingNotes(owner))throw new Error('notes_pending');await chamber.logout();location.assign('/?returnTo='+encodeURIComponent('/#settings')+'#Login');}
   return <div className="account-panel"><section ref={dialog} className="account-drawer" role="dialog" aria-modal="true" aria-label="设置">
     <header className="settings-heading"><h2>设置</h2><button className="close-account" onClick={onClose}>完成</button></header>
     <div className="settings-content">
     {(config?.aiConnection || clients.length > 0) && <section className="settings-section"><h3>AI 连接</h3>
-      {clients.map(client => <div className="client-row" key={client.id}><div><span>{client.name}</span><small>{client.status === 'revoked' ? '已撤销' : client.scopes.map(scope => scope === 'write' ? '直接写入' : '读取').join(' · ')}</small></div>
+      {clients.map(client => <div className="client-row" key={client.id}><div><span>{client.name}</span><small>{client.status === 'revoked' ? '已撤销' : client.scopes.map(scope => scope === 'write' ? '直接写入' : '读取').join(' · ')}</small>{client.lastUsedAt&&<small>最近使用 {new Date(client.lastUsedAt).toLocaleString('zh-CN')}</small>}{client.firstReadAt&&<small>AI 已读取档案{client.firstWriteAt?' · 已保存内容':''}</small>}</div>
         {client.status === 'active' && <button disabled={busy} onClick={() => void run(async () => { await call('/v1/clients/' + client.id + '/revoke',{},owner); setClients(await call('/v1/clients')); })}>撤销授权</button>}</div>)}
-      {config?.aiConnection && <details className="connection-help"><summary>连接新的 AI</summary><p>在 Claude 或其他支持 MCP 的 AI 中添加此地址，登录后即可连接。</p><code className="connection-address">{location.origin}/mcp</code><button disabled={busy} onClick={() => void run(async () => { await navigator.clipboard.writeText(location.origin + '/mcp'); setMessage('连接地址已复制。'); })}>复制连接地址</button><p className="settings-hint">写入授权允许 AI 直接保存、修改和删除记录、计划与策展。</p></details>}
+      {config?.aiConnection && <details className="connection-help"><summary>连接新的 AI</summary><p>连接 ChatGPT 或 Claude，让 AI 整理你的训练档案。</p><button onClick={onConnect}>打开连接引导</button><code className="connection-address">{location.origin}/mcp</code><button disabled={busy} onClick={() => void run(async () => { await navigator.clipboard.writeText(location.origin + '/mcp'); setMessage('连接地址已复制。'); })}>复制连接地址</button><p className="settings-hint">读取授权包括随手记原文。写入授权允许 AI 保存、修改和删除训练记录、计划与策展；随手记只能由你修改。撤销授权不会删除档案。</p></details>}
     </section>}
     <section className="settings-section"><h3>数据</h3><div className="settings-data-row"><p>{chamber.syncedAt && <>最近同步 {chamber.syncedAt.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</>}</p><button disabled={chamber.refreshing} onClick={()=>void chamber.refresh()}>{chamber.refreshing?'同步中…':'刷新'}</button></div>
       <button className="export-records" disabled={busy} onClick={() => void run(async () => { const result = await call('/v1/export'), url = URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'})), link = document.createElement('a'); link.href = url; link.download = 'lowkkey-v5.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000); })}>导出我的记录</button>
     </section>
-    <section className="settings-section"><h3>登录</h3><p className="login-identity">{account?.email ?? '正在读取…'}</p><div className="settings-actions">
-      {account?.mode === 'customer' && <><button disabled={busy} onClick={() => void run(async () => { await call('/api/auth/revoke-other-sessions',{}); setMessage('其他设备已退出。'); })}>退出其他设备</button>
-        {config?.google && config.email && <button disabled={busy} onClick={() => void run(async () => { const result = await call('/api/auth/link-social',{ provider:'google',callbackURL:'/#next' }); location.assign(result.url); })}>绑定 Google 登录</button>}</>}
-      <button disabled={busy} onClick={() => void run(async () => { await chamber.logout(); onClose(); })}>退出登录</button>
-    </div></section><p role="status" className="settings-status">{message}</p>
+    <section className="settings-section"><h3>日期与时区</h3><label>档案时区<select value={zone} onChange={e=>setZone(e.target.value)}>{[...new Set([zone,...Intl.supportedValuesOf('timeZone')])].filter(Boolean).map(value=><option key={value}>{value}</option>)}</select></label><button disabled={busy||!zone||zone===account?.timezone} onClick={()=>void run(async()=>{await call('/v1/account/preferences',{timezone:zone},owner);setAccount(await call('/v1/account'));await chamber.refresh();setMessage('时区已保存。历史记录的日期保持原样。');})}>保存时区</button></section>
+    {(chamber.state&&(chamber.state.plans.length>0||chamber.state.sessions.length>0||chamber.state.weights.length>0))&&<section className="settings-section"><h3>随时回来</h3><details><summary>添加到手机主屏幕</summary><p>iPhone：在 Safari 分享菜单中选择“添加到主屏幕”。Android：在浏览器菜单中选择“安装应用”。需要联网查看最新内容。</p></details></section>}
+    <section className="settings-section"><h3>隐私</h3><a className="privacy-settings-link" href="/privacy" target="_blank" rel="noreferrer">查看隐私政策 ↗</a>{account?.privacy?.acceptedAt&&<p>已于 {new Date(account.privacy.acceptedAt).toLocaleDateString('zh-CN')} 确认。</p>}</section>
+    <section className="settings-section"><h3>登录</h3><p className="login-identity">{account?.email ?? '正在读取…'}</p>{account?.mode==='customer'&&<p className="settings-hint">使用 Google 登录</p>}<div className="settings-actions">
+      {account?.mode === 'customer' && <button disabled={busy} onClick={() => void run(async () => { await call('/api/auth/revoke-other-sessions',{}); setMessage('其他设备已退出。'); })}>退出其他设备</button>}
+      <button disabled={busy} onClick={() => void run(async () => { if(hasPendingNotes(owner))throw new Error('notes_pending');await chamber.logout(); onClose(); })}>退出登录</button>
+    </div></section>
+    {account?.mode==='customer'&&<section className="settings-section"><h3>注销账户</h3><p className="settings-hint">注销会立即停用登录和所有 AI 连接，并删除训练档案。清理完成后可以重新注册，原有档案不会恢复。</p>{!deleting?<button disabled={busy} onClick={()=>setDeleting(true)}>注销我的账户</button>:<div><p>请先导出需要保留的记录。输入 DELETE 确认注销。</p><label>确认注销<input value={confirmation} autoComplete="off" onChange={e=>setConfirmation(e.target.value)}/></label><button disabled={busy||confirmation!=='DELETE'} onClick={()=>void run(async()=>{if(!account.fresh){await reauthenticate();return;}if(hasPendingNotes(owner))throw new Error('notes_pending');await call('/v1/account/delete',{confirm:'DELETE'},owner);clearPendingNotes(owner);localStorage.setItem('lowkkey-signout',String(Date.now()));location.assign('/?deleted=1#Login');})}>{account.fresh?'确认永久注销':'重新登录以验证身份'}</button><button disabled={busy} onClick={()=>{setDeleting(false);setConfirmation('');}}>取消</button></div>}</section>}
+    {pendingLeave&&<section className="settings-section" role="region" aria-label="未同步的随手记"><h3>还有未同步的文字</h3><p>先导出草稿，再继续退出或账户操作。也可以取消，回到随手记等待同步。</p><div className="settings-actions"><button onClick={()=>void run(async()=>{downloadPendingNotes(owner);clearPendingNotes(owner);const action=pendingLeave;setPendingLeave(null);await action();})}>导出草稿并继续</button><button onClick={()=>setPendingLeave(null)}>取消</button></div></section>}
+    <p role="status" className="settings-status">{message}</p>
     </div>
   </section></div>;
 }

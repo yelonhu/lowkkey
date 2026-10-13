@@ -40,7 +40,7 @@
 
 ```sh
 ./scripts/release migrate
-./scripts/release invite yelon.hu@gmail.com
+./scripts/release backup
 ./scripts/run check
 ./scripts/run test
 ./scripts/run build
@@ -59,11 +59,11 @@
 
 ## AI 连接
 
-MCP 地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。配置自定义连接器后，以受邀 Google 账户登录并选择 `read` / `write`。首次授权时确认当前账户邮箱；授权后所有工具都绑定该账户，与网页和其他 AI 对话共享同一份事实。
+MCP 地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。配置自定义连接器后，以 Google 账户登录并选择 `read` / `write`。首次授权时确认当前账户邮箱；授权后所有工具都绑定该账户，与网页和其他 AI 对话共享同一份事实。
 
 - Claude：在 Connectors 中添加远程自定义连接器，填入 `/mcp` 地址，使用 OAuth 发现的配置。
 - ChatGPT：在 Plugins 中添加自定义 MCP server，填入同一地址并安装到个人账户或工作区；可用性受账户及工作区权限约束。
-- 全权限恰好七个工具；只读授权只提供 `get_brief`。无需增加 `search`、`fetch` 或审批工具。
+- 全权限恰好八个工具；只读授权提供 `get_brief` 与 `read_notes`。无需增加 `search`、`fetch` 或审批工具。
 - 工具写入直接生效；AI 客户端自身可能要求确认，lowkkey 不添加第二层业务审批。
 - 在 lowkkey「设置」中撤销某个连接后，该连接的访问和刷新令牌都不能继续访问数据。
 
@@ -96,3 +96,11 @@ MCP 地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。配置
 回滚：切换 Worker **之前** 可执行 `db/showroom-release/rollback-before-cutover.sql`，删除新克隆并解除 legacy 写锁，保留所有旧事实；本地迁移测试验证此路径。切换 **之后** 已可能产生 v5 新数据，应保留 v5 架构并修复代码；必须降级时，先备份当前库，在新的恢复 D1 中还原私密 SQL 并验证账户/数据，再显式切换绑定。不能把旧备份直接覆盖有新写入的活跃数据库。退役 SQL 不在自动迁移目录，只有导入核验成功才允许执行。
 
 自动化覆盖迁移回滚、原子导入、重复日期、保留其他账户、策展版本、删除、主题、只读与撤销。官方 Claude 已由用户确认连接成功；v5 七工具重新发现和 iPhone 真机观感仍需分别验收。
+
+## 开放 Google 与随手记合并发布
+
+现在只支持 Google，任何 Google 用户都可注册，不再依赖邀请表。先执行 `./scripts/release backup`，核对所有现有认证账户均有 Google 身份并保存私密完整 SQL 与业务指纹；历史 backup-v5/import-v5/retire-v4 仅供历史发布，不再重跑。
+
+配置 PRIVACY_CONTACT_EMAIL 为已确认的公开地址；验证迁移 0002–0004、八工具、笔记只读与账户注销。当前分支提交推送且 Product checks 通过后，执行 migrate、verify-backup、deploy、status，核对 healthz 与 Git SHA。verify-backup 只允许新增 nullable training_context，不接受其他已有业务字段变化。新 Worker 启用 lifecycle 后不得回退到旧版。
+
+Google Audience 沿用 External；仅基础身份权限，不增加 API scopes。正式客户端与手机验收结果单独记录。

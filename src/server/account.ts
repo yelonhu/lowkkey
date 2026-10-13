@@ -10,7 +10,7 @@ export async function accountFor(db: D1Database, identity: Identity): Promise<st
   const key = subjectKey(identity);
   await db.prepare('INSERT OR IGNORE INTO users(id,subject_key,email,created_at) VALUES (?,?,?,?)')
     .bind(crypto.randomUUID(), key, identity.email, new Date().toISOString()).run();
-  const row = await db.prepare('SELECT id FROM users WHERE subject_key=?').bind(key).first<{ id: string }>();
+  const row = await db.prepare('SELECT id FROM users WHERE subject_key=? AND lifecycle="active"').bind(key).first<{ id: string }>();
   if (!row) throw new StoreError('ACCOUNT_UNAVAILABLE', 503);
   return row.id;
 }

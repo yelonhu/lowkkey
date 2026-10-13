@@ -6,6 +6,7 @@
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": true,
+  "triggers": {"crons": ["17 * * * *"]},
   "preview_urls": false,
   "assets": {
     "binding": "ASSETS",
@@ -16,6 +17,7 @@
     "APP_ENV": "production",
     "AUTH_MODE": "customer",
     "AI_CONNECTION_ENABLED": "1",
+    "PRIVACY_CONTACT_EMAIL": "yelon.hu@gmail.com",
     "APP_ORIGIN": "https://lowkkey-showroom-beta.yelon-hu.workers.dev"
   },
   "d1_databases": [{

@@ -1,4 +1,4 @@
-export const screens = ['next','recap','body','log'] as const;
+export const screens = ['next','recap','body','log','notes'] as const;
 export type Screen = typeof screens[number];
 export function screenFromHash():Screen {
   const key=location.hash.slice(1).split('?')[0];

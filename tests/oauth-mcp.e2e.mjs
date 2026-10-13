@@ -5,14 +5,14 @@ import { rehearsalClient } from '../scripts/rehearsal/client.mjs';
 const origin = process.env.LOWKKEY_TEST_ORIGIN ?? 'http://127.0.0.1:5174';
 const client = await rehearsalClient(Number(new URL(origin).port));
 const tools = await client.rpc('tools/list',{});
-assert.deepEqual(tools.tools.map(t=>t.name).sort(),['curate','delete','get_brief','log_session','log_weight','set_plan','set_profile']);
+assert.deepEqual(tools.tools.map(t=>t.name).sort(),['curate','delete','get_brief','log_session','log_weight','read_notes','set_plan','set_profile']);
 const contract = JSON.parse(await readFile('docs/lowkkey-handoff/protocol/mcp-tools.json','utf8'));
 for (const declared of contract.tools) {
   const actual = tools.tools.find(t=>t.name===declared.name);
   assert.deepEqual(actual.inputSchema.properties,declared.inputSchema.properties,declared.name+' input');
   assert.deepEqual(actual.outputSchema.properties,declared.outputSchema.properties,declared.name+' output');
   assert.deepEqual(actual.annotations,declared.annotations);
-  assert.deepEqual(actual.securitySchemes,[{type:'oauth2',scopes:[declared.name==='get_brief'?'read':'write']}]);
+  assert.deepEqual(actual.securitySchemes,[{type:'oauth2',scopes:[['get_brief','read_notes'].includes(declared.name)?'read':'write']}]);
 }
 const before = await client.tool('get_brief',{});
 assert.equal(before.sessions.length,0);
@@ -38,7 +38,10 @@ assert.equal(forbidden.isError,true);assert.equal(forbidden.structuredContent.re
 const invalid = await client.rpc('tools/call',{name:'log_weight',arguments:{date:'2026-02-30',lb:160}});
 assert.equal(invalid.isError,true);
 const readonly = await rehearsalClient(Number(new URL(origin).port),['read']);
-assert.deepEqual((await readonly.rpc('tools/list',{})).tools.map(t=>t.name),['get_brief']);
+assert.deepEqual((await readonly.rpc('tools/list',{})).tools.map(t=>t.name),['get_brief','read_notes']);
+await client.user('/v1/notes/2026-10-08',{text:'原文\n  135lb × 8 🙂',revision:0},'PUT');
+assert.equal((await readonly.tool('read_notes',{})).notes[0].text,'原文\n  135lb × 8 🙂');
+assert.equal((await readonly.tool('get_brief',{})).notes.count,1);
 const deniedWrite = await readonly.rpc('tools/call',{name:'log_weight',arguments:{date:'2026-10-07',lb:999}});
 assert.equal(deniedWrite.isError,true);
 assert.equal((await client.tool('get_brief',{})).weight.latest.lb,brief.weight.latest.lb);
@@ -54,4 +57,4 @@ for (const record of clients) await client.user('/v1/clients/'+record.id+'/revok
 assert.equal((await client.raw('tools/list',{})).status,401);
 const refresh = await fetch(origin+'/oauth/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',client_id:client.registered.client_id,refresh_token:client.token.refresh_token,resource:origin+'/mcp'})});
 assert.equal(refresh.ok,false);
-console.log('Seven-tool OAuth/MCP end-to-end passed');
+console.log('Eight-tool OAuth/MCP end-to-end passed');

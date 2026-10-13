@@ -54,8 +54,8 @@ export function pickData(facts:Facts,pick:Pick){
   const sorted=[...sets].sort((a,b)=>pick.kind==='assist'?toLb(a.load,a.unit)-toLb(b.load,b.unit)||strictReps(b)-strictReps(a):toLb(b.load,b.unit)-toLb(a.load,a.unit)||strictReps(b)-strictReps(a));
   const top=sorted[0];return {kind:pick.kind,top,bw:bodyweightOn(facts.weights,pick.date)?.lb??null,share:selfShare(top,pick.date,facts.weights),sets:sets.filter(s=>s.load===top.load&&s.unit===top.unit&&strictReps(s)>=strictReps(top)).length};
 }
-export function getBrief(facts:Facts,generatedAt=new Date().toISOString(),count=6):Brief {
-  const today=localToday(new Date(generatedAt)),all=scoredSessions(facts).filter(s=>s.date<=today),latest=[...facts.weights].filter(w=>w.date<=today).sort((a,b)=>a.date.localeCompare(b.date)).at(-1)??null;
+export function getBrief(facts:Facts,generatedAt=new Date().toISOString(),count=6,timezone='America/Chicago'):Brief {
+  const today=localToday(new Date(generatedAt),timezone),all=scoredSessions(facts).filter(s=>s.date<=today),latest=[...facts.weights].filter(w=>w.date<=today).sort((a,b)=>a.date.localeCompare(b.date)).at(-1)??null;
   const mean=weightMean(facts.weights,today),rate=weightRate(facts.weights,today),next=upcoming(facts,today)[0];
   const point=(p:StrengthSeries['best'])=>p?{date:p.date,e1rm:round(p.e1rm)}:null;
   const unique=new Map<string,TrainingSet>();for(const s of all)for(const x of s.sets)unique.set(exerciseKey(x),x);

@@ -3,6 +3,111 @@
   "title": "lowkkey protocol",
   "version": "5.0.0",
   "$defs": {
+    "DailyNote": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        },
+        "text": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "text",
+        "revision",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "NotesPage": {
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DailyNote"
+          }
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "notes",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "NotesSummary": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "latest_date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "count",
+        "latest_date",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
     "TrainingSession": {
       "type": "object",
       "properties": {
@@ -390,6 +495,63 @@
           "type": "string",
           "format": "date-time",
           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "notes": {
+          "$ref": "#/$defs/NotesSummary"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write"
+            ]
+          }
+        },
+        "onboarding": {
+          "type": "object",
+          "properties": {
+            "completed": {
+              "type": "boolean"
+            },
+            "entry": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "start",
+                    "existing"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "next_step": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "completed",
+            "entry",
+            "next_step"
+          ],
+          "additionalProperties": false
+        },
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrainingSession"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "today": {
           "type": "object",
@@ -1245,11 +1407,19 @@
             "string",
             "null"
           ]
+        },
+        "training_context": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
         "gain_target",
-        "body_notes"
+        "body_notes",
+        "training_context"
       ],
       "additionalProperties": false
     },
@@ -1299,6 +1469,7 @@
                 "id": {
                   "type": "string",
                   "enum": [
+                    "ink",
                     "gold",
                     "pearl"
                   ]
@@ -1376,7 +1547,7 @@
                   "anyOf": [
                     {
                       "type": "string",
-                      "pattern": "^claude · \\d{2}\\.\\d{2}$"
+                      "pattern": "^(?:claude|AI) · \\d{2}\\.\\d{2}$"
                     },
                     {
                       "type": "null"
@@ -1686,6 +1857,10 @@
           "format": "date",
           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
         },
+        "timezone": {
+          "default": "America/Chicago",
+          "type": "string"
+        },
         "theme_state": {
           "$ref": "#/$defs/ThemeState"
         }
@@ -1702,6 +1877,7 @@
         "accountId",
         "protocol",
         "today",
+        "timezone",
         "theme_state"
       ],
       "additionalProperties": false
@@ -1745,12 +1921,19 @@
         },
         "snapshot": {
           "$ref": "#/$defs/StateResponse"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DailyNote"
+          }
         }
       },
       "required": [
         "format",
         "exportedAt",
-        "snapshot"
+        "snapshot",
+        "notes"
       ],
       "additionalProperties": false
     }

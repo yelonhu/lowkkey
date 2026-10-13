@@ -4,6 +4,7 @@
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": false,
+  "triggers": {"crons": ["17 * * * *"]},
   "routes": [{"pattern": "lowkkey.example.com/*", "zone_name": "example.com"}],
   "assets": {
     "binding": "ASSETS",
@@ -14,7 +15,8 @@
     "APP_ENV": "production",
     "AUTH_MODE": "customer",
     "AI_CONNECTION_ENABLED": "0",
-    "AUTH_EMAIL_FROM": "lowkkey <login@example.com>",
+    // Set a real monitored address before enabling customer onboarding.
+    "PRIVACY_CONTACT_EMAIL": "",
     "APP_ORIGIN": "https://lowkkey.example.com",
     "ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
     "ACCESS_AUD": "REPLACE_WITH_ACCESS_APPLICATION_AUD"

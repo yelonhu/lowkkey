@@ -19,12 +19,15 @@ it('migrates legacy facts, blocks interleaved old writes, rolls back, imports at
  await db.prepare('INSERT INTO plans VALUES (?,?,?,?,?,?,?,?,?)').bind('one','胸（周三）','[]',null,'older',JSON.stringify({start_date:'2026-09-01',start_lb:140,weekly_lb_min:.55,weekly_lb_max:.77}),1,1,stamp).run();
  await db.prepare('INSERT INTO plans VALUES (?,?,?,?,?,?,?,?,?)').bind('one','背','[]',null,null,null,2,null,stamp).run();
  await migration('0001_v5.sql');
- const migrated=await state(db,'one');expect(migrated.profile).toEqual({body_notes:null,gain_target:{start:'2026-09-01',startLb:140,min:.55,max:.77}});expect(migrated.sessions[0].sets[0]).toMatchObject({ex:'bench_press',kind:'external',role:'work'});
+ await migration('0002_product.sql');
+ await migration('0003_welcome.sql');
+ const migrated=await state(db,'one');expect(migrated.profile).toEqual({body_notes:null,training_context:null,gain_target:{start:'2026-09-01',startLb:140,min:.55,max:.77}});expect(migrated.sessions[0].sets[0]).toMatchObject({ex:'bench_press',kind:'external',role:'work'});
  await expect(db.prepare('INSERT INTO weights VALUES (?,?,?,?)').bind('one','2026-10-08',140,stamp).run()).rejects.toThrow('v5_migration_retry');
  await db.prepare('CREATE TABLE d1_migrations(name TEXT)').run();await db.prepare("INSERT INTO d1_migrations VALUES ('0001_v5.sql')").run();
  const rollback=(await readFile('db/showroom-release/rollback-before-cutover.sql','utf8')).split(';').map(s=>s.trim()).filter(Boolean);await db.batch(rollback.map(s=>db.prepare(s)));
  expect((await db.prepare('SELECT raw_text FROM training_sessions').first<{raw_text:string}>())?.raw_text).toBe('Original must remain in backup');
  await db.prepare('INSERT INTO weights VALUES (?,?,?,?)').bind('one','2026-10-08',140,stamp).run();await migration('0001_v5.sql');
+ await db.prepare('ALTER TABLE profiles ADD COLUMN training_context TEXT').run();
  const restored=await state(db,'one');const facts=Facts.parse(Object.fromEntries(Object.keys(Facts.shape).map(key=>[key,restored[key as keyof typeof restored]])));
 
  // Build a literal facts object: strict schema excludes REST metadata.

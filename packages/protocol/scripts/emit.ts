@@ -46,6 +46,7 @@ for (const [op, r] of Object.entries(P.ROUTES)) {
       default: { description: 'Error', content: { 'application/json': { schema: ref(P.ApiError, 'output') } } },
     },
   };
+  if(route.scope==='public')item.security=[];
   const params: unknown[] = [...route.path.matchAll(/\{(\w+)\}/g)].map((m) => ({ name: m[1], in: 'path', required: true, schema: { type: 'string' } }));
   if (route.request && route.method === 'GET') {
     const q = z.toJSONSchema(route.request, { ...opts, io: 'input' }) as { properties?: Record<string, unknown> };

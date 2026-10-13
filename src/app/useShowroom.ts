@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { hasPendingNotes,clearPendingNotes } from './notes-model.ts';
 import { StateResponse } from '@lowkkey/protocol';
 
 export function useShowroom() {
   const [state, setState] = useState<StateResponse | null>(null);
-  const [auth, setAuth] = useState<'loading' | 'required' | 'ready'>('loading');
+  const [auth, setAuth] = useState<'loading' | 'required' | 'ready' | 'consent'>('loading');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [syncedAt, setSyncedAt] = useState<Date | null>(null), [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
@@ -16,6 +17,7 @@ export function useShowroom() {
       const response = await fetch('/v1/state', { credentials: 'same-origin', cache: 'no-store' });
       if (epoch !== generation.current) return;
       if (response.status === 401) { clear(); return; }
+      if(response.status===403){const denied=await response.json();if(epoch!==generation.current)return;if(denied.error?.code==='privacy_required'){setState(null);setAuth('consent');setError('');return;}}
       if (!response.ok) throw new Error('暂时无法读取记录。');
       const value = StateResponse.parse(await response.json());
       if (epoch !== generation.current) return;
@@ -38,7 +40,7 @@ export function useShowroom() {
       document.removeEventListener('visibilitychange', resume);
     };
   }, [refresh, clear]);
-  useEffect(()=>{const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&state&&new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())!==state.today)void refresh();},60000);return()=>clearInterval(timer);},[state,refresh]);
+  useEffect(()=>{const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&state&&new Intl.DateTimeFormat('en-CA',{timeZone:state.timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())!==state.today)void refresh();},60000);return()=>clearInterval(timer);},[state,refresh]);
   async function setTheme(theme:'ink'|'gold'|'pearl') {
     if(!state||themeBusy)return;setThemeBusy(true);
     try {const response=await fetch('/v1/preferences/theme',{method:'POST',headers:{'Content-Type':'application/json','X-Lowkkey-Account':state.accountId},body:JSON.stringify({theme})});if(!response.ok)throw new Error();await refresh();}catch{setError('主题暂时未能保存，请重试。');}finally{setThemeBusy(false);}
@@ -53,9 +55,11 @@ export function useShowroom() {
     } catch { setError('暂时无法登录，请重试。'); } finally { setBusy(false); }
   }
   async function logout() {
+    if(state&&hasPendingNotes(state.accountId))throw new Error('notes_pending');
     const response = await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     if (!response.ok) throw new Error('退出未完成');
     const result = await response.json();
+    if(state)clearPendingNotes(state.accountId);
     clear(); localStorage.setItem('lowkkey-signout', String(Date.now()));
     if (result.redirect) location.assign(result.redirect);
   }
