@@ -408,3 +408,17 @@ html[data-input="keyboard"] .note-day:focus-within .note-date h2{color:var(--ink
 .connection-history{margin-top:20px}
 .client-source{overflow-wrap:anywhere;word-break:break-word}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Display surfaces are quiet; real text editing and copyable information stay native. */
+.showroom-content,.account-panel,.journey{-webkit-user-select:none;user-select:none}
+:where(.showroom-content,.account-panel,.journey) *{-webkit-user-select:inherit;user-select:inherit}
+textarea,input,[contenteditable="true"],.note-conflict pre,.connection-address,.copy-fallback code,[role="alert"],.settings-status,.journey-status,.note-status,.privacy-document{-webkit-user-select:text;user-select:text}
+.page-viewport{min-height:calc(100svh - 110px);overflow-x:clip;touch-action:pan-y pinch-zoom}
+.page-viewport textarea,.page-viewport input,.note-conflict,.chartbox,.glyph{touch-action:auto}
+.page-viewport[data-swiping]{position:fixed;left:0;right:0;bottom:0;z-index:10;min-height:0;overflow:hidden;background:var(--bg);isolation:isolate}
+.page-viewport [data-swipe-page]{position:absolute;left:0;right:0;width:100%;will-change:transform}
+.page-viewport[data-swiping] .back-to-today{visibility:hidden}
+
+.page-viewport:has(textarea:focus),.page-viewport:has(input:focus){touch-action:auto}
+
+.tab-indicator{transform-origin:left center}

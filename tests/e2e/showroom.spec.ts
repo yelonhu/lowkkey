@@ -45,7 +45,7 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   await expect(page.getByText('还没有训练安排。和你的 AI 聊好之后，会出现在这里。')).toBeVisible();
   await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(5);
   await page.getByRole('link',{name:'log',exact:true}).click();
-  await expect(page.getByText('还没有训练记录。')).toBeVisible();
+  await expect(page.locator('main:visible').getByText('还没有训练记录。')).toBeVisible();
   await page.getByRole('link',{name:'body',exact:true}).click();
   await expect(page.getByText('还没有体重记录。')).toBeVisible();
   const tool = await connect(page.request,baseURL!);
@@ -72,7 +72,7 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
         for (const screen of ['next','recap','body','log']) {
           await page.getByRole('link',{name:screen,exact:true}).click();
           await expect(page.locator('main:visible')).toHaveAttribute('id','v-'+screen);
-          await expect(page.locator('main input,main textarea,main form')).toHaveCount(0);
+          await expect(page.locator('main:visible').locator('input,textarea,form')).toHaveCount(0);
           expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),`${theme} ${screen} ${width}`).toBe(true);
           await page.screenshot({animations:'disabled',path:`.artifacts/playwright/${testInfo.project.name}/${screen}-${theme}-${colorScheme}-${width}.png`});
         }

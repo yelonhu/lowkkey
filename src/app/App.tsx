@@ -1,3 +1,4 @@
+import { usePageSwipe } from './usePageSwipe.ts';
 import { animate, PageTabs, useMotion, useFactMotion, useRecordMotion } from './motion.tsx';
 import { useEffect,useLayoutEffect,useRef,useState } from 'react';
 import { screenFromHash,screens,targetFromHash,type Screen } from './navigation.ts';
@@ -20,25 +21,28 @@ export function App(){
 }
 function Showroom(){
   const chamber=useShowroom(),[screen,setScreen]=useState(screenFromHash),[settings,setSettings]=useState(location.hash==='#settings'),[target,setTarget]=useState(targetFromHash),[focus,setFocus]=useState<string|null>(null),trigger=useRef<HTMLButtonElement>(null);
-  const notes=useNotes(chamber.auth==='ready'?chamber.state?.accountId:undefined,chamber.state?.today,screen==='notes');
+  const notes=useNotes(chamber.auth==='ready'?chamber.state?.accountId:undefined,chamber.state?.today,screen==='notes'||screen==='log');
   useMotion();
   useFactMotion(chamber.state,screen);
   useRecordMotion(chamber.state,screen);
-  const positions=useRef<Partial<Record<Screen,number>>>({}),activeScreen=useRef(screen),visited=useRef(new Set<Screen>([screen]));
+  const [starting,setStarting]=useState(location.hash==='#start');
+  const product=useProduct(chamber.state?.accountId,chamber.refresh,starting);
+  const positions=useRef<Partial<Record<Screen,number>>>({}),activeScreen=useRef(screen);
+  const swipeCompleted=useRef(false);
+  const showingOnboarding=screen!=='notes'&&(starting||(!product.setup&&!chamber.state?.sessions.length&&!chamber.state?.plans.length&&!chamber.state?.weights.length));
+  const swipeViewport=usePageSwipe(screen,chamber.auth==='ready'&&!!chamber.state&&!settings&&!showingOnboarding,chamber.state?.accountId,positions,swipeCompleted);
   const pageMotion=useRef<Animation|null>(null),lastPage=useRef<Screen|null>(null);
-  visited.current.add(screen);
   useLayoutEffect(()=>{
     if(chamber.auth!=='ready'||!chamber.state)return;
     if(lastPage.current===screen)return;
     lastPage.current=screen;
     if(!target)window.scrollTo({top:positions.current[screen]??0,behavior:'instant'});
     pageMotion.current?.cancel();
-    if(screen!=='notes')pageMotion.current=animate(document.getElementById('v-'+screen),[{opacity:.65,transform:'translateY(6px)'},{opacity:1,transform:'translateY(0)'}]);
+    if(screen!=='notes'&&!swipeCompleted.current)pageMotion.current=animate(document.getElementById('v-'+screen),[{opacity:.65,transform:'translateY(6px)'},{opacity:1,transform:'translateY(0)'}]);
+    swipeCompleted.current=false;
   },[screen,chamber.auth,chamber.state,target]);
   const targetPositioned=useRef<string|null>(null);
   const awaitingFirstContent=useRef(false);
-  const [starting,setStarting]=useState(location.hash==='#start');
-  const product=useProduct(chamber.state?.accountId,chamber.refresh,starting);
   useEffect(()=>{
     if(!product.setup){awaitingFirstContent.current=false;return;}
     if(!product.setup.hasContent&&!product.setup.completedAt)awaitingFirstContent.current=true;
@@ -52,7 +56,7 @@ function Showroom(){
   if(chamber.auth==='loading')return <SessionLoading error={chamber.error} retry={chamber.refresh}/>;
   if(chamber.auth==='consent')return <ConsentGate chamber={chamber}/>;
   if(chamber.auth!=='ready'||!chamber.state)return <LoginGate chamber={chamber}/>;
-  if(!settings&&screen!=='notes'&&(starting||(!product.setup&&!chamber.state.sessions.length&&!chamber.state.plans.length&&!chamber.state.weights.length)))return <Onboarding product={product} onNotes={()=>{setStarting(false);location.hash='notes';}} onClose={()=>{setStarting(false);if(location.hash==='#start')location.hash='next';void chamber.refresh();}}/>;
+  if(!settings&&showingOnboarding)return <Onboarding product={product} onNotes={()=>{setStarting(false);location.hash='notes';}} onClose={()=>{setStarting(false);if(location.hash==='#start')location.hash='next';void chamber.refresh();}}/>;
   const facts=chamber.state,today=facts.today;
-  return <><div className="showroom-content" inert={settings}><div className="wrap brandrow"><button ref={trigger} className="brand" aria-label="lowkkey，打开设置" aria-haspopup="dialog" aria-expanded={settings} onClick={()=>setSettings(true)}>lowkkey</button></div><div className="navbar"><PageTabs screen={screen}/></div>{chamber.error&&<div className="wrap connection-notice" role="alert">{chamber.error}<button onClick={()=>void chamber.refresh()}>重试</button></div>}{screen!=='notes'&&product.setup&&!product.setup.hasContent&&!product.setup.completedAt&&<div className="wrap setup-resume"><button onClick={()=>setStarting(true)}>继续连接 AI，开始第一段对话</button></div>}{screens.filter(key=>visited.current.has(key)).map(key=><main key={facts.accountId+key} hidden={key!==screen} className={'wrap pg'+(key==='next'?' next':'')} id={'v-'+key}>{key==='next'?<PlanView facts={facts} today={today}/>:key==='recap'?<RecapView facts={facts} today={today} focus={focus} setFocus={setFocus}/>:key==='body'?<WeightView facts={facts} today={today}/>:key==='notes'&&notes?<NotesView model={notes} today={today} target={screen==='notes'?target:null} active={screen==='notes'}/>:<LogView facts={facts}/>}</main>)}</div>{settings&&<CustomerAccount chamber={chamber} onConnect={()=>{setSettings(false);setStarting(true);location.hash='start';}} onClose={()=>setSettings(false)} returnFocusTo={trigger.current}/>}</>;
+  return <><div className="showroom-content" inert={settings}><div className="wrap brandrow"><button ref={trigger} className="brand" aria-label="lowkkey，打开设置" aria-haspopup="dialog" aria-expanded={settings} onClick={()=>setSettings(true)}>lowkkey</button></div><div className="navbar"><PageTabs screen={screen}/></div>{chamber.error&&<div className="wrap connection-notice" role="alert">{chamber.error}<button onClick={()=>void chamber.refresh()}>重试</button></div>}{screen!=='notes'&&product.setup&&!product.setup.hasContent&&!product.setup.completedAt&&<div className="wrap setup-resume"><button onClick={()=>setStarting(true)}>继续连接 AI，开始第一段对话</button></div>}<div ref={swipeViewport} className="page-viewport">{screens.map(key=><main key={facts.accountId+key} hidden={key!==screen} inert={key!==screen} className={'wrap pg'+(key==='next'?' next':'')} id={'v-'+key}>{key==='next'?<PlanView facts={facts} today={today}/>:key==='recap'?<RecapView facts={facts} today={today} focus={focus} setFocus={setFocus}/>:key==='body'?<WeightView facts={facts} today={today}/>:key==='notes'&&notes?<NotesView model={notes} today={today} target={screen==='notes'?target:null} active={screen==='notes'}/>:<LogView facts={facts}/>}</main>)}</div></div>{settings&&<CustomerAccount chamber={chamber} onConnect={()=>{setSettings(false);setStarting(true);location.hash='start';}} onClose={()=>setSettings(false)} returnFocusTo={trigger.current}/>}</>;
 }
