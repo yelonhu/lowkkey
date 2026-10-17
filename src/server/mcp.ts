@@ -19,7 +19,13 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
     try { await toolSuccess(db,principal.ownerId,principal.clientId,name,url,activates); } catch { console.error('MCP_PROGRESS_FAILED'); }
     return response(value,url);
   };
-  const server = new McpServer({ name: 'lowkkey', version: PROTOCOL_VERSION }, { instructions: MCP_INSTRUCTIONS, capabilities:{tools:{}} });
+  const origin = new URL(request.url).origin;
+  const server = new McpServer({
+    name: 'lowkkey', title: 'lowkkey', version: PROTOCOL_VERSION,
+    description: 'Your training, plans and everyday notes, kept together.',
+    websiteUrl: origin,
+    icons: [{ src: `${origin}/icon-512.png`, mimeType: 'image/png', sizes: ['512x512'] }],
+  }, { instructions: MCP_INSTRUCTIONS, capabilities:{tools:{}} });
   const view = (screen: string, key: string, value: string) => `${new URL(request.url).origin}/#${screen}?${key}=${encodeURIComponent(value)}`;
   for (const tool of MCP_TOOLS) {
     if (!principal.scopes.includes(tool.scope)||(tool.scope==='notes:write'&&!principal.scopes.includes('read'))) continue;

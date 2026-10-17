@@ -47,6 +47,7 @@ describe('product onboarding and continuity',()=>{
   it('authorization and discovery never masquerade as a successful read',async()=>{
     const init=await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'test',version:'1'}});
     expect(init.result.instructions).toBe(MCP_INSTRUCTIONS);
+    expect(init.result).toMatchObject({serverInfo:{name:'lowkkey',title:'lowkkey',websiteUrl:'https://lowkkey.test',icons:[{src:'https://lowkkey.test/icon-512.png',mimeType:'image/png',sizes:['512x512']}]}});
     expect((await rpc('tools/list',{})).result.tools).toHaveLength(8);
     expect((await life.onboarding(db,owner)).clients[0].firstReadAt).toBeNull();
     const brief=await rpc('tools/call',{name:'get_brief',arguments:{}});
