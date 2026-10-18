@@ -75,7 +75,7 @@ describe('open Google authentication on isolated D1',()=>{
     const newOwner=await ownerForRequest(request('/v1/state',undefined,await login('delete@example.com')),env);expect(newOwner).not.toBe(owner);
     expect(await env.DB.prepare('SELECT id FROM users WHERE id=?').bind(owner).first()).toBeNull();
     expect((await env.DB.prepare('SELECT count(*) n FROM daily_notes WHERE owner_id=?').bind(newOwner).first<{n:number}>())?.n).toBe(0);
-  });
+  },15_000); // Three full Google sign-ins plus deletion exceed 5s on slower CI hosts.
 });
 
 describe('privacy belongs to an authenticated account',()=>{
