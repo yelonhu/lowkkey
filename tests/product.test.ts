@@ -55,6 +55,20 @@ describe('product onboarding and continuity',()=>{
     expect((await life.onboarding(db,owner)).clients[0].firstReadAt).toBeTruthy();
     expect((await life.onboarding(db,owner)).completedAt).toBeNull();
   });
+  it('keeps concurrent MCP discovery isolated by permission when metadata is shared',async()=>{
+    const scopes=[['read'],['read','write'],['read','write','notes:write'],['notes:write']];
+    const results=await Promise.all(Array.from({length:20},async(_,i)=>{
+      const granted=scopes[i%scopes.length];
+      const init=await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'concurrent-test',version:'1'}},granted);
+      expect(init.result.instructions).toBe(MCP_INSTRUCTIONS);
+      return (await rpc('tools/list',{},granted)).result.tools!.map(tool=>tool.name);
+    }));
+    for(let i=0;i<results.length;i++){
+      expect(results[i]).toHaveLength([2,8,9,0][i%4]);
+      expect(results[i].includes('write_note')).toBe(i%4===2);
+      if(i%4===0)expect(results[i]).toEqual(['get_brief','read_notes']);
+    }
+  });
   it('failed calls and profile writes do not complete first-content onboarding',async()=>{
     expect((await rpc('tools/call',{name:'log_weight',arguments:{date:'2026-10-12',lb:-5}})).result.isError).toBe(true);
     expect((await life.onboarding(db,owner)).clients[0].firstWriteAt).toBeNull();

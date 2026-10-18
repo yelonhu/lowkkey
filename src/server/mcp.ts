@@ -10,6 +10,15 @@ import { toolSuccess,event } from './lifecycle.ts';
 import { StoreError } from './account.ts';
 
 type Principal = { ownerId: string; clientId: string; scopes: string[] };
+// Schema metadata is identical for every account. Generate it once per isolate;
+// transports, handlers and permission filtering remain request-local.
+const toolDescriptors = mcpToolList();
+const registeredTools = MCP_TOOLS.map(tool => ({
+  ...tool,
+  descriptor: toolDescriptors.find(item => item.name === tool.name)!,
+  output: mcpOutput(tool.name),
+}));
+const rawInput = z.looseObject({});
 const response = (value: unknown, view_url?: string) => {
   const structuredContent = { result: value, ...(view_url ? { view_url } : {}) };
   return { content: [{ type: 'text' as const, text: JSON.stringify(structuredContent) }], structuredContent };
@@ -27,11 +36,11 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
     icons: [{ src: `${origin}/icon-512.png`, mimeType: 'image/png', sizes: ['512x512'] }],
   }, { instructions: MCP_INSTRUCTIONS, capabilities:{tools:{}} });
   const view = (screen: string, key: string, value: string) => `${new URL(request.url).origin}/#${screen}?${key}=${encodeURIComponent(value)}`;
-  for (const tool of MCP_TOOLS) {
+  for (const tool of registeredTools) {
     if (!principal.scopes.includes(tool.scope)||(tool.scope==='notes:write'&&!principal.scopes.includes('read'))) continue;
-    const descriptor = mcpToolList().find(t => t.name === tool.name)!;
+    const descriptor = tool.descriptor;
     server.registerTool(tool.name, {
-      title: tool.title, description: tool.description, inputSchema: z.looseObject({}), outputSchema: mcpOutput(tool.name),
+      title: tool.title, description: tool.description, inputSchema: rawInput, outputSchema: tool.output,
       annotations: descriptor.annotations, _meta: descriptor._meta,
     }, async (args: unknown) => {
       try {
@@ -57,7 +66,7 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
       }
     });
   }
-  server.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: mcpToolList()
+  server.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolDescriptors
     .filter(tool => principal.scopes.includes(MCP_TOOLS.find(item => item.name === tool.name)!.scope)&&(tool.name!=='write_note'||principal.scopes.includes('read')))
     .map(tool => ({ ...tool, inputSchema: tool.inputSchema as Tool['inputSchema'], outputSchema: tool.outputSchema as Tool['outputSchema'] })) }));
   const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
