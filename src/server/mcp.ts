@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { ListToolsRequestSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { MCP_INSTRUCTIONS, MCP_TOOLS, mcpToolList, mcpOutput, PROTOCOL_VERSION } from '@lowkkey/protocol';
+import { MCP_INSTRUCTIONS, MCP_PROMPTS, MCP_TOOLS, mcpToolList, mcpOutput, PROTOCOL_VERSION } from '@lowkkey/protocol';
 import type { D1Database } from '@cloudflare/workers-types';
 import * as store from './store.ts';
 import { readNotes, saveNote } from './notes.ts';
@@ -34,8 +34,15 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
     description: 'Your training, plans and everyday notes, kept together.',
     websiteUrl: origin,
     icons: [{ src: `${origin}/icon-512.png`, mimeType: 'image/png', sizes: ['512x512'] }],
-  }, { instructions: MCP_INSTRUCTIONS, capabilities:{tools:{}} });
+  }, { instructions: MCP_INSTRUCTIONS, capabilities:{tools:{},prompts:{}} });
   const view = (screen: string, key: string, value: string) => `${new URL(request.url).origin}/#${screen}?${key}=${encodeURIComponent(value)}`;
+  // Prompts are plain user messages; they carry the keeper role regardless of how the host treats instructions.
+  if (principal.scopes.includes('read')) for (const prompt of MCP_PROMPTS) {
+    const argsSchema = Object.fromEntries(prompt.arguments.map(argument => [argument.name, z.string().describe(argument.description)]));
+    server.registerPrompt(prompt.name, { title: prompt.title, description: prompt.description, argsSchema }, (args) => ({
+      messages: [{ role: 'user' as const, content: { type: 'text' as const, text: prompt.text((args ?? {}) as Record<string,string>) } }],
+    }));
+  }
   for (const tool of registeredTools) {
     if (!principal.scopes.includes(tool.scope)||(tool.scope==='notes:write'&&!principal.scopes.includes('read'))) continue;
     const descriptor = tool.descriptor;

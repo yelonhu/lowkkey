@@ -84,7 +84,15 @@ export const NotesPage = z.strictObject({notes:z.array(DailyNote),next_cursor:Lo
 export type NotesPage = z.infer<typeof NotesPage>;
 export const NotesSummary = z.strictObject({count:z.number().int().nonnegative(),latest_date:LocalDate.nullable(),updated_at:Instant.nullable()});
 
-export const Brief = z.strictObject({generated_at:Instant,notes:NotesSummary.optional(),timezone:z.string().optional(),permissions:z.array(z.enum(['read','write','notes:write'])).optional(),onboarding:z.object({completed:z.boolean(),entry:z.enum(['start','existing']).nullable(),next_step:z.string()}).optional(),session:TrainingSession.nullable().optional(),today:z.object({date:LocalDate,weekday:z.number().int()}),next:z.object({date:LocalDate,rel:z.string(),title:z.string()}).nullable(),plans:z.array(Plan),profile:Profile,theme_state:ThemeState,
+// The keeper's stateful to-do list. Computed from saved facts, never from the conversation.
+export const GuideMissing = z.enum(['training_context','plan','next_note','session','weight','week_letter','body_note']);
+export type GuideMissing = z.infer<typeof GuideMissing>;
+export const WeekStatus = z.strictObject({start:LocalDate,index:z.number().int().positive(),done:z.number().int().nonnegative(),planned:z.number().int().nonnegative()});
+export type WeekStatus = z.infer<typeof WeekStatus>;
+export const BriefGuide = z.strictObject({stage:z.enum(['empty','setup','active']),next_step:z.string(),missing:z.array(GuideMissing),week:WeekStatus});
+export type BriefGuide = z.infer<typeof BriefGuide>;
+
+export const Brief = z.strictObject({generated_at:Instant,notes:NotesSummary.optional(),timezone:z.string().optional(),permissions:z.array(z.enum(['read','write','notes:write'])).optional(),onboarding:z.object({completed:z.boolean(),entry:z.enum(['start','existing']).nullable(),next_step:z.string()}).optional(),guide:BriefGuide.optional(),session:TrainingSession.nullable().optional(),today:z.object({date:LocalDate,weekday:z.number().int()}),next:z.object({date:LocalDate,rel:z.string(),title:z.string()}).nullable(),plans:z.array(Plan),profile:Profile,theme_state:ThemeState,
   weight:z.object({latest:WeightInput.nullable(),mean7:WeightMean.nullable(),rate14:z.number().nullable(),status:z.enum(['above','within','below']).nullable()}),
   strength:z.array(z.object({ex:MainExercise,best:briefPoint.nullable(),latest:briefPoint.nullable(),first:briefPoint.nullable(),rel_bw:z.number().nullable(),assistance:z.object({date:LocalDate,kg:z.number(),reps:z.number(),self_percent:z.number().nullable()}).nullable()})),
   exercises:z.array(z.object({ex:ExerciseId,name:z.string(),last:z.object({date:LocalDate,compact:z.string()}),prev:z.object({date:LocalDate,compact:z.string()}).nullable()})),

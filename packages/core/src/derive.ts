@@ -1,4 +1,4 @@
-import { STRENGTH_EXERCISES, exerciseById, LB_PER_KG, type Brief, type Curation, type CurationInput, type Fact, type Facts, type Pick, type Plan, type PlanItem, type StrengthSeries, type TrainingSession, type TrainingSet, type Weight } from '@lowkkey/protocol';
+import { STRENGTH_EXERCISES, exerciseById, LB_PER_KG, type Brief, type BriefGuide, type Curation, type CurationInput, type Fact, type Facts, type GuideMissing, type Pick, type Plan, type PlanItem, type StrengthSeries, type TrainingSession, type TrainingSet, type Weight, type WeekStatus } from '@lowkkey/protocol';
 import { addDays, diffDays, fmt, localToday, monday, relativeDay, round, toLb, weekday } from './util.ts';
 import { bodyweightOn, scoreSet, strictReps, targetStatus, weightMean, weightRate } from './verifiers.ts';
 export const exerciseKey = (x:{ex:string;name?:string}) => x.ex==='custom'?'custom:'+x.name:x.ex;
@@ -69,6 +69,56 @@ export function getBrief(facts:Facts,generatedAt=new Date().toISOString(),count=
     sessions:all.slice().reverse().slice(0,count).map(s=>({date:s.date,title:s.title,...(s.note?{note:s.note}:{}),compact_by_ex:Object.fromEntries(groupSets(s.sets).map(g=>[exerciseKey(g[0]),compactSets(g,true)])),prs:s.prs.filter(ex=>STRENGTH_EXERCISES.includes(ex as typeof STRENGTH_EXERCISES[number]))})),week_facts:weekFacts(facts,today),
     curation:{current:currentCuration(facts,today),history:facts.curations.filter(c=>c.week<=monday(today)&&c.week>=addDays(monday(today),-21)).sort((a,b)=>b.week.localeCompare(a.week)).map(c=>({week:c.week,title:c.recap?.title??null,theme:c.theme?.id??null}))},
   };
+}
+/** Where the user is in the current Monday-based week: index since the first session, done vs planned days. */
+export function weekStatus(facts:Facts,today:string):WeekStatus {
+  const start=monday(today);
+  const zero=facts.sessions.map(s=>s.date).sort()[0];
+  const index=zero?Math.max(1,Math.floor(diffDays(start,monday(zero))/7)+1):1;
+  const done=facts.sessions.filter(s=>s.date>=start&&s.date<=today).length;
+  const planned=new Set(facts.plans.filter(p=>p.items.length).map(p=>p.weekday)).size;
+  return {start,index,done,planned};
+}
+
+/**
+ * The keeper's to-do list. Everything here is derived from saved facts and granted
+ * permissions, so an AI that only skims its instructions still receives a concrete
+ * "what this archive is missing" with every brief.
+ */
+export function briefGuide(facts:Facts,today:string,permissions:string[],setup:{entry:'start'|'existing'|null}):BriefGuide {
+  const week=weekStatus(facts,today);
+  const hasContext=!!facts.profile.training_context,hasPlan=facts.plans.some(p=>p.items.length);
+  const hasSession=facts.sessions.length>0,hasWeight=facts.weights.length>0;
+  const stage=hasSession?'active':hasContext||hasPlan||hasWeight?'setup':'empty';
+  const missing:GuideMissing[]=[];
+  if(!hasContext)missing.push('training_context');
+  if(!hasPlan)missing.push('plan');
+  if(hasPlan&&upcoming(facts,today).length&&!datedCuration(facts,'next',today))missing.push('next_note');
+  if(!hasSession)missing.push('session');
+  if(!hasWeight)missing.push('weight');
+  const letterDue=week.planned>0&&(week.done>=week.planned||[0,6].includes(weekday(today)));
+  if(hasSession&&letterDue&&!currentCuration(facts,today)?.recap?.letter?.length)missing.push('week_letter');
+  if(weightRate(facts.weights,today)!=null&&!datedCuration(facts,'body',today))missing.push('body_note');
+  const canWrite=permissions.includes('write');
+  let next_step:string;
+  if(!canWrite)next_step=permissions.includes('notes:write')
+    ?'当前只读，训练档案不能保存；可按明确要求写随手记。需要保存训练时请用户重新授权 write。'
+    :'当前只读。可以分析和建议，但不能保存；说明如何重新授权写入。';
+  else if(stage==='empty')next_step=setup.entry==='existing'
+    ?'请用户发来已有的计划或记录，澄清关键歧义后用 set_plan 或 log_session 保存；同时把了解到的背景写入 set_profile.training_context。'
+    :'用一句自然的问题了解用户想开始训练还是整理已有资料；然后一次问一个必要问题，了解目标、经验、每周时间与器械，保存 training_context，共同确定第一周计划并 set_plan，再用 curate.next 写一句下次提示。';
+  else if(stage==='setup')next_step=missing.includes('plan')
+    ?'背景已有，还没有计划：共同确定第一周可执行的安排后 set_plan，再用 curate.next 写一句下次提示。'
+    :'计划已就位。告诉用户训练完把内容发过来即可，由你整理保存；用户发来就 log_session。';
+  else {
+    const first=missing[0];
+    next_step=first==='week_letter'?'本周训练已完成或接近周末，还没有周信：用 curate.recap 写一封，引用本周真实记录选 1–2 个 picks，并指定 focus。'
+      :first==='next_note'?'为下一次训练用 curate.next 写一句具体提示。'
+      :first==='body_note'?'体重已有趋势但没有批注：用 curate.body 写一句，引用 get_brief.weight 的速度与状态。'
+      :first==='training_context'?'尚未保存训练背景：把用户明确表达的目标、时间、器械写入 set_profile.training_context。'
+      :'接续已有事实。用户发来训练就整理保存；修改旧训练前用 session_date 读取该日完整组。';
+  }
+  return {stage,next_step,missing,week};
 }
 export function mergeCuration(previous:Curation|undefined,input:CurationInput,revision:number,stamp:string):Curation {
   const out={...previous,...input,revision,updated_at:stamp};

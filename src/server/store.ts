@@ -1,6 +1,6 @@
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import { BriefInput, Curation, CurationInput, DeleteInput, Plan, PlanInput, Profile, ProfileInput, Preferences, SessionInput, TrainingSession, Weight, WeightInput, ClientPublic, PROTOCOL_VERSION, type StateResponse, type Facts, exerciseById } from '@lowkkey/protocol';
-import { addDays, getBrief, localToday, mergeCuration, themeState, weekday } from '@lowkkey/core';
+import { addDays, briefGuide, getBrief, localToday, mergeCuration, themeState, weekday } from '@lowkkey/core';
 import { notesSummary } from './notes.ts';
 import { onboarding } from './lifecycle.ts';
 import { StoreError } from './account.ts';
@@ -19,7 +19,8 @@ async function snapshot(db:D1Database,owner:string,now=new Date()) {
 export async function state(db:D1Database,owner:string,now=new Date()):Promise<StateResponse>{const {facts,today,timezone}=await snapshot(db,owner,now);return {...facts,accountId:owner,protocol:PROTOCOL_VERSION,today,timezone,theme_state:themeState(facts,today)};}
 export async function brief(db:D1Database,owner:string,args:unknown={},now=new Date(),permissions:('read'|'write'|'notes:write')[]=['read','write']){
   const {sessions,session_date}=BriefInput.parse(args),facts=await state(db,owner,now),setup=await onboarding(db,owner);
-  return {...getBrief(facts,now.toISOString(),sessions,facts.timezone),timezone:facts.timezone,permissions,notes:await notesSummary(db,owner),
+  const guide=briefGuide(facts,facts.today,permissions,setup);
+  return {...getBrief(facts,now.toISOString(),sessions,facts.timezone),timezone:facts.timezone,permissions,notes:await notesSummary(db,owner),guide,
     onboarding:{completed:!!setup.completedAt||setup.hasContent,entry:setup.entry,next_step:!permissions.includes('write')?(permissions.includes('notes:write')?'训练档案只读；可按明确要求写随手记。保存训练需要另外授权 write。':'当前只读。可以分析已有内容；需要保存时请用户重新授权写入。'):setup.hasContent?'读取 training_context 并接续已有事实，不重复初始化。让安排适应用户表达的生活限制；修改旧训练前用 session_date 读取该日全部组。':setup.entry==='existing'?'请用户发送已有计划或记录，澄清关键歧义后保存。':'接续用户已表达的意图：有资料就整理；希望开始则一次问一个必要问题，了解目标、经验、时间与器械，共同确定可执行的第一步后保存。'},
     ...(session_date?{session:facts.sessions.find(s=>s.date===session_date)??null}:{})};
 }
