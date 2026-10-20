@@ -77,6 +77,7 @@ MCP 地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。配置
 
 - 自动化：领域、账户/API、Chromium/WebKit 四页与深链接、OAuth 七工具、真实 Better Auth 会话 → OAuth → MCP → 同账户网页 → 撤销。账户集成测试只截获本地验证码投递；OAuth/MCP 在实际 Workers 运行时执行。
 - 自动化不能替代：真实 Google 登录、Claude/ChatGPT 官方客户端、iPhone Safari 真机回跳和跨应用刷新。
+- 2026-10-19 部署 `e711dcd`（分支 `claude/state-pod`）：管理者手册与 `guide`、MCP prompts、状态舱网页。本地 check / test / build / e2e（Chromium + WebKit）/ oauth 全部通过；真实 Claude、ChatGPT 客户端对新指令与 prompts 的表现仍待本人验收。
 - 已验收：2026-10-08 beta 首次部署完成，真实 Google 登录、受邀账户和四页空状态通过；用户确认 Claude 连接成功。Claude 的七工具真实数据闭环、ChatGPT 连接和手机 Safari 真机检查仍分别待验收，连接成功不等于全部工具已实测。
 - 首次登录必须为空。只将用户提供的真实记录写入其内测账户；合成演练数据保留在临时测试库。
 - 手机检查字体、留白、长计划、长原话、图表、320px 布局及设置里的最近同步时间。AI 返回的链接应打开对应训练日／计划日／体重日期。
