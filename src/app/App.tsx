@@ -12,10 +12,12 @@ import { LogView } from './LogView.tsx';
 import { CustomerAccount,LoginGate } from './CustomerAccount.tsx';
 import { Onboarding,useProduct } from './Onboarding.tsx';
 import { ConsentGate,PrivacyPage } from './Privacy.tsx';
+import { ServicePage } from './ServicePages.tsx';
 import { applyPageTheme } from './viewport.ts';
 import { SessionLoading } from './Welcome.tsx';
 export function App(){
   if(location.pathname==='/privacy')return <PrivacyPage/>;
+  if(location.pathname==='/support'||location.pathname==='/terms')return <ServicePage kind={location.pathname==='/support'?'support':'terms'}/>;
   if(import.meta.env.DEV&&location.pathname==='/__preview/login')return <LoginGate preview/>;
   return <Showroom/>;
 }

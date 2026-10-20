@@ -6,6 +6,7 @@ const commands = {
   dev: [['scripts/serve.mjs']],
   'preview:rehearsal': [['scripts/rehearsal.mjs']],
   'preview:empty': [['scripts/empty-preview.mjs']],
+  'plugin:check': [['scripts/plugin-package.mjs', '--check-draft'], ['--test', 'tests/plugin-package.test.mjs']],
   check: [['node_modules/typescript/bin/tsc', '--noEmit'], ['node_modules/eslint/bin/eslint.js', '.']],
   'protocol:emit': [['packages/protocol/scripts/emit.ts']],
   test: [['node_modules/vitest/vitest.mjs', 'run']],

@@ -301,15 +301,14 @@ button:disabled{cursor:default}
 .ai-options{margin-top:32px;border-top:1px solid var(--line)}
 .ai-options button{width:100%;min-height:80px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--line);font:500 17px var(--font)}
 .ai-options button:disabled{opacity:.45}.ai-mark{display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none}.ai-mark img{display:block;width:32px;height:32px;object-fit:contain}
+.ai-options button{text-align:left;padding:16px 0}
+.notes-entry{margin-top:24px;padding-top:14px;border-top:1px solid var(--line)}
+.notes-entry .journey-quiet{color:var(--ink);font-size:15px}
+.notes-entry .journey-hint{margin-top:0}
+.copy-fallback code{white-space:pre-wrap}
 .connection-host{display:flex;align-items:center;gap:10px;margin-bottom:12px;font:500 14px/1.5 var(--font);color:var(--ink2)}
 .connection-host .ai-mark,.connection-host .ai-mark img{width:24px;height:24px}
 .connection-host .ai-mark--chatgpt img{width:33px;height:33px}
-.connection-guide{margin-top:28px;border:1px solid var(--line);border-radius:12px;background:var(--surf);padding:0 18px}
-.connection-guide li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:14px;padding:20px 0}
-.connection-guide li+li{border-top:1px solid var(--line)}
-.guide-number{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid var(--line);border-radius:50%;font:500 12px/1 var(--font);color:var(--muted);margin-top:1px}
-.connection-guide h2{font:500 15px/1.6 var(--font);color:var(--ink)}
-.connection-guide p{margin-top:6px;font-size:12.5px;line-height:1.85;color:var(--muted)}
 .connection-footnote{text-align:center}
 
 .connection-receipt{font-size:12px;color:var(--muted);padding-top:18px;margin-top:24px;border-top:1px solid var(--line)}
@@ -422,3 +421,5 @@ textarea,input,[contenteditable="true"],.note-conflict pre,.connection-address,.
 .page-viewport:has(textarea:focus),.page-viewport:has(input:focus){touch-action:auto}
 
 .tab-indicator{transform-origin:left center}
+
+.connection-copy{display:block;margin:0 auto}

@@ -38,9 +38,9 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
     await page.screenshot({animations:'disabled',path:`.artifacts/playwright/${testInfo.project.name}/onboarding-${width}.png`});
   }
   await page.getByRole('button',{name:'ChatGPT',exact:true}).click();
-  await expect(page.getByRole('button',{name:'复制地址并打开 ChatGPT'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'复制地址并打开网页版'})).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button',{name:'复制地址并打开 ChatGPT'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'复制地址并打开网页版'})).toBeVisible();
   await page.getByRole('button',{name:'稍后连接',exact:true}).click();
   await expect(page.getByText('还没有训练安排。和你的 AI 聊好之后，会出现在这里。')).toBeVisible();
   await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(5);
@@ -53,7 +53,7 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await expect(page).toHaveURL(/#next\?title=/);
   await page.goto('/#start');
-  await expect(page.getByRole('heading',{name:'接下来，和你的 AI 聊聊。'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'连接 ChatGPT'})).toBeVisible();
   await page.getByRole('button',{name:'返回上一步'}).click();
   await expect(page.getByRole('button',{name:'Claude',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'稍后连接',exact:true}).click();
@@ -238,14 +238,14 @@ test('connection guidance recovers clipboard failure and hands off only after a 
     await page.screenshot({animations:'disabled',path:`.artifacts/playwright/${testInfo.project.name}/guide-${width}.png`});
   }
   await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>Promise.reject(new Error('denied'))}});window.open=()=>null;});
-  await page.getByRole('button',{name:'复制地址并打开 Claude',exact:true}).click();
-  await expect(page.getByRole('status')).toContainText('复制没有完成');
+  await page.getByRole('button',{name:'复制地址并打开网页版',exact:true}).click();
+  await expect(page.getByRole('status')).toContainText('未能复制');
   await expect(page.locator('.copy-fallback code')).toBeVisible();
   await expect(page.getByRole('heading',{name:'接下来，和你的 AI 聊聊。'})).toHaveCount(0);
   setup.clients=[{id:'actual-client',name:'Actual Claude client',scopes:['read','write'],status:'active',createdAt:new Date().toISOString(),lastUsedAt:null,firstReadAt:null,firstWriteAt:null}];
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await expect(page.getByRole('heading',{name:'接下来，和你的 AI 聊聊。'})).toBeVisible();
-  await expect(page.getByText('已授权：Actual Claude client')).toBeVisible();
+  await expect(page.getByTestId('connection-receipt')).toBeVisible();
   await page.getByRole('textbox',{name:'你的第一句话'}).fill('我有一些旧记录，帮我接着整理。');
   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>Promise.resolve()}}));
   await page.getByRole('button',{name:'复制开场白并打开 Claude'}).click();
@@ -257,6 +257,57 @@ test('connection guidance recovers clipboard failure and hands off only after a 
   await page.reload();await expect(page.getByRole('heading',{name:'接下来，和你的 AI 聊聊。'})).toBeVisible();
 });
 
+
+test('ChatGPT mobile guidance separates authorization, installation and first read',async({page},testInfo)=>{
+  await page.route('https://fonts.googleapis.com/**',r=>r.abort());await page.route('https://fonts.gstatic.com/**',r=>r.abort());
+  const grant={id:'claude',name:'Claude',scopes:['read'],status:'active',createdAt:new Date().toISOString(),lastUsedAt:null,firstReadAt:new Date().toISOString() as string|null,firstWriteAt:null};
+  let setup={ai:null as string|null,entry:null,skippedAt:null,completedAt:null,firstViewUrl:null,hasContent:false,step:'choose',connectionStartedAt:null as string|null,clients:[grant]};
+  await page.route('**/v1/onboarding',r=>{if(r.request().method()==='POST')setup={...setup,...r.request().postDataJSON()};return r.fulfill({json:setup});});
+  await page.goto('/');await page.getByRole('button',{name:'打开我的展厅',exact:true}).click();await page.goto('/#start');
+  const options=page.locator('.ai-options button');await expect(options).toHaveCount(2);
+  const sizes=await options.evaluateAll(items=>items.map(el=>el.getBoundingClientRect().height));expect(sizes[0]).toBe(sizes[1]);
+  await expect(page.getByText('首次连接需在网页版完成，建议使用电脑。')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'先随手记',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'ChatGPT',exact:true}).click();
+  await expect(page.getByTestId('connection-receipt')).toHaveCount(0);
+  for(const width of [320,390,1280]){
+    await page.setViewportSize({width,height:844});
+    await expect(page.locator('.journey-copy')).toHaveText('请打开网页版连接。');
+    await expect(page.locator('.journey-help')).not.toHaveAttribute('open','');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({animations:'disabled',path:`.artifacts/playwright/${testInfo.project.name}/chatgpt-${width}.png`});
+  }
+  await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>Promise.reject(new Error('denied'))}});window.open=()=>null;});
+  await page.getByRole('button',{name:'复制地址并打开网页版',exact:true}).click();
+  await expect(page.locator('.copy-fallback code')).toHaveText(new URL('/mcp',page.url()).href);
+  await expect(page.getByRole('link',{name:'打开 ChatGPT 网页版 ↗',exact:true})).toBeVisible();
+  expect(await page.locator('.copy-fallback code').evaluate(el=>getComputedStyle(el).userSelect)).toBe('text');
+  await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:(text:string)=>{document.body.dataset.copied=text;return Promise.resolve();}}});window.open=()=>{throw new Error('Copy must not open a tab');};});
+  await page.getByRole('button',{name:'仅复制地址',exact:true}).click();
+  expect(await page.locator('body').getAttribute('data-copied')).toBe(new URL('/mcp',page.url()).href);
+  await expect(page.locator('.copy-fallback')).toHaveCount(0);
+  await page.evaluate(()=>{window.open=()=>({opener:null,location:{replace:(url:string)=>{document.body.dataset.opened=url;}},close:()=>{}} as unknown as Window);});
+  await page.getByRole('button',{name:'复制地址并打开网页版',exact:true}).click();
+  await expect(page.locator('body')).toHaveAttribute('data-opened','https://chatgpt.com/plugins');
+  await expect(page.getByTestId('connection-receipt')).toHaveCount(0);
+  await expect(page.getByRole('status')).toHaveText('已复制');
+  await expect(page.locator('.journey-status')).toBeEmpty({timeout:4000});
+  setup.clients.push({...grant,id:'gpt',name:'ChatGPT',firstReadAt:null});
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(page.getByRole('heading',{name:'连接 ChatGPT'})).toBeVisible();
+  await expect(page.getByTestId('connection-receipt')).toContainText('当前只读');
+  await page.getByRole('button',{name:'继续去聊天',exact:true}).click();
+  await expect(page.getByRole('textbox',{name:'你的第一句话'})).toHaveValue('请读取我的 lowkkey 训练简报。');
+  await page.reload();await expect(page.getByRole('heading',{name:'接下来，和你的 AI 聊聊。'})).toBeVisible();
+  setup.clients[1].firstReadAt=new Date().toISOString();
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(page.getByTestId('connection-receipt')).toContainText('已连接');
+  setup.clients[1].status='revoked';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(page.getByTestId('connection-receipt')).toHaveCount(0);
+  await expect(page.getByRole('heading',{name:'连接 ChatGPT'})).toBeVisible();
+  await page.getByRole('button',{name:'先随手记',exact:true}).click();
+  await expect(page).toHaveURL(/#notes$/);
+});
 
 test('initial session check stays neutral, recovers network failure, and preview cannot authenticate',async({page})=>{
   await page.route('https://fonts.googleapis.com/**',route=>route.abort());
@@ -282,4 +333,15 @@ test('initial session check stays neutral, recovers network failure, and preview
   await page.getByRole('button',{name:'使用 Google 继续'}).click();
   await expect(page.getByRole('alert')).toContainText('不会发起 Google 登录或创建账户');
   expect(privateRequests).toBe(0);
+});
+
+
+test('support and draft terms are public and readable without a session',async({page})=>{
+  await page.route('https://fonts.googleapis.com/**',r=>r.abort());await page.route('https://fonts.gstatic.com/**',r=>r.abort());
+  for(const path of ['/support','/terms']){
+    await page.goto(path);await expect(page.locator('.privacy-document')).toBeVisible();
+    await expect(page.getByRole('link',{name:'yelon.hu@gmail.com',exact:true})).toHaveAttribute('href','mailto:yelon.hu@gmail.com');
+    for(const width of [320,390,1280]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+    if(path==='/terms')await expect(page.getByText('服务条款 · 草稿，尚未生效')).toBeVisible();
+  }
 });
