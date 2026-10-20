@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rehearsal",
+      "runtimeExecutable": "./scripts/run",
+      "runtimeArgs": [
+        "preview:rehearsal"
+      ],
+      "port": 5179
+    },
+    {
+      "name": "dev",
+      "runtimeExecutable": "./scripts/run",
+      "runtimeArgs": [
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "empty",
+      "runtimeExecutable": "./scripts/run",
+      "runtimeArgs": [
+        "preview:empty"
+      ],
+      "port": 5176
+    }
+  ]
+}

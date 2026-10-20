@@ -53,5 +53,6 @@ test('quiet motion, reading positions, grouped grants and reduced motion',async(
   if(cdp){const done=new Promise<void>(resolve=>cdp.once('Tracing.tracingComplete',()=>resolve()));await cdp.send('Tracing.end');await done;await cdp.detach();}
   await mkdir('.artifacts/motion',{recursive:true});
   await writeFile(`.artifacts/motion/${info.project.name}.json`,JSON.stringify({frames,events},null,2));
-  await expect.poll(()=>page.evaluate(()=>document.getAnimations().filter(a=>a.playState==='running').length)).toBe(0);
+  // At rest only the brand's infinite heartbeat may run; every finite motion has settled.
+  await expect.poll(()=>page.evaluate(()=>document.getAnimations().filter(a=>a.playState==='running'&&a.effect?.getTiming().iterations!==Infinity).length)).toBe(0);
 });

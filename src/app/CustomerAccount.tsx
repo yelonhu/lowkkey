@@ -3,7 +3,7 @@ import { animate } from './motion.tsx';
 import { clearPendingNotes,downloadPendingNotes,hasPendingNotes } from './notes-model.ts';
 import { PRIVACY_VERSION } from '@lowkkey/protocol';
 import { Welcome } from './Welcome.tsx';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { ClientPublic } from '@lowkkey/protocol';
 import type { useShowroom } from './useShowroom.ts';
 import {call,errorLabel,returnPath,type AuthConfig,type Account} from './customer-api.ts';
@@ -36,13 +36,24 @@ export function CustomerAccount({ chamber,onClose,returnFocusTo,onConnect,accoun
   const [zone,setZone]=useState(''),[deleting,setDeleting]=useState(false),[confirmation,setConfirmation]=useState('');
   const panel=useRef<HTMLDivElement>(null),closing=useRef(false);
   const dialog = useRef<HTMLElement>(null), owner = accountId??chamber.state!.accountId;
-  useLayoutEffect(()=>{animate(panel.current,[{opacity:0},{opacity:1}],280);animate(dialog.current,[{opacity:0,transform:'translateY(8px) scale(.985)'},{opacity:1,transform:'none'}],280);},[]);
+  useLayoutEffect(()=>{animate(panel.current,[{opacity:0},{opacity:1}],280);animate(dialog.current,[{opacity:0,transform:'translateY(24px) scale(.985)'},{opacity:1,transform:'none'}],320);},[]);
   async function close(after=onClose){
     if(closing.current)return;closing.current=true;
-    const overlay=animate(panel.current,[{opacity:getComputedStyle(panel.current!).opacity},{opacity:0}],180);
-    const drawer=animate(dialog.current,[{transform:getComputedStyle(dialog.current!).transform,opacity:getComputedStyle(dialog.current!).opacity},{transform:'translateY(6px) scale(.985)',opacity:0}],180);
+    const overlay=animate(panel.current,[{opacity:getComputedStyle(panel.current!).opacity},{opacity:0}],200);
+    const drawer=animate(dialog.current,[{transform:getComputedStyle(dialog.current!).transform,opacity:getComputedStyle(dialog.current!).opacity},{transform:'translateY(28px) scale(.985)',opacity:0}],200);
     await Promise.all([overlay?.finished.catch(()=>{}),drawer?.finished.catch(()=>{})]);after();
   }
+  // On a phone the sheet follows a downward drag on its heading and closes past 80px.
+  const drag=useRef<{y:number;id:number}|null>(null);
+  const dragStart=(event:ReactPointerEvent<HTMLElement>)=>{if(event.pointerType!=='touch'||busy)return;drag.current={y:event.clientY,id:event.pointerId};try{event.currentTarget.setPointerCapture(event.pointerId);}catch{/* Synthetic pointers cannot be captured; the drag still follows pointer ids. */}};
+  const dragMove=(event:ReactPointerEvent<HTMLElement>)=>{if(!drag.current||event.pointerId!==drag.current.id||!dialog.current)return;dialog.current.style.transform=`translateY(${Math.max(0,event.clientY-drag.current.y)}px)`;};
+  const dragEnd=(event:ReactPointerEvent<HTMLElement>)=>{
+    if(!drag.current||event.pointerId!==drag.current.id)return;
+    const dy=event.clientY-drag.current.y;drag.current=null;
+    if(dy>80){void close();return;}
+    const settle=animate(dialog.current,[{transform:`translateY(${Math.max(0,dy)}px)`},{transform:'translateY(0)'}],200);
+    if(settle)settle.onfinish=()=>{dialog.current?.style.removeProperty('transform');};else dialog.current?.style.removeProperty('transform');
+  };
   useEffect(() => {
     if(new URLSearchParams(location.search).has('authError'))setMessage(errorLabel(new URLSearchParams(location.search).get('error')??'REQUEST_FAILED'));
     void Promise.all([call('/v1/account').then(value=>{setAccount(value);setZone(value.timezone);}), call('/api/auth/config').then(setConfig), call('/v1/clients').then(setClients)]).catch(() => setMessage('暂时无法读取账户。'));
@@ -67,7 +78,7 @@ export function CustomerAccount({ chamber,onClose,returnFocusTo,onConnect,accoun
   }
   async function reauthenticate(){if(hasPendingNotes(owner))throw new Error('notes_pending');await chamber.logout();location.assign('/?returnTo='+encodeURIComponent('/#settings')+'#Login');}
   return <div ref={panel} className="account-panel"><section ref={dialog} className="account-drawer" role="dialog" aria-modal="true" aria-label="设置">
-    <header className="settings-heading"><h2>设置</h2><button className="close-account" onClick={()=>void close()}>完成</button></header>
+    <header className="settings-heading" onPointerDown={dragStart} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={dragEnd}><h2>设置</h2><button className="close-account" onClick={()=>void close()}>完成</button></header>
     <div className="settings-content">
     {(config?.aiConnection || clients.length > 0) && <section className="settings-section"><h3>AI 连接</h3>
       <Connections clients={clients} busy={busy} onRevoke={selected=>void run(async()=>{

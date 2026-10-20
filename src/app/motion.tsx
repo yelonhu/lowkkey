@@ -1,6 +1,6 @@
 import type { StateResponse } from '@lowkkey/protocol';
 import { strengthSeries } from '@lowkkey/core';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { screens, type Screen } from './navigation.ts';
 
 export const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -88,4 +88,88 @@ export function useRecordMotion(facts:StateResponse|null,screen:Screen){
       if(node){animate(node,[{backgroundColor:'transparent'},{backgroundColor:getComputedStyle(node).getPropertyValue('--wash')},{backgroundColor:'transparent'}],800);state.pending.delete(ex);}
     }
   },[facts,screen]);
+}
+
+// First arrival on a page: its blocks rise in sequence. Later visits keep the quiet fade.
+export function useArrivalMotion(ready:boolean,screen:Screen,owner:string|undefined,skip:RefObject<boolean>){
+  const seen=useRef(new Set<string>());
+  useLayoutEffect(()=>{
+    if(!ready||!owner)return;
+    const key=owner+':'+screen;
+    if(seen.current.has(key))return;
+    seen.current.add(key);
+    if(skip.current||reducedMotion())return;
+    const page=document.getElementById('v-'+screen);
+    if(!page)return;
+    const blocks=[...page.children].filter((el):el is HTMLElement=>el instanceof HTMLElement&&!el.hidden).slice(0,7);
+    blocks.forEach((el,i)=>el.animate([{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'translateY(0)'}],{duration:380,delay:i*48,easing:ease,fill:'backwards'}));
+  },[ready,screen,owner,skip]);
+}
+
+// Pull past the top to sync. Touch events keep firing through native overscroll, so the
+// mark follows the finger; release beyond the threshold refreshes, then settles.
+export function usePullRefresh(enabled:boolean,refresh:()=>Promise<void>){
+  useEffect(()=>{
+    if(!enabled)return;
+    const indicator=document.getElementById('pull');
+    if(!indicator)return;
+    const threshold=72;
+    let startY=0,startX=0,active=false,locked=false,progress=0,busy=false,timer=0;
+    const set=(value:number)=>{progress=value;indicator.style.setProperty('--p',String(Math.max(0,Math.min(1,value))));};
+    const start=(event:TouchEvent)=>{
+      if(busy||event.touches.length!==1||scrollY>0||reducedMotion())return;
+      if(document.activeElement?.matches('textarea,input'))return;
+      const target=event.target instanceof Element?event.target:null;
+      if(target?.closest('textarea,input,.chartbox,.account-panel,.journey'))return;
+      startY=event.touches[0].clientY;startX=event.touches[0].clientX;active=true;locked=false;
+    };
+    const move=(event:TouchEvent)=>{
+      if(!active)return;
+      const dy=event.touches[0].clientY-startY,dx=event.touches[0].clientX-startX;
+      if(!locked){
+        if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){active=false;return;}
+        if(dy<=12)return;
+        locked=true;indicator.dataset.live='';
+      }
+      if(scrollY>0||dy<0){set(0);return;}
+      set((dy-12)/threshold);
+    };
+    const end=()=>{
+      if(!active)return;
+      active=false;delete indicator.dataset.live;
+      if(progress<1||busy){set(0);return;}
+      busy=true;indicator.dataset.state='syncing';
+      void refresh().finally(()=>{
+        indicator.dataset.state='done';
+        timer=window.setTimeout(()=>{delete indicator.dataset.state;set(0);busy=false;},720);
+      });
+    };
+    const options={passive:true} as const;
+    window.addEventListener('touchstart',start,options);window.addEventListener('touchmove',move,options);
+    window.addEventListener('touchend',end,options);window.addEventListener('touchcancel',end,options);
+    return()=>{
+      clearTimeout(timer);delete indicator.dataset.state;delete indicator.dataset.live;set(0);
+      window.removeEventListener('touchstart',start);window.removeEventListener('touchmove',move);
+      window.removeEventListener('touchend',end);window.removeEventListener('touchcancel',end);
+    };
+  },[enabled,refresh]);
+}
+
+// A hero number settles into place on arrival instead of appearing fully formed.
+export function useSettle(value:number,digits=1,duration=560){
+  const [mounted]=useState(()=>performance.now());
+  const [shown,setShown]=useState(value);
+  useEffect(()=>{
+    if(performance.now()-mounted>1200||reducedMotion()){setShown(value);return;}
+    const from=value-Math.max(.6,Math.abs(value)*.004),started=performance.now();
+    let frame=0;
+    const tick=(now:number)=>{
+      const t=Math.min(1,(now-started)/duration),eased=1-(1-t)**3;
+      setShown(from+(value-from)*eased);
+      if(t<1)frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return()=>cancelAnimationFrame(frame);
+  },[value,mounted,duration]);
+  return Math.round(shown*10**digits)/10**digits;
 }

@@ -131,11 +131,12 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   await expect(page.getByRole('button',{name:'lowkkey，打开设置',exact:true})).toBeFocused();
   await page.getByRole('button',{name:'lowkkey，打开设置',exact:true}).click();
   await expect(page.locator('.connection-group').filter({hasText:'Showroom E2E'})).toBeVisible();
+  // On phones the settings are a sheet rising from the bottom edge; it never covers the top safe margin.
   for(const [width,height] of [[390,844],[320,568]]){
     await page.setViewportSize({width,height});
-    const card=await page.getByRole('dialog').boundingBox();
-    expect(card!.y).toBeGreaterThanOrEqual(40);
-    expect(card!.y+card!.height).toBeLessThanOrEqual(height-40);
+    const edges=async()=>{const card=await page.getByRole('dialog').boundingBox();return card?[Math.round(card.y),Math.round(card.y+card.height)]:[0,Infinity];};
+    await expect.poll(async()=>(await edges())[1]).toBeLessThanOrEqual(height);
+    expect((await edges())[0]).toBeGreaterThanOrEqual(40);
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({animations:'disabled',path:`.artifacts/playwright/${testInfo.project.name}/settings-${width}.png`});
   }
@@ -297,7 +298,7 @@ test('ChatGPT mobile guidance separates authorization, installation and first re
   await expect(page.getByRole('heading',{name:'连接 ChatGPT'})).toBeVisible();
   await expect(page.getByTestId('connection-receipt')).toContainText('当前只读');
   await page.getByRole('button',{name:'继续去聊天',exact:true}).click();
-  await expect(page.getByRole('textbox',{name:'你的第一句话'})).toHaveValue('请读取我的 lowkkey 训练简报。');
+  await expect(page.getByRole('textbox',{name:'你的第一句话'})).toHaveValue(/^请读取我的 lowkkey 训练简报，然后以我的档案管理者身份带我开始/);
   await page.reload();await expect(page.getByRole('heading',{name:'接下来，和你的 AI 聊聊。'})).toBeVisible();
   setup.clients[1].firstReadAt=new Date().toISOString();
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));

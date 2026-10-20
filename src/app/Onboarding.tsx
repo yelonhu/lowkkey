@@ -20,7 +20,9 @@ export const aiHosts={
 function matchesAI(client:Setup['clients'][number],ai:Setup['ai']){
   return ai==='chatgpt'?/\b(chatgpt|openai)\b/i.test(client.name):ai==='claude'?/\b(claude|anthropic)\b/i.test(client.name):false;
 }
-export const starter='请先看看我的 lowkkey，带我开始。训练安排也请考虑我的日常生活。';
+// The first message carries the keeper role itself, so it reaches the AI even when a host skims server instructions.
+export const starter='请你以我的 lowkkey 档案管理者身份工作：先调用 get_brief，读里面的 guide，然后带我开始。我不会自己填表，所有内容由你用工具写入；一次只问我一个必要的问题，确定一步就保存一步。训练安排也请考虑我的日常生活。';
+export const gptStarter='请读取我的 lowkkey 训练简报，然后以我的档案管理者身份带我开始：按简报里的 guide，一次只问我一个必要的问题，确定一步就保存一步。我不会自己填表，所有内容由你写入。';
 export function useProduct(owner:string|undefined,onRefresh:()=>Promise<void>,waiting:boolean){
   const [setup,setSetup]=useState<Setup|null>(null),[loadedOwner,setLoadedOwner]=useState<string>(),[error,setError]=useState(''),[timedOut,setTimedOut]=useState(false),generation=useRef(0);
   const refresh=useCallback(async()=>{
@@ -67,7 +69,7 @@ export function Onboarding({product,onClose,onNotes}:{product:ReturnType<typeof 
   const active=(setup?.clients??[]).filter(c=>c.status==='active'&&matchesAI(c,setup?.ai??null)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   const current=active[0],recent=current&&setup?.connectionStartedAt&&current.createdAt>=setup.connectionStartedAt?current:undefined;
   const readOnly=!!current&&!current.scopes.includes('write'),isGPT=setup?.ai==='chatgpt';
-  useEffect(()=>{const heading=document.querySelector<HTMLElement>('.journey h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}window.scrollTo({top:0});setMessage('');setFallback(null);setOpenLink(null);setPrompt(setup?.ai==='chatgpt'?'请读取我的 lowkkey 训练简报。':starter);if(copyTimer.current)clearTimeout(copyTimer.current);},[setup?.step,setup?.ai]);
+  useEffect(()=>{const heading=document.querySelector<HTMLElement>('.journey h1');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}window.scrollTo({top:0});setMessage('');setFallback(null);setOpenLink(null);setPrompt(setup?.ai==='chatgpt'?gptStarter:starter);if(copyTimer.current)clearTimeout(copyTimer.current);},[setup?.step,setup?.ai]);
   useEffect(()=>()=>{if(copyTimer.current)clearTimeout(copyTimer.current);},[]);
   useEffect(()=>{if(recent&&setup?.ai==='claude'&&setup.step==='guide')void update({step:'chat'}).catch(()=>{});},[recent?.id,setup?.step,setup?.ai]);
   async function run(task:()=>Promise<unknown>){if(busy)return;setBusy(true);setMessage('');try{await task();}catch{setMessage('暂时未能保存，请重试。');}finally{setBusy(false);}}
@@ -90,12 +92,12 @@ export function Onboarding({product,onClose,onNotes}:{product:ReturnType<typeof 
   const receipt=current&&<p className="connection-receipt" data-testid="connection-receipt">{current.firstReadAt?'已连接':'已授权'} · {current.name}{readOnly&&' · 当前只读'}</p>;
   return <Welcome action={<button className="journey-quiet" disabled={busy} onClick={exit}>稍后连接</button>} back={step==='choose'?undefined:()=>void run(()=>update({step:'choose'}))}>
     {step==='choose'?<>
-      <p className="meta">让对话接上你的档案</p><h1>你习惯和谁聊？</h1><p className="journey-copy">连接一次，以后就在那里聊训练。<br/>整理好的内容，会留在这里。</p>
+      <p className="meta">让对话接上你的档案</p><h1>你习惯和谁聊？</h1><p className="journey-copy">连接一次，以后就在那里聊训练。<br/>你不用填任何表：AI 负责写，lowkkey 负责陪你看。</p>
       <div className="ai-options">{(['chatgpt','claude'] as const).map(ai=><button key={ai} aria-label={aiHosts[ai].name} disabled={busy} onClick={()=>void run(()=>update({ai,step:'guide',skipped:false}))}><ProviderMark ai={ai}/><span>{aiHosts[ai].name}</span></button>)}</div>
       <p className="journey-hint">之后也可以连接另一个 AI，接着同一份档案聊。</p>
     </>:chat?<>
       <p className="meta">{current.firstReadAt?'已连接':'已授权'}</p><h1>接下来，和你的 AI 聊聊。</h1>
-      <p className="journey-copy">{isGPT?'在 ChatGPT 中安装 lowkkey，即可开始。':'在对话的连接器菜单中启用 lowkkey。'}</p>
+      <p className="journey-copy">{isGPT?'在 ChatGPT 中安装 lowkkey，即可开始。':'在对话的连接器菜单中启用 lowkkey。'}<br/>发出下面这句话，它会以你档案管理者的身份带你开始。</p>
       <label className="starter-label" htmlFor="starter">你的第一句话</label><textarea id="starter" className="starter-input" value={prompt} onChange={e=>setPrompt(e.target.value)} rows={4} maxLength={2000}/>
       <button className="journey-primary" disabled={busy||!prompt.trim()} onClick={()=>void copy(prompt,host.chat)}>复制开场白并打开 {host.name}</button>{receipt}
       <button className="journey-quiet" disabled={busy} onClick={()=>void product.refresh()}>重新检查连接</button>

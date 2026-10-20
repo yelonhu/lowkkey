@@ -39,7 +39,10 @@ a,summary,.chartbox,.chartbox svg{-webkit-tap-highlight-color:transparent}
 /* ── 头部：品牌与主题点会滚走，导航吸顶 ── */
 .brandrow{display:flex;align-items:center;justify-content:space-between;padding-top:max(18px,env(safe-area-inset-top));height:calc(48px + max(18px,env(safe-area-inset-top)) - 18px)}
 .brand{font:600 15px/1 var(--font);letter-spacing:-.01em}
-.brand::after{content:".";font:inherit;letter-spacing:0;color:var(--acc-ink)}
+/* 品牌后的句点是这个舱的心跳：平时缓慢呼吸，同步时加快。 */
+.brand::after{content:".";font:inherit;letter-spacing:0;color:var(--acc-ink);display:inline-block;animation:breathe 3.8s ease-in-out infinite}
+html[data-syncing] .brand::after{animation-duration:.9s}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
 .navbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border-bottom:1px solid var(--line)}
 body::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top,0px);z-index:21;pointer-events:none;background:var(--bg)}
 .tabs{display:flex;gap:24px}
@@ -54,11 +57,12 @@ body::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area
 .sh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
 .sh h2{font:600 13px/1 var(--font);color:var(--ink);letter-spacing:.01em}
 .sh span{font-size:12px;color:var(--muted)}
-.cl{position:relative;padding:11px 14px 11px 16px;border-radius:10px;background:var(--wash-bg);font:400 15px/1.85 var(--font);color:var(--ink2)}
-.cl::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--g0),var(--g1),var(--g2))}
-.cl.sm{font-size:13.5px;line-height:1.8;padding:9px 12px 9px 14px}
-.cl.sm::before{top:9px;bottom:9px}
-.card{background:var(--surf);border:1px solid var(--line);border-radius:var(--r-card)}
+/* AI 的声音：一枚安静的墨点在每段前面，页面上只有这一个声音。 */
+.cl{position:relative;padding:11px 14px 11px 26px;border-radius:12px;background:var(--wash-bg);font:400 15px/1.85 var(--font);color:var(--ink2)}
+.cl::before{content:"";position:absolute;left:12px;top:calc(11px + .925em - 2.5px);width:5px;height:5px;border-radius:50%;background:linear-gradient(135deg,var(--g0),var(--g2))}
+.cl.sm{font-size:13.5px;line-height:1.8;padding:9px 12px 9px 24px}
+.cl.sm::before{left:11px;top:calc(9px + .9em - 2.5px)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--depth)}
 .chev{width:14px;height:14px;flex:none;stroke:var(--faint);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
 svg{display:block;overflow:visible}
 svg text{font-family:var(--font);fill:var(--muted);font-size:10px}
@@ -97,10 +101,10 @@ svg text{font-family:var(--font);fill:var(--muted);font-size:10px}
 .dy .coach.cl{font-size:13px;color:var(--ink2);margin:2px 0 16px;padding:10px 14px 10px 16px;line-height:1.8}
 
 /* ── recap ── */
-.letter h1{font:600 26px/1.35 var(--font);letter-spacing:.02em;margin-top:8px}
-.letter p{margin-top:14px;font:400 15.5px/1.95 var(--font);color:var(--ink2);text-wrap:pretty}
-.letter .body{position:relative;padding:18px 18px 18px 20px;margin-top:16px;border-radius:14px;background:var(--wash-bg)}
-.letter .body::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--g0),var(--g1),var(--g2))}
+.letter h1{font:600 28px/1.35 var(--font);letter-spacing:.02em;margin-top:8px;text-wrap:balance}
+.letter p{margin-top:16px;font:400 16px/2 var(--font);color:var(--ink2);text-wrap:pretty}
+.letter .body{position:relative;padding:20px 20px 20px 30px;margin-top:18px;border-radius:16px;background:var(--wash-bg)}
+.letter .body::before{content:"";position:absolute;left:14px;top:calc(20px + 1em - 3px);width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,var(--g0),var(--g2))}
 .letter .body p:first-child{margin-top:0}
 .sign{margin-top:12px;font-size:12.5px;color:var(--acc-ink);text-align:right}
 .tnote{margin-top:14px;padding:10px 12px;border-radius:var(--r-sm);box-shadow:inset 0 0 0 1px var(--line);font-size:12.5px;color:var(--ink2);display:flex;justify-content:space-between;gap:12px;align-items:center}
@@ -156,7 +160,7 @@ svg text{font-family:var(--font);fill:var(--muted);font-size:10px}
 
 /* ── body ── */
 .bw{display:flex;align-items:baseline;gap:12px;margin-top:6px}
-.bw b{font:600 34px/1.1 var(--font);letter-spacing:-.03em}
+.bw b{font:600 40px/1.1 var(--font);letter-spacing:-.035em}
 .bw span{font-size:15px;color:var(--muted)}
 .rate{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin-top:10px;font-size:13px;color:var(--ink2)}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--wash);color:var(--acc-ink)}
@@ -383,7 +387,6 @@ body,.navbar,.account-drawer,.card,.cl{transition:background-color .4s,color .4s
 .tabs a[aria-current]::after{content:none}
 .tab-indicator{position:absolute;left:0;bottom:-1px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--g0),var(--g1),var(--g2));pointer-events:none;transition:transform .24s cubic-bezier(.22,.8,.25,1),width .24s cubic-bezier(.22,.8,.25,1)}
 .brand,.lift,.journey-primary,.ai-options button{transition:transform .12s,color .2s,background-color .4s}
-.brand:active,.lift:active,.journey-primary:active,.ai-options button:active{transform:scale(.985)}
 .detail-reveal{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .24s cubic-bezier(.22,.8,.25,1),opacity .18s}
 li.open .detail-reveal{grid-template-rows:1fr;opacity:1}
 .detail-reveal>.detail,li.open .detail-reveal>.detail{display:block;min-height:0;overflow:hidden;padding:0}
@@ -423,3 +426,69 @@ textarea,input,[contenteditable="true"],.note-conflict pre,.connection-address,.
 .tab-indicator{transform-origin:left center}
 
 .connection-copy{display:block;margin:0 auto}
+
+/* ──────────────────────────────────────────────────────────────
+   状态舱：环境光、心跳、按压、下拉、到达。
+   AI 每周选的主题不只换线条颜色，而是在页面顶部形成一层天光。
+   ────────────────────────────────────────────────────────────── */
+html[data-theme=ink]{--depth:0 1px 2px rgba(0,0,0,.025),0 12px 32px -20px rgba(0,0,0,.14);--sky:radial-gradient(120% 70% at 50% -10%,rgba(0,0,0,.035),transparent 70%)}
+html[data-theme=gold]{--depth:0 1px 2px rgba(60,40,10,.03),0 12px 32px -20px rgba(120,90,40,.22);--sky:radial-gradient(110% 70% at 30% -10%,rgba(205,174,112,.34),transparent 64%),radial-gradient(80% 50% at 85% 0%,rgba(176,141,79,.16),transparent 62%)}
+html[data-theme=pearl]{--depth:0 1px 2px rgba(30,30,60,.03),0 12px 32px -20px rgba(60,70,140,.2);--sky:radial-gradient(100% 70% at 22% -10%,rgba(138,123,216,.26),transparent 62%),radial-gradient(90% 60% at 78% -6%,rgba(91,155,213,.22),transparent 60%),radial-gradient(60% 40% at 55% 10%,rgba(154,167,184,.14),transparent 60%)}
+@media (prefers-color-scheme:dark){
+  html[data-theme=ink]{--depth:none;--sky:radial-gradient(120% 70% at 50% -10%,rgba(255,255,255,.04),transparent 70%)}
+  html[data-theme=gold]{--depth:none;--sky:radial-gradient(110% 70% at 30% -10%,rgba(228,200,142,.16),transparent 64%),radial-gradient(80% 50% at 85% 0%,rgba(210,176,114,.08),transparent 62%)}
+  html[data-theme=pearl]{--depth:none;--sky:radial-gradient(100% 70% at 22% -10%,rgba(165,149,240,.16),transparent 62%),radial-gradient(90% 60% at 78% -6%,rgba(116,178,234,.12),transparent 60%)}
+}
+.showroom-content{position:relative}
+.sky{position:absolute;left:0;right:0;top:0;height:min(42vh,360px);pointer-events:none;z-index:0;background:var(--sky);animation:sky-in 1.2s ease-out both}
+@keyframes sky-in{from{opacity:0}to{opacity:1}}
+.brandrow,.page-viewport,.connection-notice,.setup-resume{position:relative;z-index:1}
+.mood{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:64%;font-size:12px;color:var(--muted);letter-spacing:.01em;white-space:nowrap;animation:fade-in .6s ease-out both}
+.mood>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mood b{font-weight:500;color:var(--acc-ink)}
+.mood .mark{flex:none;width:5px;height:5px;border-radius:50%;background:linear-gradient(135deg,var(--g0),var(--g2))}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+
+/* next 页顶部的状态行：今天在哪里。 */
+.status{display:flex;flex-wrap:wrap;gap:4px 0;margin:-6px 0 22px;font-size:12.5px;color:var(--muted);letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.status span{display:inline-flex;align-items:baseline}
+.status span+span::before{content:"·";margin:0 8px;color:var(--faint)}
+.status b{font-weight:500;color:var(--ink2);margin-right:.25em}
+.status .done{color:var(--acc-ink)}
+
+/* 按压：手指按下即刻回应，移开即取消，与网络和渲染无关。 */
+[data-pressed]{transition:transform .08s,opacity .08s,background-color .08s}
+.brand[data-pressed],.lift[data-pressed],.journey-primary[data-pressed],.ai-options button[data-pressed],.pick[data-pressed],.sh-it[data-pressed]{transform:scale(.975)}
+.tabs a[data-pressed]{color:var(--ink)}
+.row[data-pressed],.dy>summary[data-pressed],.client-row button[data-pressed],.note-quiet[data-pressed],.journey-quiet[data-pressed],.settings-section button[data-pressed]{background:var(--wash);box-shadow:0 0 0 8px var(--wash);border-radius:6px}
+.lift[data-pressed]{background:var(--wash2)}
+.showroom-content,.journey,.account-panel{-webkit-touch-callout:none}
+
+/* 下拉：在最顶部继续往下拉，墨点随手指浮现；松手同步。 */
+.pull{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 14px);z-index:19;display:flex;justify-content:center;pointer-events:none;opacity:var(--p,0);transform:translateY(calc(var(--p,0) * 16px - 8px)) scale(calc(.6 + var(--p,0) * .4));transition:opacity .18s,transform .18s}
+.pull[data-live]{transition:none}
+.pull i{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--g0),var(--g2));box-shadow:0 0 0 3px var(--bg)}
+.pull[data-state=syncing]{--p:1;transition:opacity .18s,transform .18s}
+.pull[data-state=syncing] i{animation:breathe .9s ease-in-out infinite}
+.pull[data-state=done]{--p:1}
+.pull[data-state=done] i{animation:settle .6s ease-out both}
+@keyframes settle{0%{transform:scale(1)}40%{transform:scale(1.5)}100%{transform:scale(0);opacity:0}}
+.pull[data-state=done]::after{content:"已同步";position:absolute;top:18px;font-size:11px;color:var(--muted);white-space:nowrap;animation:fade-in .3s ease-out both}
+
+/* 空状态有声音，也有下一步。 */
+.empty{margin-top:6px}
+.empty .cl{display:block}
+.empty-link{display:inline-flex;align-items:center;gap:6px;min-height:40px;margin-top:10px;padding:0 2px;font-size:13px;color:var(--ink2);border-bottom:1px solid var(--line)}
+.empty-link::after{content:"→";color:var(--faint)}
+
+/* 日历格子只放一个字，完整名称在悬停或长按时可见。 */
+.cell .c{max-width:none;overflow:visible;text-overflow:clip}
+
+/* 设置在手机上是一张从底部升起的纸。 */
+@media(max-width:600px){
+  .account-panel{align-items:flex-end;padding:max(40px,calc(env(safe-area-inset-top) + 24px)) 0 0}
+  .account-drawer{max-width:none;max-height:calc(100svh - max(40px,calc(env(safe-area-inset-top) + 24px)));border-radius:22px 22px 0 0;border-bottom:0;box-shadow:0 -12px 48px rgba(0,0,0,.14);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .account-drawer::before{content:"";display:block;width:36px;height:4px;border-radius:2px;margin:10px auto -6px;background:var(--line);flex:none}
+  .settings-heading{touch-action:none;cursor:grab}
+}
+@media(prefers-reduced-motion:reduce){.brand::after,.sky,.mood,.pull i{animation:none!important}}

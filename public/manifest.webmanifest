@@ -3,8 +3,8 @@
   "short_name": "lowkkey",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F1F1EF",
-  "theme_color": "#F1F1EF",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "icons": [
     {
       "src": "/icon-192.png?v=ink-1",
