@@ -1,4 +1,4 @@
-const controls='button,a[href],[role="button"],[role="radio"]';
+const controls='button,a[href],summary,[role="button"],[role="radio"]';
 
 // Pointer feedback belongs to the live control, independently of API/render work.
 export function installPressFeedback(root:HTMLElement){

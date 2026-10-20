@@ -98,7 +98,8 @@ svg text{font-family:var(--font);fill:var(--muted);font-size:10px}
 .dy[open]>summary .chev{transform:rotate(90deg)}
 .dy .items{margin-top:0;border-top:1px solid var(--line2)}
 .dy .it:last-child{border-bottom:0}
-.dy .coach.cl{font-size:13px;color:var(--ink2);margin:2px 0 16px;padding:10px 14px 10px 16px;line-height:1.8}
+.dy .coach.cl{font-size:13px;color:var(--ink2);margin:2px 0 16px;padding:10px 14px 10px 26px;line-height:1.8}
+.dy .coach.cl::before{left:12px;top:calc(10px + .9em - 2.5px)}
 
 /* ── recap ── */
 .letter h1{font:600 28px/1.35 var(--font);letter-spacing:.02em;margin-top:8px;text-wrap:balance}
