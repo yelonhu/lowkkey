@@ -6,6 +6,10 @@ const origin = process.env.LOWKKEY_TEST_ORIGIN ?? 'http://127.0.0.1:5174';
 const client = await rehearsalClient(Number(new URL(origin).port),['read','write','notes:write']);
 const tools = await client.rpc('tools/list',{});
 assert.deepEqual(tools.tools.map(t=>t.name).sort(),['curate','delete','get_brief','log_session','log_weight','read_notes','set_plan','set_profile','write_note']);
+const prompts = await client.rpc('prompts/list',{});
+assert.deepEqual(prompts.prompts.map(p=>p.name).sort(),['log_today','start','weekly_letter']);
+const prompted = await client.rpc('prompts/get',{name:'log_today',arguments:{text:'卧推 95 × 8'}});
+assert.ok(prompted.messages[0].content.text.includes('卧推 95 × 8'));
 const contract = JSON.parse(await readFile('docs/lowkkey-handoff/protocol/mcp-tools.json','utf8'));
 for (const declared of contract.tools) {
   const actual = tools.tools.find(t=>t.name===declared.name);
@@ -25,6 +29,7 @@ assert.deepEqual(await client.tool('log_weight',{date:fixtureToday,lb:160}),firs
 await seedShowroom(client.tool);
 const brief = await client.tool('get_brief',{});
 assert.equal(brief.weight.mean7.n,7); assert.equal(brief.sessions.length,6);
+assert.equal(brief.guide.stage,'active'); assert.ok(Array.isArray(brief.guide.missing)); assert.equal(brief.guide.week.start,fixtureWeek);
 assert.equal(brief.curation.current.week,fixtureWeek); assert.ok(brief.generated_at);
 const receipt=await client.rpc('tools/call',{name:'log_session',arguments:fixtureSessions.at(-1)});
 assert.equal(receipt.structuredContent.view_url,origin+'/#log?date='+fixtureToday);
@@ -43,6 +48,7 @@ const invalid = await client.rpc('tools/call',{name:'log_weight',arguments:{date
 assert.equal(invalid.isError,true);
 const readonly = await rehearsalClient(Number(new URL(origin).port),['read']);
 assert.deepEqual((await readonly.rpc('tools/list',{})).tools.map(t=>t.name),['get_brief','read_notes']);
+assert.equal((await readonly.rpc('prompts/list',{})).prompts.length,3);
 await client.user('/v1/notes/2026-10-08',{text:'原文\n  135lb × 8 🙂',revision:0},'PUT');
 assert.equal((await readonly.tool('read_notes',{})).notes[0].text,'原文\n  135lb × 8 🙂');
 assert.equal((await readonly.tool('get_brief',{})).notes.count,1);
