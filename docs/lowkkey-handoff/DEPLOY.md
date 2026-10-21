@@ -16,7 +16,7 @@
 
 客户登录继续支持邀请制 Google 和邮箱验证码。环境需配置 AUTH_MODE=customer、BETTER_AUTH_SECRET、APP_ORIGIN；Google 使用 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET；邮箱使用 RESEND_API_KEY / AUTH_EMAIL_FROM。启用 AI 连接入口需 AI_CONNECTION_ENABLED=1 与 HTTPS。
 
-允许连接的路由包含 /api/*、/v1/*、/mcp、/.well-known/*、/authorize、/oauth/*。OAuth 使用 read / write 两种权限，并在同意页明确直接写入及同日覆盖。用户在账户面板撤销授权后，访问与刷新令牌均不得再使用。
+允许连接的路由包含 /api/_、/v1/_、/mcp、/.well-known/_、/authorize、/oauth/_。OAuth 使用 read / write 两种权限，并在同意页明确直接写入及同日覆盖。用户在账户面板撤销授权后，访问与刷新令牌均不得再使用。
 
 邀请管理继续使用 scripts/invite.mjs。--local 默认使用 .data/showroom；必须传入对应的新环境配置。撤销邀请同时撤销客户会话与 oauth_clients 授权。
 

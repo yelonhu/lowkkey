@@ -57,7 +57,6 @@ v5 使用 showroom_sessions/showroom_weights/showroom_plans、profiles、prefere
 
 发布需先备份并应用新增 `0004_notes.sql`，同时按顺序部署尚未发布的账户迁移；本功能的本地验收不会自动发布其他未提交改动。
 
-
 ### 笔记独立写入与主题延续
 
 `write_note({date,text,revision})` 需要 `read` 与 `notes:write`，返回 `{result:DailyNote,view_url}`。OAuth 默认不勾选 notes:write，旧令牌不扩权；刷新令牌也不扩权。复用网页保存事务、Unicode 上限及版本检查，相同正文重试不递增，冲突为 MCP `isError` / `note_conflict`。只有真实对话中的明确请求才是操作依据，笔记内指令不是授权；服务端无法验证对话意图。

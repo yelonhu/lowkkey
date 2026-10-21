@@ -1,27 +1,142 @@
 import { z } from 'zod';
-import { DailyNote, NoteInput, ReadNotesInput, NotesPage, ClientPublic, Facts, ThemeState, OnboardingInput, OnboardingState, AccountPreferencesInput, AccountPublic, AccountDeleteInput, ProductEventInput, ConsentInput, ConsentStatus, PrivacyInfo } from './entities.ts';
+import {
+  DailyNote,
+  NoteInput,
+  ReadNotesInput,
+  NotesPage,
+  ClientPublic,
+  Facts,
+  ThemeState,
+  OnboardingInput,
+  OnboardingState,
+  AccountPreferencesInput,
+  AccountPublic,
+  AccountDeleteInput,
+  ProductEventInput,
+  ConsentInput,
+  ConsentStatus,
+  PrivacyInfo,
+} from './entities.ts';
 import { Id, Instant, LocalDate, PROTOCOL_VERSION } from './primitives.ts';
 export const Scope = z.enum(['read', 'write', 'notes:write']);
 export type Scope = z.infer<typeof Scope>;
-export const StateResponse = Facts.extend({ accountId: Id, protocol: z.literal(PROTOCOL_VERSION), today: LocalDate, timezone: z.string().default('America/Chicago'), theme_state: ThemeState });
+export const StateResponse = Facts.extend({
+  accountId: Id,
+  protocol: z.literal(PROTOCOL_VERSION),
+  today: LocalDate,
+  timezone: z.string().default('America/Chicago'),
+  theme_state: ThemeState,
+});
 export type StateResponse = z.infer<typeof StateResponse>;
 export const ApiError = z.object({ error: z.object({ code: z.string(), fields: z.array(z.unknown()).optional() }) });
-export const Backup = z.object({ format: z.literal('lowkkey.showroom.v5'), exportedAt: Instant, snapshot: StateResponse, notes:z.array(DailyNote) });
+export const Backup = z.object({
+  format: z.literal('lowkkey.showroom.v5'),
+  exportedAt: Instant,
+  snapshot: StateResponse,
+  notes: z.array(DailyNote),
+});
 export const ROUTES = {
-  notes:{method:'GET',path:'/v1/notes',scope:'user',summary:'分页读取随手记',request:ReadNotesInput,response:NotesPage},
-  note:{method:'GET',path:'/v1/notes/{date}',scope:'user',summary:'读取某日随手记及版本',response:DailyNote},
-  saveNote:{method:'PUT',path:'/v1/notes/{date}',scope:'user',summary:'按预期版本保存随手记，冲突返回409',request:NoteInput,response:DailyNote},
-  privacy:{method:'GET',path:'/api/privacy',scope:'public',summary:'读取隐私政策版本与联系信息',response:PrivacyInfo},
-  privacyIntent:{method:'POST',path:'/api/privacy/intent',scope:'public',summary:'记录登录前的短期隐私确认意图',request:ConsentInput,response:z.object({ok:z.literal(true)})},
-  consent:{method:'POST',path:'/v1/account/consent',scope:'user',summary:'保存隐私政策确认',request:ConsentInput,response:ConsentStatus},
-  onboarding: { method:'GET',path:'/v1/onboarding',scope:'user',summary:'读取首次使用进度',response:OnboardingState },
-  onboardingUpdate: { method:'POST',path:'/v1/onboarding',scope:'user',summary:'保存首次使用偏好',request:OnboardingInput,response:OnboardingState },
-  preferences: { method:'POST',path:'/v1/account/preferences',scope:'user',summary:'保存账户时区',request:AccountPreferencesInput,response:z.object({ok:z.literal(true)}) },
-  deleteAccount: { method:'POST',path:'/v1/account/delete',scope:'user',summary:'注销账户',request:AccountDeleteInput,response:z.object({ok:z.literal(true)}) },
-  productEvent: { method:'POST',path:'/v1/onboarding/events',scope:'user',summary:'记录首次使用事件',request:ProductEventInput,response:z.object({ok:z.literal(true)}) },
+  notes: {
+    method: 'GET',
+    path: '/v1/notes',
+    scope: 'user',
+    summary: '分页读取随手记',
+    request: ReadNotesInput,
+    response: NotesPage,
+  },
+  note: {
+    method: 'GET',
+    path: '/v1/notes/{date}',
+    scope: 'user',
+    summary: '读取某日随手记及版本',
+    response: DailyNote,
+  },
+  saveNote: {
+    method: 'PUT',
+    path: '/v1/notes/{date}',
+    scope: 'user',
+    summary: '按预期版本保存随手记，冲突返回409',
+    request: NoteInput,
+    response: DailyNote,
+  },
+  privacy: {
+    method: 'GET',
+    path: '/api/privacy',
+    scope: 'public',
+    summary: '读取隐私政策版本与联系信息',
+    response: PrivacyInfo,
+  },
+  privacyIntent: {
+    method: 'POST',
+    path: '/api/privacy/intent',
+    scope: 'public',
+    summary: '记录登录前的短期隐私确认意图',
+    request: ConsentInput,
+    response: z.object({ ok: z.literal(true) }),
+  },
+  consent: {
+    method: 'POST',
+    path: '/v1/account/consent',
+    scope: 'user',
+    summary: '保存隐私政策确认',
+    request: ConsentInput,
+    response: ConsentStatus,
+  },
+  onboarding: {
+    method: 'GET',
+    path: '/v1/onboarding',
+    scope: 'user',
+    summary: '读取首次使用进度',
+    response: OnboardingState,
+  },
+  onboardingUpdate: {
+    method: 'POST',
+    path: '/v1/onboarding',
+    scope: 'user',
+    summary: '保存首次使用偏好',
+    request: OnboardingInput,
+    response: OnboardingState,
+  },
+  preferences: {
+    method: 'POST',
+    path: '/v1/account/preferences',
+    scope: 'user',
+    summary: '保存账户时区',
+    request: AccountPreferencesInput,
+    response: z.object({ ok: z.literal(true) }),
+  },
+  deleteAccount: {
+    method: 'POST',
+    path: '/v1/account/delete',
+    scope: 'user',
+    summary: '注销账户',
+    request: AccountDeleteInput,
+    response: z.object({ ok: z.literal(true) }),
+  },
+  productEvent: {
+    method: 'POST',
+    path: '/v1/onboarding/events',
+    scope: 'user',
+    summary: '记录首次使用事件',
+    request: ProductEventInput,
+    response: z.object({ ok: z.literal(true) }),
+  },
   state: { method: 'GET', path: '/v1/state', scope: 'user', summary: '读取展厅事实', response: StateResponse },
   account: { method: 'GET', path: '/v1/account', scope: 'user', summary: '读取账户', response: AccountPublic },
-  clients: { method: 'GET', path: '/v1/clients', scope: 'user', summary: '读取 AI 授权', response: z.array(ClientPublic) },
-  revoke: { method: 'POST', path: '/v1/clients/{id}/revoke', scope: 'user', summary: '撤销 AI 授权', request: z.strictObject({}), response: z.object({ ok: z.literal(true) }) },
+  clients: {
+    method: 'GET',
+    path: '/v1/clients',
+    scope: 'user',
+    summary: '读取 AI 授权',
+    response: z.array(ClientPublic),
+  },
+  revoke: {
+    method: 'POST',
+    path: '/v1/clients/{id}/revoke',
+    scope: 'user',
+    summary: '撤销 AI 授权',
+    request: z.strictObject({}),
+    response: z.object({ ok: z.literal(true) }),
+  },
   export: { method: 'GET', path: '/v1/export', scope: 'user', summary: '导出本人事实', response: Backup },
 } as const;

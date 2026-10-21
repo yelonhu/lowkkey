@@ -24,11 +24,11 @@ Playwright 同时运行 Chromium 和移动 WebKit，每个引擎使用独立的�
 
 视觉比较使用同一份隔离 D1 空账户状态、相同视口和字体加载条件，对比 `1764ec2` 与本轮实现：
 
-| 画板 | 比较结果 |
-| --- | --- |
-| Main、Session、Body、Progress、Ledger、Transition、Debrief、Icon | 像素一致 |
-| Connect | 排除两个本地端口造成的连接地址文本差异后，像素一致 |
-| Capture | 背景按本轮要求替换为真实当前页面，因此整屏不同；sheet 尺寸一致，24 个像素存在最大 1/255 的颜色通道差异，位于手柄与文字的抗锯齿边缘 |
+| 画板                                                             | 比较结果                                                                                                                           |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Main、Session、Body、Progress、Ledger、Transition、Debrief、Icon | 像素一致                                                                                                                           |
+| Connect                                                          | 排除两个本地端口造成的连接地址文本差异后，像素一致                                                                                 |
+| Capture                                                          | 背景按本轮要求替换为真实当前页面，因此整屏不同；sheet 尺寸一致，24 个像素存在最大 1/255 的颜色通道差异，位于手柄与文字的抗锯齿边缘 |
 
 本地证据：`.artifacts/interaction-before/`、`.artifacts/interaction-after/`、`.artifacts/interaction-visual-report.json`。每轮完整浏览器测试另输出 `.artifacts/playwright/chromium/v1-*.png` 和 `.artifacts/playwright/webkit/v1-*.png`。这些运行产物不纳入 Git。
 

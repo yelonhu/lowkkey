@@ -8,15 +8,45 @@ const e2e = process.argv[2] === '--e2e';
 if (process.argv.length > (e2e ? 3 : 2)) throw new Error('Unsupported argument');
 const directory = e2e ? `.data/e2e-showroom/${randomUUID()}` : '.data/showroom';
 if (e2e) process.env.LOWKKEY_E2E_DIR = directory;
-if(e2e&&process.env.LOWKKEY_E2E_TLS==='1'){
-  await mkdir(directory,{recursive:true});
-  execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',`${directory}/localhost.key`,'-out',`${directory}/localhost.crt`,'-days','1','-subj','/CN=localhost'],{stdio:'ignore'});
+if (e2e && process.env.LOWKKEY_E2E_TLS === '1') {
+  await mkdir(directory, { recursive: true });
+  execFileSync(
+    'openssl',
+    [
+      'req',
+      '-x509',
+      '-newkey',
+      'rsa:2048',
+      '-nodes',
+      '-keyout',
+      `${directory}/localhost.key`,
+      '-out',
+      `${directory}/localhost.crt`,
+      '-days',
+      '1',
+      '-subj',
+      '/CN=localhost',
+    ],
+    { stdio: 'ignore' },
+  );
 }
 const runtime = localRuntime(directory);
-try { await applyMigrations(await runtime.getD1Database('DB')); } finally { await runtime.dispose(); }
+try {
+  await applyMigrations(await runtime.getD1Database('DB'));
+} finally {
+  await runtime.dispose();
+}
 const server = await createServer({ mode: e2e ? 'test' : 'development', configFile: 'vite.config.ts' });
-await server.listen(); server.printUrls();
-process.send?.({type:"ready",isolated:e2e,port:server.config.server.port,...(e2e?{directory}:{})});
+await server.listen();
+server.printUrls();
+process.send?.({ type: 'ready', isolated: e2e, port: server.config.server.port, ...(e2e ? { directory } : {}) });
 let stopping = false;
-async function stop() { if (stopping) return; stopping = true; await server.close(); if (e2e) await rm(directory, { recursive: true, force: true }); process.exit(0); }
-process.on('SIGINT', stop); process.on('SIGTERM', stop);
+async function stop() {
+  if (stopping) return;
+  stopping = true;
+  await server.close();
+  if (e2e) await rm(directory, { recursive: true, force: true });
+  process.exit(0);
+}
+process.on('SIGINT', stop);
+process.on('SIGTERM', stop);

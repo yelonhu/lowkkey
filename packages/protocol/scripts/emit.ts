@@ -16,7 +16,11 @@ mkdirSync(out, { recursive: true });
 const opts = { unrepresentable: 'any' } as const;
 
 // 1) 组件：所有登记过 id 的实体
-const components = (z.toJSONSchema(z.globalRegistry, { ...opts, io: 'output', uri: (id) => `#/components/schemas/${id}` }) as { schemas: Record<string, Record<string, unknown>> }).schemas;
+const components = (
+  z.toJSONSchema(z.globalRegistry, { ...opts, io: 'output', uri: id => `#/components/schemas/${id}` }) as {
+    schemas: Record<string, Record<string, unknown>>;
+  }
+).schemas;
 for (const s of Object.values(components)) {
   delete s.$schema;
   delete s.$id;
@@ -36,7 +40,14 @@ function ref(schema: z.ZodType, io: 'input' | 'output') {
 
 const paths: Record<string, Record<string, unknown>> = {};
 for (const [op, r] of Object.entries(P.ROUTES)) {
-  const route = r as { method: string; path: string; scope: string | string[]; summary: string; request?: z.ZodType; response: z.ZodType };
+  const route = r as {
+    method: string;
+    path: string;
+    scope: string | string[];
+    summary: string;
+    request?: z.ZodType;
+    response: z.ZodType;
+  };
   const item: Record<string, unknown> = {
     operationId: op,
     summary: route.summary,
@@ -46,11 +57,17 @@ for (const [op, r] of Object.entries(P.ROUTES)) {
       default: { description: 'Error', content: { 'application/json': { schema: ref(P.ApiError, 'output') } } },
     },
   };
-  if(route.scope==='public')item.security=[];
-  const params: unknown[] = [...route.path.matchAll(/\{(\w+)\}/g)].map((m) => ({ name: m[1], in: 'path', required: true, schema: { type: 'string' } }));
+  if (route.scope === 'public') item.security = [];
+  const params: unknown[] = [...route.path.matchAll(/\{(\w+)\}/g)].map(m => ({
+    name: m[1],
+    in: 'path',
+    required: true,
+    schema: { type: 'string' },
+  }));
   if (route.request && route.method === 'GET') {
     const q = z.toJSONSchema(route.request, { ...opts, io: 'input' }) as { properties?: Record<string, unknown> };
-    for (const [name, schema] of Object.entries(q.properties ?? {})) params.push({ name, in: 'query', required: false, schema });
+    for (const [name, schema] of Object.entries(q.properties ?? {}))
+      params.push({ name, in: 'query', required: false, schema });
   } else if (route.request) {
     item.requestBody = { required: true, content: { 'application/json': { schema: ref(route.request, 'input') } } };
   }
@@ -62,10 +79,22 @@ writeFileSync(
   JSON.stringify(
     {
       openapi: '3.1.0',
-      info: { title: 'lowkkey API', version: P.PROTOCOL_VERSION, description: '见 INTERFACE.md。客户网页使用应用会话；Access 仅保留管理和兼容环境；Remote MCP 使用 OAuth。客户写入必须携带 X-Lowkkey-Account。scope 见各操作的 x-scopes。' },
+      info: {
+        title: 'lowkkey API',
+        version: P.PROTOCOL_VERSION,
+        description:
+          '见 INTERFACE.md。客户网页使用应用会话；Access 仅保留管理和兼容环境；Remote MCP 使用 OAuth。客户写入必须携带 X-Lowkkey-Account。scope 见各操作的 x-scopes。',
+      },
       servers: [{ url: '/' }],
-      components: { schemas: components, securitySchemes: { customerSession:{type:'apiKey',in:'cookie',name:'__Secure-better-auth.session_token'},accessAssertion: { type: 'apiKey', in: 'header', name: 'Cf-Access-Jwt-Assertion' }, accessCookie: { type: 'apiKey', in: 'cookie', name: 'CF_Authorization' } } },
-      security: [{customerSession:[]},{ accessAssertion: [] }, { accessCookie: [] }],
+      components: {
+        schemas: components,
+        securitySchemes: {
+          customerSession: { type: 'apiKey', in: 'cookie', name: '__Secure-better-auth.session_token' },
+          accessAssertion: { type: 'apiKey', in: 'header', name: 'Cf-Access-Jwt-Assertion' },
+          accessCookie: { type: 'apiKey', in: 'cookie', name: 'CF_Authorization' },
+        },
+      },
+      security: [{ customerSession: [] }, { accessAssertion: [] }, { accessCookie: [] }],
       paths,
     },
     null,
@@ -75,7 +104,16 @@ writeFileSync(
 
 writeFileSync(
   join(out, 'schema.json'),
-  JSON.stringify({ $schema: 'https://json-schema.org/draft/2020-12/schema', title: 'lowkkey protocol', version: P.PROTOCOL_VERSION, $defs: components }, null, 2).replaceAll('#/components/schemas/', '#/$defs/'),
+  JSON.stringify(
+    {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      title: 'lowkkey protocol',
+      version: P.PROTOCOL_VERSION,
+      $defs: components,
+    },
+    null,
+    2,
+  ).replaceAll('#/components/schemas/', '#/$defs/'),
 );
 
 writeFileSync(join(out, 'mcp-tools.json'), JSON.stringify({ tools: P.mcpToolList() }, null, 2));

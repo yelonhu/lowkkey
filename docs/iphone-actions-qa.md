@@ -44,7 +44,6 @@
 
 回滚：主站保持 `05da8aa`。本批独立版本只换应用代码，不回退 D1 或删除事实。独立版本与主站使用相同业务资源时，账号中的真实操作同样会保存，不能当作可随意重置的测试库。
 
-
 ## 2026-10-07：底部布局修复
 
 用户真机截图显示旧版本仍有提交按钮裁切与底部多余留白，下面 2026-10-06 的自动化结果不代表这些问题已解决。
@@ -98,7 +97,7 @@
 如仍有顶部色块，用 Safari 打开 `/?viewport=1#Main`，需要复现主屏幕行为时把这个地址另加到主屏幕。通过 Mac Safari 的开发菜单连接 iPhone 网页，在控制台执行：
 
 ```js
-JSON.parse(document.documentElement.dataset.viewport)
+JSON.parse(document.documentElement.dataset.viewport);
 ```
 
 只包含屏幕/视口/外壳尺寸、显示模式、安全区 padding 和主题，不含账户数据。分别在冷启动首页、训练页、打开键盘时复制结果，并附同一时刻截图。诊断只在 URL 含 `viewport` 时启用。

@@ -4,25 +4,19 @@
     {
       "name": "rehearsal",
       "runtimeExecutable": "./scripts/run",
-      "runtimeArgs": [
-        "preview:rehearsal"
-      ],
+      "runtimeArgs": ["preview:rehearsal"],
       "port": 5179
     },
     {
       "name": "dev",
       "runtimeExecutable": "./scripts/run",
-      "runtimeArgs": [
-        "dev"
-      ],
+      "runtimeArgs": ["dev"],
       "port": 5173
     },
     {
       "name": "empty",
       "runtimeExecutable": "./scripts/run",
-      "runtimeArgs": [
-        "preview:empty"
-      ],
+      "runtimeArgs": ["preview:empty"],
       "port": 5176
     }
   ]

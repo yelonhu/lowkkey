@@ -1,0 +1,13 @@
+.artifacts
+.cache
+.data
+.local
+.logs
+.tmp
+.toolchain
+.wrangler
+node_modules
+package-lock.json
+docs/lowkkey-handoff/protocol
+db
+public

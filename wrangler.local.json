@@ -2,24 +2,13 @@
   "name": "lowkkey-showroom-local",
   "main": "src/server/worker.ts",
   "compatibility_date": "2026-07-30",
-  "compatibility_flags": [
-    "nodejs_compat",
-    "global_fetch_strictly_public"
-  ],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": false,
   "preview_urls": false,
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": [
-      "/api/*",
-      "/v1/*",
-      "/mcp",
-      "/.well-known/*",
-      "/authorize",
-      "/oauth/*",
-      "/healthz"
-    ]
+    "run_worker_first": ["/api/*", "/v1/*", "/mcp", "/.well-known/*", "/authorize", "/oauth/*", "/healthz"]
   },
   "d1_databases": [
     {

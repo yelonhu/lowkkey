@@ -2,38 +2,390 @@ import { useId, useState } from 'react';
 import type { PointerEvent } from 'react';
 import type { Facts } from '@lowkkey/protocol';
 import { addDays, dayIndex, fmt, md, monday, round, SHORT, strengthSeries, targetAt, weightMean } from '@lowkkey/core';
-import { Gradient,useWidth } from './Graphics.tsx';
-const sign=(n:number)=>n>0?'+':'';
-export function StrengthChart({facts,today,focus}:{facts:Facts;today:string;focus:string}){
-  const {ref,width:W}=useWidth(),id=useId(),[hover,setHover]=useState<number|null>(null);
-  const lines=strengthSeries(facts).filter(s=>s.points.length).map(s=>({...s,pts:s.points.map(p=>({...p,pct:(p.e1rm/s.first!.e1rm-1)*100}))}));
-  const H=Math.round(Math.min(230,Math.max(190,W*.52))),Lp=30,Rp=84,T=10,B=24;
-  const first=facts.sessions.map(s=>s.date).sort()[0]??today,x0=dayIndex(first),x1=Math.max(x0+1,dayIndex(today),...lines.flatMap(l=>l.pts.map(p=>dayIndex(p.date))));
-  const lo=Math.min(0,Math.floor(Math.min(0,...lines.flatMap(l=>l.pts.map(p=>p.pct)))/10)*10),hi=Math.max(10,Math.ceil(Math.max(0,...lines.flatMap(l=>l.pts.map(p=>p.pct)))/10)*10);
-  const X=(date:string)=>Lp+(dayIndex(date)-x0)/(x1-x0)*(W-Lp-Rp),Y=(v:number)=>T+(hi-v)/(hi-lo)*(H-T-B);
-  const grid=[];for(let v=lo;v<=hi;v+=10)grid.push(v);
-  const weeks=[];for(let d=monday(first),i=1;dayIndex(d)<=x1;d=addDays(d,7),i++)weeks.push({date:d,i});
-  const ends=lines.map(l=>({line:l,end:l.pts.at(-1)!,y:Y(l.pts.at(-1)!.pct)})).sort((a,b)=>a.y-b.y);
-  for(let i=1;i<ends.length;i++)ends[i].y=Math.max(ends[i].y,ends[i-1].y+15);
-  if(ends.length&&ends.at(-1)!.y>H-B){ends.at(-1)!.y=H-B;for(let i=ends.length-2;i>=0;i--)ends[i].y=Math.min(ends[i].y,ends[i+1].y-15);}
-  const selected=lines.find(l=>l.ex===focus)??lines[0],point=hover==null?null:selected?.pts[hover];
-  const move=(e:PointerEvent<SVGSVGElement>)=>{if(!selected)return;const px=e.clientX-e.currentTarget.getBoundingClientRect().left;let index=0;selected.pts.forEach((p,i)=>{if(Math.abs(X(p.date)-px)<Math.abs(X(selected.pts[index].date)-px))index=i;});setHover(index);};
-  return <div ref={ref} className="chartbox" role="group" aria-label="四项力量趋势，左右方向键查看读数" tabIndex={lines.length?0:undefined} onKeyDown={e=>{if(!selected)return;if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();setHover(i=>Math.max(0,Math.min(selected.pts.length-1,(i??-1)+(e.key==='ArrowRight'?1:-1))));}if(e.key==='Escape')setHover(null);}} onBlur={()=>setHover(null)}>{W>0&&lines.length>0&&<><svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" focusable="false" aria-label="四项力量相对第一次的变化" onPointerMove={move} onPointerDown={move} onPointerLeave={()=>setHover(null)}><Gradient id={id} width={W}/>{grid.map(v=><g key={v}><line x1={Lp} x2={W-Rp} y1={Y(v)} y2={Y(v)} className={v?'gl':'gf'}/><text x={Lp-8} y={Y(v)+3.5} textAnchor="end">{sign(v)}{v}%</text></g>)}{weeks.map(w=><text key={w.date} x={X(dayIndex(w.date)<x0?first:w.date)} y={H-6} textAnchor={w.i===1?'start':'middle'}>W{w.i}</text>)}{[...lines].sort((a,b)=>Number(a.ex===focus)-Number(b.ex===focus)).map(l=>{const on=l.ex===focus,d=l.pts.map((p,i)=>(i?'L':'M')+X(p.date)+' '+Y(p.pct)).join(' '),end=l.pts.at(-1)!;return <g key={l.ex}>{on&&<path d={`${d} L${X(end.date)} ${Y(0)} L${X(l.pts[0].date)} ${Y(0)} Z`} style={{fill:'var(--wash)'}}/>}<path d={d} fill="none" stroke={on?`url(#${id})`:'var(--ink)'} strokeOpacity={on?1:.28} strokeWidth={on?2:1.25} strokeLinecap="round" strokeLinejoin="round"/><circle cx={X(end.date)} cy={Y(end.pct)} r={on?4:3} fill={on?'var(--g1)':'var(--ink)'} fillOpacity={on?1:.45} stroke="var(--bg)" strokeWidth="2"/></g>;})}{ends.map(e=><g key={e.line.ex}>{(Math.abs(e.y-Y(e.end.pct))>1||X(e.end.date)<W-Rp-2)&&<path d={`M${X(e.end.date)+6} ${Y(e.end.pct)} L${W-Rp+4} ${e.y}`} className="gl"/>}<text x={W-Rp+8} y={e.y+3.5} style={{fontSize:11,fill:e.line.ex===focus?'var(--ink)':'var(--muted)',fontWeight:e.line.ex===focus?600:400}}>{SHORT[e.line.ex]} {sign(Math.round(e.end.pct))}{Math.round(e.end.pct)}%</text></g>)}{point&&<g><line x1={X(point.date)} x2={X(point.date)} y1={T} y2={H-B} className="gs" strokeOpacity=".25"/><circle cx={X(point.date)} cy={Y(point.pct)} r="4" fill="var(--ink)" stroke="var(--bg)" strokeWidth="2"/></g>}</svg>{point&&<div className="tip on" style={{left:Math.min(Math.max(X(point.date),80),W-80),top:Math.max(Y(point.pct)-48,-8)}}>{SHORT[selected.ex]} <b>{Math.round(point.e1rm)}</b> lb <span className="mu">{point.pct?sign(Math.round(point.pct))+Math.round(point.pct)+'%':'起点'} · {md(point.date)}</span></div>}</>}</div>;
+import { Gradient, useWidth } from './Graphics.tsx';
+const sign = (n: number) => (n > 0 ? '+' : '');
+export function StrengthChart({ facts, today, focus }: { facts: Facts; today: string; focus: string }) {
+  const { ref, width: W } = useWidth(),
+    id = useId(),
+    [hover, setHover] = useState<number | null>(null);
+  const lines = strengthSeries(facts)
+    .filter(s => s.points.length)
+    .map(s => ({ ...s, pts: s.points.map(p => ({ ...p, pct: (p.e1rm / s.first!.e1rm - 1) * 100 })) }));
+  const H = Math.round(Math.min(230, Math.max(190, W * 0.52))),
+    Lp = 30,
+    Rp = 84,
+    T = 10,
+    B = 24;
+  const first = facts.sessions.map(s => s.date).sort()[0] ?? today,
+    x0 = dayIndex(first),
+    x1 = Math.max(x0 + 1, dayIndex(today), ...lines.flatMap(l => l.pts.map(p => dayIndex(p.date))));
+  const lo = Math.min(0, Math.floor(Math.min(0, ...lines.flatMap(l => l.pts.map(p => p.pct))) / 10) * 10),
+    hi = Math.max(10, Math.ceil(Math.max(0, ...lines.flatMap(l => l.pts.map(p => p.pct))) / 10) * 10);
+  const X = (date: string) => Lp + ((dayIndex(date) - x0) / (x1 - x0)) * (W - Lp - Rp),
+    Y = (v: number) => T + ((hi - v) / (hi - lo)) * (H - T - B);
+  const grid = [];
+  for (let v = lo; v <= hi; v += 10) grid.push(v);
+  const weeks = [];
+  for (let d = monday(first), i = 1; dayIndex(d) <= x1; d = addDays(d, 7), i++) weeks.push({ date: d, i });
+  const ends = lines.map(l => ({ line: l, end: l.pts.at(-1)!, y: Y(l.pts.at(-1)!.pct) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 15);
+  if (ends.length && ends.at(-1)!.y > H - B) {
+    ends.at(-1)!.y = H - B;
+    for (let i = ends.length - 2; i >= 0; i--) ends[i].y = Math.min(ends[i].y, ends[i + 1].y - 15);
+  }
+  const selected = lines.find(l => l.ex === focus) ?? lines[0],
+    point = hover == null ? null : selected?.pts[hover];
+  const move = (e: PointerEvent<SVGSVGElement>) => {
+    if (!selected) return;
+    const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
+    let index = 0;
+    selected.pts.forEach((p, i) => {
+      if (Math.abs(X(p.date) - px) < Math.abs(X(selected.pts[index].date) - px)) index = i;
+    });
+    setHover(index);
+  };
+  return (
+    <div
+      ref={ref}
+      className="chartbox"
+      role="group"
+      aria-label="四项力量趋势，左右方向键查看读数"
+      tabIndex={lines.length ? 0 : undefined}
+      onKeyDown={e => {
+        if (!selected) return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          setHover(i => Math.max(0, Math.min(selected.pts.length - 1, (i ?? -1) + (e.key === 'ArrowRight' ? 1 : -1))));
+        }
+        if (e.key === 'Escape') setHover(null);
+      }}
+      onBlur={() => setHover(null)}
+    >
+      {W > 0 && lines.length > 0 && (
+        <>
+          <svg
+            width={W}
+            height={H}
+            viewBox={`0 0 ${W} ${H}`}
+            role="img"
+            focusable="false"
+            aria-label="四项力量相对第一次的变化"
+            onPointerMove={move}
+            onPointerDown={move}
+            onPointerLeave={() => setHover(null)}
+          >
+            <Gradient id={id} width={W} />
+            {grid.map(v => (
+              <g key={v}>
+                <line x1={Lp} x2={W - Rp} y1={Y(v)} y2={Y(v)} className={v ? 'gl' : 'gf'} />
+                <text x={Lp - 8} y={Y(v) + 3.5} textAnchor="end">
+                  {sign(v)}
+                  {v}%
+                </text>
+              </g>
+            ))}
+            {weeks.map(w => (
+              <text
+                key={w.date}
+                x={X(dayIndex(w.date) < x0 ? first : w.date)}
+                y={H - 6}
+                textAnchor={w.i === 1 ? 'start' : 'middle'}
+              >
+                W{w.i}
+              </text>
+            ))}
+            {[...lines]
+              .sort((a, b) => Number(a.ex === focus) - Number(b.ex === focus))
+              .map(l => {
+                const on = l.ex === focus,
+                  d = l.pts.map((p, i) => (i ? 'L' : 'M') + X(p.date) + ' ' + Y(p.pct)).join(' '),
+                  end = l.pts.at(-1)!;
+                return (
+                  <g key={l.ex}>
+                    {on && (
+                      <path
+                        d={`${d} L${X(end.date)} ${Y(0)} L${X(l.pts[0].date)} ${Y(0)} Z`}
+                        style={{ fill: 'var(--wash)' }}
+                      />
+                    )}
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke={on ? `url(#${id})` : 'var(--ink)'}
+                      strokeOpacity={on ? 1 : 0.28}
+                      strokeWidth={on ? 2 : 1.25}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle
+                      cx={X(end.date)}
+                      cy={Y(end.pct)}
+                      r={on ? 4 : 3}
+                      fill={on ? 'var(--g1)' : 'var(--ink)'}
+                      fillOpacity={on ? 1 : 0.45}
+                      stroke="var(--bg)"
+                      strokeWidth="2"
+                    />
+                  </g>
+                );
+              })}
+            {ends.map(e => (
+              <g key={e.line.ex}>
+                {(Math.abs(e.y - Y(e.end.pct)) > 1 || X(e.end.date) < W - Rp - 2) && (
+                  <path d={`M${X(e.end.date) + 6} ${Y(e.end.pct)} L${W - Rp + 4} ${e.y}`} className="gl" />
+                )}
+                <text
+                  x={W - Rp + 8}
+                  y={e.y + 3.5}
+                  style={{
+                    fontSize: 11,
+                    fill: e.line.ex === focus ? 'var(--ink)' : 'var(--muted)',
+                    fontWeight: e.line.ex === focus ? 600 : 400,
+                  }}
+                >
+                  {SHORT[e.line.ex]} {sign(Math.round(e.end.pct))}
+                  {Math.round(e.end.pct)}%
+                </text>
+              </g>
+            ))}
+            {point && (
+              <g>
+                <line x1={X(point.date)} x2={X(point.date)} y1={T} y2={H - B} className="gs" strokeOpacity=".25" />
+                <circle
+                  cx={X(point.date)}
+                  cy={Y(point.pct)}
+                  r="4"
+                  fill="var(--ink)"
+                  stroke="var(--bg)"
+                  strokeWidth="2"
+                />
+              </g>
+            )}
+          </svg>
+          {point && (
+            <div
+              className="tip on"
+              style={{ left: Math.min(Math.max(X(point.date), 80), W - 80), top: Math.max(Y(point.pct) - 48, -8) }}
+            >
+              {SHORT[selected.ex]} <b>{Math.round(point.e1rm)}</b> lb{' '}
+              <span className="mu">
+                {point.pct ? sign(Math.round(point.pct)) + Math.round(point.pct) + '%' : '起点'} · {md(point.date)}
+              </span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
-export function WeightChart({facts,today,miniWeek}:{facts:Facts;today:string;miniWeek?:string}){
-  const {ref,width:W}=useWidth(),id=useId(),[hover,setHover]=useState<string|null>(null),all=[...facts.weights].filter(w=>w.date<=today).sort((a,b)=>a.date.localeCompare(b.date));
-  const weights=miniWeek?all.filter(w=>monday(w.date)===miniWeek):all,target=miniWeek?null:facts.profile.gain_target,mean=weightMean(all,today),future=!!target&&mean.lb!=null;
-  const H=miniWeek?64:220,Lp=miniWeek?0:34,Rp=miniWeek?0:8,T=miniWeek?5:10,B=miniWeek?5:24;
-  const d0=dayIndex(miniWeek??weights[0]?.date??today),dT=dayIndex(today),d1=miniWeek?d0+6:Math.max(d0+1,dT+(future?28:0));
-  const historical=target&&target.start<=today?targetAt(target,today):null;
-  const means=weights.map(w=>({date:w.date,lb:weightMean(all,w.date).lb}));
-  const values=[...weights.map(w=>w.lb),...means.flatMap(m=>m.lb==null?[]:[m.lb]),...(future?[mean.lb!+target!.max*4]:[]),...(historical?[target!.startLb,(historical.min+historical.max)/2]:[])];
-  const lo=Math.floor((Math.min(...values,Infinity)-1)/2)*2,hi=Math.max(lo+2,Math.ceil((Math.max(...values,-Infinity)+1)/2)*2);
-  const X=(d:number)=>Lp+(d-d0)/(d1-d0)*(W-Lp-Rp),Y=(v:number)=>T+(hi-v)/(hi-lo)*(H-T-B);
-  const grid=[];if(!miniWeek&&values.length)for(let v=lo;v<=hi;v+=2)grid.push(v);
-  const weeks=[];if(!miniWeek)for(let d=addDays(monday(weights[0]?.date??today),7);dayIndex(d)<=d1;d=addDays(d,7))weeks.push(d);
-  const paths:string[]=[];let path='';for(const p of means){if(p.lb==null){if(path)paths.push(path);path='';}else path+=(path?' L':'M')+X(dayIndex(p.date))+' '+Y(p.lb);}if(path)paths.push(path);
-  const last=means.filter(p=>p.lb!=null).at(-1),point=weights.find(w=>w.date===hover),hoverMean=point?weightMean(all,point.date).lb:null;
-  const move=(e:PointerEvent<SVGSVGElement>)=>{if(miniWeek||!weights.length)return;const px=e.clientX-e.currentTarget.getBoundingClientRect().left;setHover(weights.reduce((a,b)=>Math.abs(X(dayIndex(b.date))-px)<Math.abs(X(dayIndex(a.date))-px)?b:a).date);};
-  return <div ref={ref} className="chartbox" role="group" aria-label="体重趋势，左右方向键查看读数" tabIndex={miniWeek||!weights.length?undefined:0} onKeyDown={e=>{if(miniWeek||!weights.length)return;if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const i=weights.findIndex(w=>w.date===hover);setHover(weights[Math.max(0,Math.min(weights.length-1,i+(e.key==='ArrowRight'?1:-1)))].date);}if(e.key==='Escape')setHover(null);}} onBlur={()=>setHover(null)}>{W>0&&weights.length>0&&<><svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" focusable="false" aria-label="体重：每天的称重和七日均值" onPointerMove={move} onPointerDown={move} onPointerLeave={()=>setHover(null)}><Gradient id={id} width={W}/>{grid.map(v=><g key={v}><line x1={Lp} x2={W-Rp} y1={Y(v)} y2={Y(v)} className="gl"/><text x={Lp-8} y={Y(v)+3.5} textAnchor="end">{v}</text></g>)}{weeks.map(d=><text key={d} x={Math.min(W-Rp-14,Math.max(Lp+14,X(dayIndex(d))))} y={H-6} textAnchor="middle" style={d>today?{fill:'var(--faint)'}:undefined}>{md(d)}</text>)}{future&&<><path d={`M${X(dT)} ${Y(mean.lb!)} L${X(d1)} ${Y(mean.lb!+target!.max*4)} L${X(d1)} ${Y(mean.lb!+target!.min*4)} Z`} style={{fill:'var(--wash)'}}/><text x={X(d1)-4} y={Y(mean.lb!+target!.max*4)-7} textAnchor="end">目标 +{target!.min}–{target!.max} / 周</text></>}{historical&&<><line x1={X(Math.max(d0,dayIndex(target!.start)))} x2={X(dT)} y1={Y(target!.startLb+(Math.max(d0,dayIndex(target!.start))-dayIndex(target!.start))/7*(target!.min+target!.max)/2)} y2={Y((historical.min+historical.max)/2)} className="gf" strokeWidth="1"/><text x={Math.min(W-45,X(dT)+6)} y={Y((historical.min+historical.max)/2)+3.5} style={{fill:'var(--faint)'}}>按目标</text></>}{paths.map((d,i)=><path key={i} d={d} fill="none" stroke={`url(#${id})`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>)}{weights.map(w=><circle key={w.date} cx={X(dayIndex(w.date))} cy={Y(w.lb)} r="2.5" fill="var(--muted)" fillOpacity=".55"/>)}{last&&<circle cx={X(dayIndex(last.date))} cy={Y(last.lb!)} r="4" fill="var(--g2)" stroke="var(--bg)" strokeWidth="2"/>}{point&&<g><line x1={X(dayIndex(point.date))} x2={X(dayIndex(point.date))} y1={T} y2={H-B} className="gs" strokeOpacity=".25"/><circle cx={X(dayIndex(point.date))} cy={Y(point.lb)} r="4" fill="var(--ink)" stroke="var(--bg)" strokeWidth="2"/></g>}</svg>{point&&<div className="tip on" style={{left:Math.min(Math.max(X(dayIndex(point.date)),80),W-80),top:Math.max(Y(point.lb)-50,-8)}}><b>{fmt(point.lb)}</b> lb <span className="mu">{md(point.date)}{hoverMean!=null?' · 均值 '+round(hoverMean):''}</span></div>}</>}</div>;
+export function WeightChart({ facts, today, miniWeek }: { facts: Facts; today: string; miniWeek?: string }) {
+  const { ref, width: W } = useWidth(),
+    id = useId(),
+    [hover, setHover] = useState<string | null>(null),
+    all = [...facts.weights].filter(w => w.date <= today).sort((a, b) => a.date.localeCompare(b.date));
+  const weights = miniWeek ? all.filter(w => monday(w.date) === miniWeek) : all,
+    target = miniWeek ? null : facts.profile.gain_target,
+    mean = weightMean(all, today),
+    future = !!target && mean.lb != null;
+  const H = miniWeek ? 64 : 220,
+    Lp = miniWeek ? 0 : 34,
+    Rp = miniWeek ? 0 : 8,
+    T = miniWeek ? 5 : 10,
+    B = miniWeek ? 5 : 24;
+  const d0 = dayIndex(miniWeek ?? weights[0]?.date ?? today),
+    dT = dayIndex(today),
+    d1 = miniWeek ? d0 + 6 : Math.max(d0 + 1, dT + (future ? 28 : 0));
+  const historical = target && target.start <= today ? targetAt(target, today) : null;
+  const means = weights.map(w => ({ date: w.date, lb: weightMean(all, w.date).lb }));
+  const values = [
+    ...weights.map(w => w.lb),
+    ...means.flatMap(m => (m.lb == null ? [] : [m.lb])),
+    ...(future ? [mean.lb! + target!.max * 4] : []),
+    ...(historical ? [target!.startLb, (historical.min + historical.max) / 2] : []),
+  ];
+  const lo = Math.floor((Math.min(...values, Infinity) - 1) / 2) * 2,
+    hi = Math.max(lo + 2, Math.ceil((Math.max(...values, -Infinity) + 1) / 2) * 2);
+  const X = (d: number) => Lp + ((d - d0) / (d1 - d0)) * (W - Lp - Rp),
+    Y = (v: number) => T + ((hi - v) / (hi - lo)) * (H - T - B);
+  const grid = [];
+  if (!miniWeek && values.length) for (let v = lo; v <= hi; v += 2) grid.push(v);
+  const weeks = [];
+  if (!miniWeek)
+    for (let d = addDays(monday(weights[0]?.date ?? today), 7); dayIndex(d) <= d1; d = addDays(d, 7)) weeks.push(d);
+  const paths: string[] = [];
+  let path = '';
+  for (const p of means) {
+    if (p.lb == null) {
+      if (path) paths.push(path);
+      path = '';
+    } else path += (path ? ' L' : 'M') + X(dayIndex(p.date)) + ' ' + Y(p.lb);
+  }
+  if (path) paths.push(path);
+  const last = means.filter(p => p.lb != null).at(-1),
+    point = weights.find(w => w.date === hover),
+    hoverMean = point ? weightMean(all, point.date).lb : null;
+  const move = (e: PointerEvent<SVGSVGElement>) => {
+    if (miniWeek || !weights.length) return;
+    const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
+    setHover(
+      weights.reduce((a, b) => (Math.abs(X(dayIndex(b.date)) - px) < Math.abs(X(dayIndex(a.date)) - px) ? b : a)).date,
+    );
+  };
+  return (
+    <div
+      ref={ref}
+      className="chartbox"
+      role="group"
+      aria-label="体重趋势，左右方向键查看读数"
+      tabIndex={miniWeek || !weights.length ? undefined : 0}
+      onKeyDown={e => {
+        if (miniWeek || !weights.length) return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const i = weights.findIndex(w => w.date === hover);
+          setHover(weights[Math.max(0, Math.min(weights.length - 1, i + (e.key === 'ArrowRight' ? 1 : -1)))].date);
+        }
+        if (e.key === 'Escape') setHover(null);
+      }}
+      onBlur={() => setHover(null)}
+    >
+      {W > 0 && weights.length > 0 && (
+        <>
+          <svg
+            width={W}
+            height={H}
+            viewBox={`0 0 ${W} ${H}`}
+            role="img"
+            focusable="false"
+            aria-label="体重：每天的称重和七日均值"
+            onPointerMove={move}
+            onPointerDown={move}
+            onPointerLeave={() => setHover(null)}
+          >
+            <Gradient id={id} width={W} />
+            {grid.map(v => (
+              <g key={v}>
+                <line x1={Lp} x2={W - Rp} y1={Y(v)} y2={Y(v)} className="gl" />
+                <text x={Lp - 8} y={Y(v) + 3.5} textAnchor="end">
+                  {v}
+                </text>
+              </g>
+            ))}
+            {weeks.map(d => (
+              <text
+                key={d}
+                x={Math.min(W - Rp - 14, Math.max(Lp + 14, X(dayIndex(d))))}
+                y={H - 6}
+                textAnchor="middle"
+                style={d > today ? { fill: 'var(--faint)' } : undefined}
+              >
+                {md(d)}
+              </text>
+            ))}
+            {future && (
+              <>
+                <path
+                  d={`M${X(dT)} ${Y(mean.lb!)} L${X(d1)} ${Y(mean.lb! + target!.max * 4)} L${X(d1)} ${Y(mean.lb! + target!.min * 4)} Z`}
+                  style={{ fill: 'var(--wash)' }}
+                />
+                <text x={X(d1) - 4} y={Y(mean.lb! + target!.max * 4) - 7} textAnchor="end">
+                  目标 +{target!.min}–{target!.max} / 周
+                </text>
+              </>
+            )}
+            {historical && (
+              <>
+                <line
+                  x1={X(Math.max(d0, dayIndex(target!.start)))}
+                  x2={X(dT)}
+                  y1={Y(
+                    target!.startLb +
+                      (((Math.max(d0, dayIndex(target!.start)) - dayIndex(target!.start)) / 7) *
+                        (target!.min + target!.max)) /
+                        2,
+                  )}
+                  y2={Y((historical.min + historical.max) / 2)}
+                  className="gf"
+                  strokeWidth="1"
+                />
+                <text
+                  x={Math.min(W - 45, X(dT) + 6)}
+                  y={Y((historical.min + historical.max) / 2) + 3.5}
+                  style={{ fill: 'var(--faint)' }}
+                >
+                  按目标
+                </text>
+              </>
+            )}
+            {paths.map((d, i) => (
+              <path
+                key={i}
+                d={d}
+                fill="none"
+                stroke={`url(#${id})`}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+            {weights.map(w => (
+              <circle
+                key={w.date}
+                cx={X(dayIndex(w.date))}
+                cy={Y(w.lb)}
+                r="2.5"
+                fill="var(--muted)"
+                fillOpacity=".55"
+              />
+            ))}
+            {last && (
+              <circle
+                cx={X(dayIndex(last.date))}
+                cy={Y(last.lb!)}
+                r="4"
+                fill="var(--g2)"
+                stroke="var(--bg)"
+                strokeWidth="2"
+              />
+            )}
+            {point && (
+              <g>
+                <line
+                  x1={X(dayIndex(point.date))}
+                  x2={X(dayIndex(point.date))}
+                  y1={T}
+                  y2={H - B}
+                  className="gs"
+                  strokeOpacity=".25"
+                />
+                <circle
+                  cx={X(dayIndex(point.date))}
+                  cy={Y(point.lb)}
+                  r="4"
+                  fill="var(--ink)"
+                  stroke="var(--bg)"
+                  strokeWidth="2"
+                />
+              </g>
+            )}
+          </svg>
+          {point && (
+            <div
+              className="tip on"
+              style={{
+                left: Math.min(Math.max(X(dayIndex(point.date)), 80), W - 80),
+                top: Math.max(Y(point.lb) - 50, -8),
+              }}
+            >
+              <b>{fmt(point.lb)}</b> lb{' '}
+              <span className="mu">
+                {md(point.date)}
+                {hoverMean != null ? ' · 均值 ' + round(hoverMean) : ''}
+              </span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }

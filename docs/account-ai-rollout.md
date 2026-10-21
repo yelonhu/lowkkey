@@ -22,13 +22,13 @@
 
 客户模式变量：
 
-| 名称 | 用途 |
-| --- | --- |
-| `AUTH_MODE=customer` | 启用应用客户会话 |
-| `APP_ORIGIN` | 唯一 HTTPS 客户域名，也是 OAuth issuer |
-| `AUTH_EMAIL_FROM` | 已验证发信域名的地址，例如 `lowkkey <login@your-domain>` |
-| `AI_CONNECTION_ENABLED=0` | 默认隐藏尚未验收的公网连接操作；路由与授权检查通过后改为 1 |
-| `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` | 仅旧账户迁移或 Access 模式需要 |
+| 名称                                | 用途                                                       |
+| ----------------------------------- | ---------------------------------------------------------- |
+| `AUTH_MODE=customer`                | 启用应用客户会话                                           |
+| `APP_ORIGIN`                        | 唯一 HTTPS 客户域名，也是 OAuth issuer                     |
+| `AUTH_EMAIL_FROM`                   | 已验证发信域名的地址，例如 `lowkkey <login@your-domain>`   |
+| `AI_CONNECTION_ENABLED=0`           | 默认隐藏尚未验收的公网连接操作；路由与授权检查通过后改为 1 |
+| `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` | 仅旧账户迁移或 Access 模式需要                             |
 
 用 Wrangler secrets 设置以下值，**不要写进 JSON、Git 或截图**：
 

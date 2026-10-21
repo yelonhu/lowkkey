@@ -1,56 +1,313 @@
-import { describe,it,expect } from 'vitest';
-import { Facts,TrainingSet,SessionInput,CurationInput,PlanInput } from '@lowkkey/protocol';
-import { addDays,bestSets,bodyweightOn,briefGuide,compactSets,completedWeeks,datedCuration,e1rm,getBrief,heaviest,latestRecap,localToday,mergeCuration,monday,pickData,plates,scoreSet,selfShare,setExclusion,strengthSeries,targetAt,targetStatus,themeState,upcoming,weekStatus,weightMean,weightRate,weekFacts } from '../src/index.ts';
-const stamp='2026-10-08T15:00:00Z',today='2026-10-08';
-const empty=()=>Facts.parse({sessions:[],weights:[],plans:[],profile:{gain_target:null,body_notes:null},preferences:{theme:'ink',manual_week:null},curations:[],annotations:{},plan_history:[]});
-const set=(patch:Record<string,unknown>={})=>TrainingSet.parse({ex:'bench_press',load:100,unit:'lb',kind:'external',reps:10,...patch});
-const session=(date=today,sets=[set()])=>({date,title:'胸',sets,updated_at:stamp});
-const weights=Array.from({length:14},(_,i)=>({date:addDays(today,i-13),lb:140+i*.1,updated_at:stamp}));
-const item={ex:'bench_press',load:100,unit:'lb',loadKind:'external',sets:3,min:8,max:10};
-describe('v5 shared calculations',()=>{
-  it('counts strict reps and excludes warmups, drops, partials and unknown totals',()=>{expect(e1rm(100,1)).toBe(100);expect(e1rm(100,21)).toBeNull();expect(scoreSet(set({reps:12,cheat:2}),[],today)).toBeCloseTo(133.333);for(const patch of [{role:'warmup'},{role:'drop'},{partial:true},{per:'side'}])expect(scoreSet(set(patch),[],today)).toBeNull();expect(scoreSet(set({role:'backoff'}),[],today)).not.toBeNull();expect(setExclusion(set({partial:true}),[],today)).toBe('partial_rom');});
-  it('normalizes kg and keeps dumbbells per hand',()=>{expect(scoreSet(set({load:10,unit:'kg'}),[],today)).toBeCloseTo(29.3949);expect(scoreSet(set({ex:'db_shoulder_press',load:40}),[],today)).toBeCloseTo(53.3333);});
-  it('uses only bodyweight on or before training for assist, bodyweight and extra load',()=>{const s=set({ex:'pull_up',kind:'assist',load:10,unit:'kg'});expect(scoreSet(s,[],today)).toBeNull();expect(scoreSet(s,[{date:'2026-10-09',lb:150,updated_at:stamp}],today)).toBeNull();const w=[{date:today,lb:150,updated_at:stamp}];expect(scoreSet(s,w,today)).toBeCloseTo((150-22.0462)*4/3);expect(scoreSet({...s,kind:'bodyweight',load:0},w,today)).toBe(200);expect(scoreSet({...s,kind:'bodyweight',load:10,unit:'lb'},w,today)).toBeCloseTo(160*4/3);expect(bodyweightOn(w,'2026-10-07')).toBeNull();});
-  it('selects best sets and longitudinal PRs deterministically',()=>{const f=empty();f.sessions=[session('2026-10-01',[set({load:90})]),session(today,[set({load:150,role:'warmup'}),set(),set({reps:8})])];expect(bestSets(f.sessions[1],[]).bench_press.set_index).toBe(1);const line=strengthSeries(f).find(s=>s.ex==='bench_press')!;expect(line.points).toHaveLength(2);expect(line.best?.date).toBe(today);expect(weekFacts(f,today)).toContainEqual(expect.objectContaining({kind:'pr',ex:'bench_press'}));});
-  it('formats adjacent groups without merging different units or load semantics',()=>{expect(compactSets([set({role:'warmup'}),set({load:135,reps:10,cheat:2}),set({load:135,reps:7}),set({load:125,reps:6,partial:true})])).toBe('135 × 8+2 / 7 · 125 × 6*');expect(compactSets([set({unit:'kg'}),set()],true)).toBe('100 kg × 10 · 100 lb × 10');});
-  it('fits exact plates and refuses approximate loads',()=>{expect(plates(135)).toEqual([45]);expect(plates(175)).toEqual([45,10,10]);expect(plates(45)).toEqual([]);expect(plates(136)).toBeNull();});
-  it('requires four real dates in seven calendar days, never fills missing dates',()=>{expect(weightMean(weights.slice(-3),today)).toEqual({date:today,lb:null,n:3});expect(weightMean(weights,today).n).toBe(7);expect(weightMean(weights,today).lb).toBeCloseTo(141);expect(weightMean(weights,addDays(today,7)).lb).toBeNull();});
-  it('regresses at least eight points using actual dates and compares unrounded rate',()=>{expect(weightRate(weights,today)).toBeCloseTo(.7);expect(weightRate(weights.slice(-7),today)).toBeNull();const target={start:today,startLb:140,min:.55,max:.77};expect(targetStatus(.7,target)).toBe('within');expect(targetStatus(.7701,target)).toBe('above');expect(targetStatus(.7,null)).toBeNull();expect(targetAt(target,addDays(today,28))).toEqual({date:addDays(today,28),min:142.2,max:143.08});});
-  it('uses Chicago dates and Monday weeks at daylight-saving boundaries',()=>{expect(localToday(new Date('2026-10-09T04:30:00Z'))).toBe(today);expect(localToday(new Date('2026-11-02T05:30:00Z'))).toBe('2026-11-01');expect(monday('2026-10-11')).toBe('2026-10-05');});
-  it('finds the next seven dates and skips today after a recorded session',()=>{const f=empty();f.plans=[{...PlanInput.parse({title:'胸',weekday:4,items:[item]}),updated_at:stamp}];expect(upcoming(f,today)[0].date).toBe(today);f.sessions=[session()];expect(upcoming(f,today)).toEqual([]);});
-  it('retains the latest applicable AI theme and ignores manual and future choices',()=>{const f=empty();f.curations=[{week:'2026-10-05',theme:{id:'gold',why:'达成'},updated_at:stamp,revision:1},{week:'2026-10-19',theme:{id:'pearl',why:'下周'},updated_at:stamp,revision:2}];f.preferences={theme:'pearl',manual_week:'2026-10-05'};expect(themeState(f,today)).toMatchObject({active:'gold',manual_this_week:false,source_week:'2026-10-05',reason:'达成'});expect(themeState(f,'2026-10-12').active).toBe('gold');expect(themeState(f,'2026-10-19').active).toBe('pearl');f.curations[1].theme=null;expect(themeState(f,'2026-10-19').active).toBe('gold');f.curations[0].theme=null;expect(themeState(f,today).active).toBe('ink');});
-  it('expires dated copy and never resurrects explicitly cleared advice',()=>{const f=empty();f.curations=[{week:'2026-09-28',body:{date:'2026-10-01',text:'旧内容'},updated_at:stamp,revision:1}];expect(datedCuration(f,'body',today)).toBeNull();f.curations[0].body!.date='2026-10-07';f.curations.push({week:'2026-10-05',body:null,updated_at:stamp,revision:2});expect(datedCuration(f,'body',today)).toBeNull();});
-  it('falls back to the last letter and retains its theme',()=>{const f=empty();f.curations=[{week:'2026-09-28',theme:{id:'gold',why:'历史主题'},recap:{title:'上一封',letter:['正文']},revision:1,updated_at:stamp},{week:'2026-10-05',body:{date:today,text:'本周'},revision:2,updated_at:stamp}];expect(latestRecap(f,today)?.week).toBe('2026-09-28');expect(themeState(f,today).active).toBe('gold');});
-  it('merges recap subfields and per-date annotations, preserving null clear',()=>{const c=mergeCuration(undefined,{week:'2026-10-05',recap:{title:'标题',letter:['正文']},log:{[today]:'批注'}},1,stamp);const n=mergeCuration(c,{week:c.week,recap:{title:null},log:{[today]:null}},2,stamp);expect(n.recap).toEqual({title:null,letter:['正文']});expect(n.log).toEqual({});});
-  it('selects assistance at >=8 strict reps, with latest equal-assistance date',()=>{const f=empty();f.weights=weights;f.sessions=[session('2026-10-01',[set({ex:'pull_up',kind:'assist',load:12,unit:'kg'})]),session(today,[set({ex:'pull_up',kind:'assist',load:10,unit:'kg',reps:7}),set({ex:'pull_up',kind:'assist',load:12,unit:'kg',reps:8})])];expect(heaviest(f,'pull_up')?.date).toBe(today);expect(heaviest(f,'pull_up')?.set.load).toBe(12);expect(selfShare(heaviest(f,'pull_up')!.set,today,[])).toBeNull();});
-  it('detects stalls, breakthroughs and milestones from eligible completed sets',()=>{const f=empty();f.sessions=['2026-09-25','2026-09-28','2026-09-30','2026-10-05','2026-10-07'].map((d,i)=>session(d,[set({load:i===4?135:100})]));const facts=weekFacts(f,today);expect(facts).toContainEqual(expect.objectContaining({kind:'unstuck',after_sessions:3}));expect(facts).toContainEqual(expect.objectContaining({kind:'threshold',what:'一片'}));});
-  it('does not retrospectively invent plan adherence',()=>{const f=empty();const plan={...PlanInput.parse({title:'胸',weekday:2,items:[item]}),updated_at:stamp};f.plans=[plan];expect(weekFacts(f,today).some(x=>x.kind==='missed')).toBe(false);f.plan_history=[{effective_date:'2026-09-28',revision:1,plans:[plan]}];f.sessions=[session('2026-09-29')];expect(completedWeeks(f,today)).toBe(1);expect(weekFacts(f,today)).toContainEqual({kind:'missed',date:'2026-10-06',title:'胸'});});
-  it('returns six compact sessions by default, real custom history, and no raw data',()=>{const f=empty();f.sessions=Array.from({length:8},(_,i)=>session(addDays(today,-i),[set({ex:'custom',name:'自定义动作'})]));const b=getBrief(f,stamp);expect(b.sessions).toHaveLength(6);expect(b.exercises).toHaveLength(1);expect(b.exercises[0].prev).not.toBeNull();expect(JSON.stringify(b)).not.toContain('raw_text');expect(getBrief(f,stamp,0).sessions).toEqual([]);});
-  it('resolves all five pick types and ignores deleted references',()=>{const f=empty();f.weights=weights;f.sessions=[session(today,[set({load:135}),set({ex:'db_shoulder_press',load:40}),set({ex:'pull_up',kind:'assist',load:10,unit:'kg'})])];for(const [kind,ex] of [['barbell','bench_press'],['dumbbell','db_shoulder_press'],['assist','pull_up'],['weight',undefined],['rhythm',undefined]] as const)expect(pickData(f,{kind,ex,date:today,title:'标题',note:''})).not.toBeNull();expect(pickData(f,{kind:'barbell',ex:'back_squat',date:today,title:'标题',note:''})).toBeNull();});
-  it('counts the week from the first session and compares done days with planned weekdays',()=>{
-    const f=empty();
-    expect(weekStatus(f,today)).toEqual({start:'2026-10-05',index:1,done:0,planned:0});
-    f.plans=[{...PlanInput.parse({title:'胸',weekday:2,items:[item]}),updated_at:stamp},{...PlanInput.parse({title:'腿',weekday:4,items:[item]}),updated_at:stamp}];
-    f.sessions=[session('2026-09-22'),session('2026-10-06')];
-    expect(weekStatus(f,today)).toEqual({start:'2026-10-05',index:3,done:1,planned:2});
+import { describe, it, expect } from 'vitest';
+import { Facts, TrainingSet, SessionInput, CurationInput, PlanInput } from '@lowkkey/protocol';
+import {
+  addDays,
+  bestSets,
+  bodyweightOn,
+  briefGuide,
+  compactSets,
+  completedWeeks,
+  datedCuration,
+  e1rm,
+  getBrief,
+  heaviest,
+  latestRecap,
+  localToday,
+  mergeCuration,
+  monday,
+  pickData,
+  plates,
+  scoreSet,
+  selfShare,
+  setExclusion,
+  strengthSeries,
+  targetAt,
+  targetStatus,
+  themeState,
+  upcoming,
+  weekStatus,
+  weightMean,
+  weightRate,
+  weekFacts,
+} from '../src/index.ts';
+const stamp = '2026-10-08T15:00:00Z',
+  today = '2026-10-08';
+const empty = () =>
+  Facts.parse({
+    sessions: [],
+    weights: [],
+    plans: [],
+    profile: { gain_target: null, body_notes: null },
+    preferences: { theme: 'ink', manual_week: null },
+    curations: [],
+    annotations: {},
+    plan_history: [],
   });
-  it('derives the keeper guide from saved facts and granted permissions only',()=>{
-    const f=empty();
-    const readOnly=briefGuide(f,today,['read'],{entry:null});
-    expect(readOnly.stage).toBe('empty');expect(readOnly.next_step).toContain('只读');
-    const fresh=briefGuide(f,today,['read','write'],{entry:null});
-    expect(fresh.missing).toEqual(['training_context','plan','session','weight']);expect(fresh.next_step).toContain('一次问一个');
-    expect(briefGuide(f,today,['read','write'],{entry:'existing'}).next_step).toContain('已有的计划或记录');
-    f.profile.training_context='每周三次，家里有哑铃。';
-    f.plans=[{...PlanInput.parse({title:'胸',weekday:4,items:[item]}),updated_at:stamp}];
-    const setup=briefGuide(f,today,['read','write'],{entry:'start'});
-    expect(setup.stage).toBe('setup');expect(setup.missing).toEqual(['next_note','session','weight']);expect(setup.next_step).toContain('计划已就位');
-    f.sessions=[session(today)];f.weights=weights;
-    const active=briefGuide(f,today,['read','write'],{entry:'start'});
-    expect(active.stage).toBe('active');expect(active.missing).toContain('week_letter');expect(active.missing).toContain('body_note');expect(active.next_step).toContain('周信');
-    f.curations=[{week:'2026-10-05',recap:{letter:['写过了']},body:{date:today,text:'稳'},next:{date:addDays(today,7),text:'下次'},revision:1,updated_at:stamp}];
-    const settled=briefGuide(f,today,['read','write'],{entry:'start'});
-    expect(settled.missing).toEqual([]);expect(settled.next_step).toContain('接续已有事实');
+const set = (patch: Record<string, unknown> = {}) =>
+  TrainingSet.parse({ ex: 'bench_press', load: 100, unit: 'lb', kind: 'external', reps: 10, ...patch });
+const session = (date = today, sets = [set()]) => ({ date, title: '胸', sets, updated_at: stamp });
+const weights = Array.from({ length: 14 }, (_, i) => ({
+  date: addDays(today, i - 13),
+  lb: 140 + i * 0.1,
+  updated_at: stamp,
+}));
+const item = { ex: 'bench_press', load: 100, unit: 'lb', loadKind: 'external', sets: 3, min: 8, max: 10 };
+describe('v5 shared calculations', () => {
+  it('counts strict reps and excludes warmups, drops, partials and unknown totals', () => {
+    expect(e1rm(100, 1)).toBe(100);
+    expect(e1rm(100, 21)).toBeNull();
+    expect(scoreSet(set({ reps: 12, cheat: 2 }), [], today)).toBeCloseTo(133.333);
+    for (const patch of [{ role: 'warmup' }, { role: 'drop' }, { partial: true }, { per: 'side' }])
+      expect(scoreSet(set(patch), [], today)).toBeNull();
+    expect(scoreSet(set({ role: 'backoff' }), [], today)).not.toBeNull();
+    expect(setExclusion(set({ partial: true }), [], today)).toBe('partial_rom');
   });
-  it('rejects deprecated inputs, invalid borrowed reps and invalid curation',()=>{expect(SessionInput.safeParse({date:today,title:'胸',sets:[],raw_text:'old'}).success).toBe(false);expect(TrainingSet.safeParse({...set(),cheat:11}).success).toBe(false);expect(TrainingSet.safeParse({...set(),ex:'custom'}).success).toBe(false);for(const value of [{week:today},{week:'2026-10-05',theme:{id:'gold',why:'好！'}},{week:'2026-10-05',body:{date:today,text:'👍'}}])expect(CurationInput.safeParse(value).success).toBe(false);});
+  it('normalizes kg and keeps dumbbells per hand', () => {
+    expect(scoreSet(set({ load: 10, unit: 'kg' }), [], today)).toBeCloseTo(29.3949);
+    expect(scoreSet(set({ ex: 'db_shoulder_press', load: 40 }), [], today)).toBeCloseTo(53.3333);
+  });
+  it('uses only bodyweight on or before training for assist, bodyweight and extra load', () => {
+    const s = set({ ex: 'pull_up', kind: 'assist', load: 10, unit: 'kg' });
+    expect(scoreSet(s, [], today)).toBeNull();
+    expect(scoreSet(s, [{ date: '2026-10-09', lb: 150, updated_at: stamp }], today)).toBeNull();
+    const w = [{ date: today, lb: 150, updated_at: stamp }];
+    expect(scoreSet(s, w, today)).toBeCloseTo(((150 - 22.0462) * 4) / 3);
+    expect(scoreSet({ ...s, kind: 'bodyweight', load: 0 }, w, today)).toBe(200);
+    expect(scoreSet({ ...s, kind: 'bodyweight', load: 10, unit: 'lb' }, w, today)).toBeCloseTo((160 * 4) / 3);
+    expect(bodyweightOn(w, '2026-10-07')).toBeNull();
+  });
+  it('selects best sets and longitudinal PRs deterministically', () => {
+    const f = empty();
+    f.sessions = [
+      session('2026-10-01', [set({ load: 90 })]),
+      session(today, [set({ load: 150, role: 'warmup' }), set(), set({ reps: 8 })]),
+    ];
+    expect(bestSets(f.sessions[1], []).bench_press.set_index).toBe(1);
+    const line = strengthSeries(f).find(s => s.ex === 'bench_press')!;
+    expect(line.points).toHaveLength(2);
+    expect(line.best?.date).toBe(today);
+    expect(weekFacts(f, today)).toContainEqual(expect.objectContaining({ kind: 'pr', ex: 'bench_press' }));
+  });
+  it('formats adjacent groups without merging different units or load semantics', () => {
+    expect(
+      compactSets([
+        set({ role: 'warmup' }),
+        set({ load: 135, reps: 10, cheat: 2 }),
+        set({ load: 135, reps: 7 }),
+        set({ load: 125, reps: 6, partial: true }),
+      ]),
+    ).toBe('135 × 8+2 / 7 · 125 × 6*');
+    expect(compactSets([set({ unit: 'kg' }), set()], true)).toBe('100 kg × 10 · 100 lb × 10');
+  });
+  it('fits exact plates and refuses approximate loads', () => {
+    expect(plates(135)).toEqual([45]);
+    expect(plates(175)).toEqual([45, 10, 10]);
+    expect(plates(45)).toEqual([]);
+    expect(plates(136)).toBeNull();
+  });
+  it('requires four real dates in seven calendar days, never fills missing dates', () => {
+    expect(weightMean(weights.slice(-3), today)).toEqual({ date: today, lb: null, n: 3 });
+    expect(weightMean(weights, today).n).toBe(7);
+    expect(weightMean(weights, today).lb).toBeCloseTo(141);
+    expect(weightMean(weights, addDays(today, 7)).lb).toBeNull();
+  });
+  it('regresses at least eight points using actual dates and compares unrounded rate', () => {
+    expect(weightRate(weights, today)).toBeCloseTo(0.7);
+    expect(weightRate(weights.slice(-7), today)).toBeNull();
+    const target = { start: today, startLb: 140, min: 0.55, max: 0.77 };
+    expect(targetStatus(0.7, target)).toBe('within');
+    expect(targetStatus(0.7701, target)).toBe('above');
+    expect(targetStatus(0.7, null)).toBeNull();
+    expect(targetAt(target, addDays(today, 28))).toEqual({ date: addDays(today, 28), min: 142.2, max: 143.08 });
+  });
+  it('uses Chicago dates and Monday weeks at daylight-saving boundaries', () => {
+    expect(localToday(new Date('2026-10-09T04:30:00Z'))).toBe(today);
+    expect(localToday(new Date('2026-11-02T05:30:00Z'))).toBe('2026-11-01');
+    expect(monday('2026-10-11')).toBe('2026-10-05');
+  });
+  it('finds the next seven dates and skips today after a recorded session', () => {
+    const f = empty();
+    f.plans = [{ ...PlanInput.parse({ title: '胸', weekday: 4, items: [item] }), updated_at: stamp }];
+    expect(upcoming(f, today)[0].date).toBe(today);
+    f.sessions = [session()];
+    expect(upcoming(f, today)).toEqual([]);
+  });
+  it('retains the latest applicable AI theme and ignores manual and future choices', () => {
+    const f = empty();
+    f.curations = [
+      { week: '2026-10-05', theme: { id: 'gold', why: '达成' }, updated_at: stamp, revision: 1 },
+      { week: '2026-10-19', theme: { id: 'pearl', why: '下周' }, updated_at: stamp, revision: 2 },
+    ];
+    f.preferences = { theme: 'pearl', manual_week: '2026-10-05' };
+    expect(themeState(f, today)).toMatchObject({
+      active: 'gold',
+      manual_this_week: false,
+      source_week: '2026-10-05',
+      reason: '达成',
+    });
+    expect(themeState(f, '2026-10-12').active).toBe('gold');
+    expect(themeState(f, '2026-10-19').active).toBe('pearl');
+    f.curations[1].theme = null;
+    expect(themeState(f, '2026-10-19').active).toBe('gold');
+    f.curations[0].theme = null;
+    expect(themeState(f, today).active).toBe('ink');
+  });
+  it('expires dated copy and never resurrects explicitly cleared advice', () => {
+    const f = empty();
+    f.curations = [
+      { week: '2026-09-28', body: { date: '2026-10-01', text: '旧内容' }, updated_at: stamp, revision: 1 },
+    ];
+    expect(datedCuration(f, 'body', today)).toBeNull();
+    f.curations[0].body!.date = '2026-10-07';
+    f.curations.push({ week: '2026-10-05', body: null, updated_at: stamp, revision: 2 });
+    expect(datedCuration(f, 'body', today)).toBeNull();
+  });
+  it('falls back to the last letter and retains its theme', () => {
+    const f = empty();
+    f.curations = [
+      {
+        week: '2026-09-28',
+        theme: { id: 'gold', why: '历史主题' },
+        recap: { title: '上一封', letter: ['正文'] },
+        revision: 1,
+        updated_at: stamp,
+      },
+      { week: '2026-10-05', body: { date: today, text: '本周' }, revision: 2, updated_at: stamp },
+    ];
+    expect(latestRecap(f, today)?.week).toBe('2026-09-28');
+    expect(themeState(f, today).active).toBe('gold');
+  });
+  it('merges recap subfields and per-date annotations, preserving null clear', () => {
+    const c = mergeCuration(
+      undefined,
+      { week: '2026-10-05', recap: { title: '标题', letter: ['正文'] }, log: { [today]: '批注' } },
+      1,
+      stamp,
+    );
+    const n = mergeCuration(c, { week: c.week, recap: { title: null }, log: { [today]: null } }, 2, stamp);
+    expect(n.recap).toEqual({ title: null, letter: ['正文'] });
+    expect(n.log).toEqual({});
+  });
+  it('selects assistance at >=8 strict reps, with latest equal-assistance date', () => {
+    const f = empty();
+    f.weights = weights;
+    f.sessions = [
+      session('2026-10-01', [set({ ex: 'pull_up', kind: 'assist', load: 12, unit: 'kg' })]),
+      session(today, [
+        set({ ex: 'pull_up', kind: 'assist', load: 10, unit: 'kg', reps: 7 }),
+        set({ ex: 'pull_up', kind: 'assist', load: 12, unit: 'kg', reps: 8 }),
+      ]),
+    ];
+    expect(heaviest(f, 'pull_up')?.date).toBe(today);
+    expect(heaviest(f, 'pull_up')?.set.load).toBe(12);
+    expect(selfShare(heaviest(f, 'pull_up')!.set, today, [])).toBeNull();
+  });
+  it('detects stalls, breakthroughs and milestones from eligible completed sets', () => {
+    const f = empty();
+    f.sessions = ['2026-09-25', '2026-09-28', '2026-09-30', '2026-10-05', '2026-10-07'].map((d, i) =>
+      session(d, [set({ load: i === 4 ? 135 : 100 })]),
+    );
+    const facts = weekFacts(f, today);
+    expect(facts).toContainEqual(expect.objectContaining({ kind: 'unstuck', after_sessions: 3 }));
+    expect(facts).toContainEqual(expect.objectContaining({ kind: 'threshold', what: '一片' }));
+  });
+  it('does not retrospectively invent plan adherence', () => {
+    const f = empty();
+    const plan = { ...PlanInput.parse({ title: '胸', weekday: 2, items: [item] }), updated_at: stamp };
+    f.plans = [plan];
+    expect(weekFacts(f, today).some(x => x.kind === 'missed')).toBe(false);
+    f.plan_history = [{ effective_date: '2026-09-28', revision: 1, plans: [plan] }];
+    f.sessions = [session('2026-09-29')];
+    expect(completedWeeks(f, today)).toBe(1);
+    expect(weekFacts(f, today)).toContainEqual({ kind: 'missed', date: '2026-10-06', title: '胸' });
+  });
+  it('returns six compact sessions by default, real custom history, and no raw data', () => {
+    const f = empty();
+    f.sessions = Array.from({ length: 8 }, (_, i) =>
+      session(addDays(today, -i), [set({ ex: 'custom', name: '自定义动作' })]),
+    );
+    const b = getBrief(f, stamp);
+    expect(b.sessions).toHaveLength(6);
+    expect(b.exercises).toHaveLength(1);
+    expect(b.exercises[0].prev).not.toBeNull();
+    expect(JSON.stringify(b)).not.toContain('raw_text');
+    expect(getBrief(f, stamp, 0).sessions).toEqual([]);
+  });
+  it('resolves all five pick types and ignores deleted references', () => {
+    const f = empty();
+    f.weights = weights;
+    f.sessions = [
+      session(today, [
+        set({ load: 135 }),
+        set({ ex: 'db_shoulder_press', load: 40 }),
+        set({ ex: 'pull_up', kind: 'assist', load: 10, unit: 'kg' }),
+      ]),
+    ];
+    for (const [kind, ex] of [
+      ['barbell', 'bench_press'],
+      ['dumbbell', 'db_shoulder_press'],
+      ['assist', 'pull_up'],
+      ['weight', undefined],
+      ['rhythm', undefined],
+    ] as const)
+      expect(pickData(f, { kind, ex, date: today, title: '标题', note: '' })).not.toBeNull();
+    expect(pickData(f, { kind: 'barbell', ex: 'back_squat', date: today, title: '标题', note: '' })).toBeNull();
+  });
+  it('counts the week from the first session and compares done days with planned weekdays', () => {
+    const f = empty();
+    expect(weekStatus(f, today)).toEqual({ start: '2026-10-05', index: 1, done: 0, planned: 0 });
+    f.plans = [
+      { ...PlanInput.parse({ title: '胸', weekday: 2, items: [item] }), updated_at: stamp },
+      { ...PlanInput.parse({ title: '腿', weekday: 4, items: [item] }), updated_at: stamp },
+    ];
+    f.sessions = [session('2026-09-22'), session('2026-10-06')];
+    expect(weekStatus(f, today)).toEqual({ start: '2026-10-05', index: 3, done: 1, planned: 2 });
+  });
+  it('derives the keeper guide from saved facts and granted permissions only', () => {
+    const f = empty();
+    const readOnly = briefGuide(f, today, ['read'], { entry: null });
+    expect(readOnly.stage).toBe('empty');
+    expect(readOnly.next_step).toContain('只读');
+    const fresh = briefGuide(f, today, ['read', 'write'], { entry: null });
+    expect(fresh.missing).toEqual(['training_context', 'plan', 'session', 'weight']);
+    expect(fresh.next_step).toContain('一次问一个');
+    expect(briefGuide(f, today, ['read', 'write'], { entry: 'existing' }).next_step).toContain('已有的计划或记录');
+    f.profile.training_context = '每周三次，家里有哑铃。';
+    f.plans = [{ ...PlanInput.parse({ title: '胸', weekday: 4, items: [item] }), updated_at: stamp }];
+    const setup = briefGuide(f, today, ['read', 'write'], { entry: 'start' });
+    expect(setup.stage).toBe('setup');
+    expect(setup.missing).toEqual(['next_note', 'session', 'weight']);
+    expect(setup.next_step).toContain('计划已就位');
+    f.sessions = [session(today)];
+    f.weights = weights;
+    const active = briefGuide(f, today, ['read', 'write'], { entry: 'start' });
+    expect(active.stage).toBe('active');
+    expect(active.missing).toContain('week_letter');
+    expect(active.missing).toContain('body_note');
+    expect(active.next_step).toContain('周信');
+    f.curations = [
+      {
+        week: '2026-10-05',
+        recap: { letter: ['写过了'] },
+        body: { date: today, text: '稳' },
+        next: { date: addDays(today, 7), text: '下次' },
+        revision: 1,
+        updated_at: stamp,
+      },
+    ];
+    const settled = briefGuide(f, today, ['read', 'write'], { entry: 'start' });
+    expect(settled.missing).toEqual([]);
+    expect(settled.next_step).toContain('接续已有事实');
+  });
+  it('rejects deprecated inputs, invalid borrowed reps and invalid curation', () => {
+    expect(SessionInput.safeParse({ date: today, title: '胸', sets: [], raw_text: 'old' }).success).toBe(false);
+    expect(TrainingSet.safeParse({ ...set(), cheat: 11 }).success).toBe(false);
+    expect(TrainingSet.safeParse({ ...set(), ex: 'custom' }).success).toBe(false);
+    for (const value of [
+      { week: today },
+      { week: '2026-10-05', theme: { id: 'gold', why: '好！' } },
+      { week: '2026-10-05', body: { date: today, text: '👍' } },
+    ])
+      expect(CurationInput.safeParse(value).success).toBe(false);
+  });
 });
