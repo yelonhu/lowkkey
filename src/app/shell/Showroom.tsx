@@ -151,25 +151,6 @@ export function Showroom() {
     targetPositioned.current = key;
   }, [target, screen, chamber.state]);
 
-  if (chamber.auth === 'loading') return <SessionLoading error={chamber.error} retry={chamber.refresh} />;
-  if (chamber.auth === 'consent') return <ConsentGate chamber={chamber} />;
-  if (chamber.auth !== 'ready' || !chamber.state) return <LoginGate chamber={chamber} />;
-  if (!settings && showingOnboarding)
-    return (
-      <Onboarding
-        product={product}
-        onNotes={() => {
-          setStarting(false);
-          location.hash = 'notes';
-        }}
-        onClose={() => {
-          setStarting(false);
-          if (location.hash === '#start') location.hash = 'next';
-          void chamber.refresh();
-        }}
-      />
-    );
-
   // A door copies one sentence and opens the user's AI; the conversation stays there.
   const [toast, setToast] = useState('');
   const toastTimer = useRef<number>(0);
@@ -206,6 +187,25 @@ export function Showroom() {
     },
     [ai],
   );
+  if (chamber.auth === 'loading') return <SessionLoading error={chamber.error} retry={chamber.refresh} />;
+  if (chamber.auth === 'consent') return <ConsentGate chamber={chamber} />;
+  if (chamber.auth !== 'ready' || !chamber.state) return <LoginGate chamber={chamber} />;
+  if (!settings && showingOnboarding)
+    return (
+      <Onboarding
+        product={product}
+        onNotes={() => {
+          setStarting(false);
+          location.hash = 'notes';
+        }}
+        onClose={() => {
+          setStarting(false);
+          if (location.hash === '#start') location.hash = 'next';
+          void chamber.refresh();
+        }}
+      />
+    );
+
   const facts = chamber.state,
     today = facts.today,
     theme = facts.theme_state;
