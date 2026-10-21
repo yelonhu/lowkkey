@@ -12,6 +12,7 @@ const displayFont =
 // A few are shown as earned with dates; the rest wait as outlines. Names come from the catalog.
 const earnedDates: Record<string, string> = {
   first_session: '2026-09-23',
+  first_plan: '2026-09-22',
   plate_1: '2026-10-03',
   letter_1: '2026-10-05',
   weigh_1: '2026-09-23',
@@ -19,6 +20,7 @@ const earnedDates: Record<string, string> = {
   streak_4: '2026-10-26',
   week_full: '2026-10-12',
   note_1: '2026-10-14',
+  rest_kept: '2026-10-18',
 };
 
 function useDisplayFont() {
@@ -257,12 +259,12 @@ export function Styleguide() {
             </div>
           </div>
           <div className="sg-spec">
-            <span>品牌字 · 正体候选 · 现在是 Inter</span>
+            <span>品牌字 · 已定 Bodoni Moda 正体</span>
             <div className="sg-brands">
               {(
                 [
-                  ['inter', 'Inter 600', '现在'],
-                  ['bodoni', 'Bodoni Moda 500', '与奖章同一张脸'],
+                  ['bodoni', 'Bodoni Moda 500', '已定 · 与奖章同一张脸'],
+                  ['inter', 'Inter 600', '此前'],
                   ['newsreader', 'Newsreader 600', '报纸的衬线，稳'],
                   ['fraunces', 'Fraunces 500', '软一点，有性格'],
                   ['cormorant', 'Cormorant 600', '细而贵'],
@@ -355,8 +357,19 @@ export function Styleguide() {
           ))}
         </div>
         <p className="sg-note">
-          名字是趣味所在：一句诗、一个被反用的成语、对事物本身的双关、对游戏的致意。章上只有一个图样，名字在章下，条件只说一次。未获得的是一圈线，等着被刻上。金属随主题：水墨是铂金，鎏金是金。
+          名字是趣味所在：欧洲史里的故事、奢侈品牌的起家、健身房里的梗、被反用的中文句子。章上只有一个图样，名字在章下，条件只说一次；典故在下面。未获得的是一圈线，等着被刻上。
         </p>
+        <details className="sg-lore">
+          <summary>每一枚的典故</summary>
+          <dl>
+            {ACHIEVEMENTS.map(m => (
+              <div key={m.id}>
+                <dt>{m.name}</dt>
+                <dd>{m.lore}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       </section>
 
       <section className="sg-sec">
@@ -445,10 +458,10 @@ export function Styleguide() {
               </a>
             </article>
             <article className="bd-card bd-medal">
-              <Medal motif="135" unit="lb" name="一片冰心" date="2026-10-03" size={96} />
+              <Medal motif="犊" name="米洛的牛犊" date="2026-10-10" size={96} />
               <p>
                 <b>本周落下一枚</b>
-                卧推第一次挂上一片。它会留在 recap 页末尾的成就墙上。
+                卧推的第一个纪录。它会留在 recap 页末尾的成就墙上。
               </p>
             </article>
           </div>

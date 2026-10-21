@@ -326,6 +326,42 @@
   gap: var(--s7) var(--s4);
   justify-items: center;
 }
+.sg-lore {
+  margin-top: var(--s6);
+  border-top: var(--hair) solid var(--line);
+}
+.sg-lore summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: var(--t-label);
+  color: var(--ink2);
+  cursor: pointer;
+  list-style: none;
+}
+.sg-lore summary::after {
+  content: '+';
+  margin-left: auto;
+  color: var(--faint);
+}
+.sg-lore[open] summary::after {
+  content: '−';
+}
+.sg-lore dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s4) var(--s6);
+  margin: 0 0 var(--s4);
+}
+.sg-lore dt {
+  font: 500 var(--t-label) / 1.5 var(--font);
+  color: var(--ink);
+}
+.sg-lore dd {
+  margin: 2px 0 0;
+  font: 400 var(--t-small) / 1.7 var(--font);
+  color: var(--muted);
+}
 .sg-medals .medal span {
   max-width: 132px;
   line-height: 1.5;

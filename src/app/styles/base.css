@@ -92,8 +92,10 @@ summary,
   height: calc(48px + max(18px, env(safe-area-inset-top)) - 18px);
 }
 .brand {
-  font: 600 15px/1 var(--font);
-  letter-spacing: -0.01em;
+  /* 品牌字：Bodoni Moda 正体，与奖章上的数字同一张脸。小字用低光学尺寸让发丝立得住。 */
+  font: 500 19px/1 var(--display);
+  font-variation-settings: 'opsz' 18;
+  letter-spacing: 0.01em;
 }
 /* 品牌后的句点是这个舱的心跳：平时缓慢呼吸，同步时加快。 */
 .brand::after {
