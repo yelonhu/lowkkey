@@ -24,6 +24,8 @@ import {
 } from '@lowkkey/core';
 import { Equipment } from '../ui/Graphics.tsx';
 import { Medal } from '../ui/Medal.tsx';
+import { ShareButton } from '../ui/ShareButton.tsx';
+import { letterImage, medalImage } from '../ui/share.ts';
 import { StrengthChart, WeightChart } from '../ui/TrendChart.tsx';
 import { useState } from 'react';
 function ContactSheet({ facts, today, weekOnly }: { facts: Facts; today: string; weekOnly?: string }) {
@@ -197,6 +199,20 @@ function MedalWall({ medals }: { medals: StateResponse['medals'] }) {
           {chosen.story.map((paragraph, i) => (
             <p key={i}>{paragraph}</p>
           ))}
+          <ShareButton
+            make={() =>
+              medalImage({
+                name: chosen.name,
+                motif: chosen.motif,
+                unit: chosen.unit,
+                date: chosen.date,
+                occasion: chosen.occasion,
+                story: chosen.story,
+              })
+            }
+            name={'lowkkey-' + chosen.key + '.png'}
+            title={chosen.name}
+          />
         </div>
       )}
     </section>
@@ -239,6 +255,20 @@ export function RecapView({
             ))}
           </div>
           {letter.recap.sign && <p className="sign">— {letter.recap.sign}</p>}
+          {!!letter.recap.letter?.length && (
+            <ShareButton
+              make={() =>
+                letterImage({
+                  meta: `week ${wi} · ${md(w0)} – ${md(addDays(w0, 6))}`,
+                  title: letter.recap!.title,
+                  paragraphs: letter.recap!.letter ?? [],
+                  sign: letter.recap!.sign,
+                })
+              }
+              name={'lowkkey-letter-' + letter.week + '.png'}
+              title={letter.recap.title ?? '周信'}
+            />
+          )}
         </section>
       )}
       {!!letter?.recap?.picks?.some(p => pickData(facts, p)) && (

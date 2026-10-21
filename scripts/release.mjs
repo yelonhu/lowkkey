@@ -1,6 +1,6 @@
 import { spawnSync, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, chmodSync, mkdirSync } from 'node:fs';
-import { randomBytes, createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { environment, root } from './environment.mjs';
 
 process.chdir(root);
@@ -100,6 +100,21 @@ switch (command) {
   case 'create-kv':
     wrangler('kv', 'namespace', 'create', 'lowkkey-showroom-beta-oauth', '--update-config=false');
     break;
+  case 'vapid': {
+    // 信到了 signs its pushes with one P-256 key. It is generated here, kept only in the secrets file.
+    if (!existsSync(secretsFile)) throw new Error('Run init-secrets first');
+    const current = JSON.parse(readFileSync(secretsFile, 'utf8'));
+    if (current.VAPID_PRIVATE_JWK) {
+      console.log('VAPID key already present; keeping it so existing subscriptions stay valid.');
+      break;
+    }
+    const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const jwk = privateKey.export({ format: 'jwk' });
+    current.VAPID_PRIVATE_JWK = JSON.stringify({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d });
+    writeFileSync(secretsFile, JSON.stringify(current, null, 2) + '\n', { mode: 0o600 });
+    console.log('Added VAPID_PRIVATE_JWK to the private secrets file. Deploy to publish it.');
+    break;
+  }
   case 'init-secrets': {
     if (existsSync(secretsFile)) throw new Error('Secrets file already exists; it will not be overwritten');
     writeFileSync(
@@ -316,7 +331,7 @@ switch (command) {
     const secrets = JSON.parse(readFileSync(secretsFile, 'utf8'));
     if (
       Object.keys(secrets).some(
-        key => !['BETTER_AUTH_SECRET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'].includes(key),
+        key => !['BETTER_AUTH_SECRET', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'VAPID_PRIVATE_JWK'].includes(key),
       ) ||
       typeof secrets.BETTER_AUTH_SECRET !== 'string' ||
       secrets.BETTER_AUTH_SECRET.length < 32 ||
@@ -353,6 +368,6 @@ switch (command) {
   }
   default:
     console.log(
-      'Usage: ./scripts/release login|whoami|resources|create-d1|create-kv|init-secrets|backup|verify-backup|backup-v5|migrate|import-v5 PRIVATE_HTML EMAIL|retire-v4|build|deploy|status',
+      'Usage: ./scripts/release login|whoami|resources|create-d1|create-kv|init-secrets|vapid|backup|verify-backup|backup-v5|migrate|import-v5 PRIVATE_HTML EMAIL|retire-v4|build|deploy|status',
     );
 }

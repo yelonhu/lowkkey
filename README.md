@@ -43,6 +43,8 @@
 
 写入立即生效，返回保存对象和 `view_url`。同日修正须重传完整组数据。输入先验证，D1 原子批次及版本比较防止并发 patch 丢失。网页通过独立接口编辑随手记，AI 写随手记需单独授权一次（`notes:write`，同时需要 `read`）；普通读写连接为十项，不含 `write_note`。默认保留原文后追加，只有明确要求才改写或清空。随手记有独立日期版本；冲突保留两份供用户选择，断网草稿按账户暂存本机，同步后移除。导出和注销覆盖随手记。
 
+信到了：AI 写了周信、落下一枚奖章时，服务端通过 Web Push 推一句（十分钟一条、一周三条），设置里一键开关；iPhone 需从主屏幕打开。壳与静态资源由 service worker 留在本机，即开。
+
 [协议说明](docs/lowkkey-handoff/INTERFACE.md) · [设计实现](docs/lowkkey-handoff/DESIGN.md) · [beta 发布与迁移](docs/showroom-beta.md)
 
 ## 首次使用与账户

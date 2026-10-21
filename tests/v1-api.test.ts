@@ -60,6 +60,36 @@ const call = (path: string, method = 'GET', user = 'one', body?: unknown, extra:
 const set = { ex: 'bench_press', load: 100, unit: 'lb', kind: 'external', reps: 8 };
 const item = { ex: 'bench_press', load: 100, unit: 'lb', loadKind: 'external', sets: 3, min: 8, max: 10 };
 describe('v5 account-isolated transactional storage', () => {
+  it('keeps push subscriptions per device, only once the server holds a key', async () => {
+    expect(await (await call('/v1/push')).json()).toEqual({ key: null, subscriptions: 0 });
+    const subscription = {
+      endpoint: 'https://push.example/one',
+      expirationTime: null,
+      keys: { p256dh: 'B'.repeat(87), auth: 'a'.repeat(22) },
+    };
+    expect((await call('/v1/push', 'POST', 'one', subscription)).status).toBe(503);
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
+    const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+    const configured = (path: string, method = 'GET', body?: unknown) =>
+      app.fetch(
+        new Request(origin + path, {
+          method,
+          headers: { Origin: origin, 'X-Test-User': 'one', 'Content-Type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+        { DB: db, APP_ENV: 'test', APP_ORIGIN: origin, VAPID_PRIVATE_JWK: JSON.stringify(jwk) },
+      );
+    const status = await (await configured('/v1/push')).json();
+    expect(status.subscriptions).toBe(0);
+    expect(typeof status.key).toBe('string');
+    expect(await (await configured('/v1/push', 'POST', subscription)).json()).toMatchObject({ subscriptions: 1 });
+    expect(await (await configured('/v1/push', 'POST', subscription)).json()).toMatchObject({ subscriptions: 1 });
+    expect((await configured('/v1/push', 'POST', { endpoint: 'nope', keys: subscription.keys })).status).toBe(400);
+    expect(await (await call('/v1/push', 'GET', 'two')).json()).toEqual({ key: null, subscriptions: 0 });
+    expect(
+      await (await configured('/v1/push/unsubscribe', 'POST', { endpoint: subscription.endpoint })).json(),
+    ).toMatchObject({ subscriptions: 0 });
+  });
   it('starts genuinely empty', async () => {
     const state = await store.state(db, owner);
     expect(state.sessions).toEqual([]);

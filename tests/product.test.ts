@@ -8,9 +8,11 @@ import * as store from '../src/server/store.ts';
 import { mcpResponse } from '../src/server/mcp.ts';
 import { localToday } from '@lowkkey/core';
 import { Brief, OnboardingState, MCP_INSTRUCTIONS } from '@lowkkey/protocol';
+import type { Notice } from '../src/server/push.ts';
 const directory = '.data/product-test/' + crypto.randomUUID();
 let mf: Miniflare, db: D1Database, owner: string, other: string;
 const stamp = new Date('2026-10-12T01:30:00Z');
+const notices: Notice[] = [];
 beforeAll(async () => {
   mf = new Miniflare({
     modules: true,
@@ -54,6 +56,7 @@ async function rpc(method: string, params: unknown, scopes = ['read', 'write']) 
     }),
     db,
     { ownerId: owner, clientId: 'client', scopes },
+    notice => notices.push(notice),
   );
   return (await response.json()) as {
     result: {
@@ -252,6 +255,41 @@ describe('product onboarding and continuity', () => {
     expect((await store.state(db, owner, stamp)).theme_state.active).toBe('ink');
     await store.setProfile(db, owner, { training_context: null });
     expect((await store.brief(db, owner, {}, stamp)).profile.training_context).toBeNull();
+  });
+  it('tells the device once when a letter is written or a medal is earned', async () => {
+    notices.length = 0;
+    const letter = { week: '2026-10-05', recap: { title: '稳稳地向前', letter: ['这周卧推完成得更稳。'] } };
+    expect((await rpc('tools/call', { name: 'curate', arguments: letter })).result.isError).toBeFalsy();
+    expect((await rpc('tools/call', { name: 'curate', arguments: letter })).result.isError).toBeFalsy();
+    await rpc('tools/call', {
+      name: 'curate',
+      arguments: { week: '2026-10-05', body: { date: '2026-10-11', text: '慢慢来。' } },
+    });
+    expect(notices).toEqual([
+      { kind: 'letter', title: '信到了', body: '稳稳地向前', url: 'https://lowkkey.test/#recap?week=2026-10-05' },
+    ]);
+    await rpc('tools/call', { name: 'curate', arguments: { ...letter, recap: { letter: ['改了一句。'] } } });
+    expect(notices).toHaveLength(2);
+    const medal = {
+      key: 'first-light',
+      date: null,
+      name: '初光',
+      motif: '初',
+      occasion: '约定的一枚',
+      story: ['一段。'],
+    };
+    await rpc('tools/call', { name: 'award', arguments: medal });
+    expect(notices).toHaveLength(2);
+    await rpc('tools/call', { name: 'award', arguments: { ...medal, date: '2026-10-10' } });
+    await rpc('tools/call', { name: 'award', arguments: { ...medal, date: '2026-10-10', story: ['换一段。'] } });
+    expect(notices.slice(2)).toEqual([
+      {
+        kind: 'medal',
+        title: '一枚新的奖章',
+        body: '初光 · 约定的一枚',
+        url: 'https://lowkkey.test/#recap?medal=first-light',
+      },
+    ]);
   });
   it('blocks deletion immediately, retries cleanup, and preserves other owners', async () => {
     await db

@@ -16,6 +16,8 @@ import {
   ConsentInput,
   ConsentStatus,
   PrivacyInfo,
+  PushStatus,
+  PushSubscriptionInput,
 } from './entities.ts';
 import { Id, Instant, LocalDate, PROTOCOL_VERSION } from './primitives.ts';
 export const Scope = z.enum(['read', 'write', 'notes:write']);
@@ -139,4 +141,21 @@ export const ROUTES = {
     response: z.object({ ok: z.literal(true) }),
   },
   export: { method: 'GET', path: '/v1/export', scope: 'user', summary: '导出本人事实', response: Backup },
+  pushStatus: { method: 'GET', path: '/v1/push', scope: 'user', summary: '读取推送状态', response: PushStatus },
+  pushSubscribe: {
+    method: 'POST',
+    path: '/v1/push',
+    scope: 'user',
+    summary: '登记本设备的推送订阅',
+    request: PushSubscriptionInput,
+    response: PushStatus,
+  },
+  pushUnsubscribe: {
+    method: 'POST',
+    path: '/v1/push/unsubscribe',
+    scope: 'user',
+    summary: '取消本设备的推送订阅',
+    request: PushSubscriptionInput.pick({ endpoint: true }),
+    response: PushStatus,
+  },
 } as const;

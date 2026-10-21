@@ -301,11 +301,19 @@ export async function logContext(db: D1Database, owner: string, value: unknown, 
     };
   });
 }
-export async function award(db: D1Database, owner: string, value: unknown, now = new Date()) {
+/** Callers that tell the device what is new pass a `news` box; the store marks what just happened. */
+export async function award(
+  db: D1Database,
+  owner: string,
+  value: unknown,
+  now = new Date(),
+  news?: { earned?: boolean },
+) {
   const input = MedalInput.parse(value);
   return mutate(db, owner, (facts, _revision, today) => {
     if (input.date && input.date > today) field(['date'], '日期不能在今天之后');
     const prior = facts.medals.find(m => m.key === input.key);
+    if (news) news.earned = !!input.date && !prior?.date;
     const same =
       prior &&
       JSON.stringify({ ...prior, updated_at: undefined }) === JSON.stringify({ ...input, updated_at: undefined });
@@ -366,7 +374,13 @@ export async function deleteFact(db: D1Database, owner: string, value: unknown) 
     };
   });
 }
-export async function curate(db: D1Database, owner: string, value: unknown, now = new Date()) {
+export async function curate(
+  db: D1Database,
+  owner: string,
+  value: unknown,
+  now = new Date(),
+  news?: { letter?: boolean },
+) {
   const input = CurationInput.parse(value);
   return mutate(
     db,
@@ -401,12 +415,12 @@ export async function curate(db: D1Database, owner: string, value: unknown, now 
       }
       for (const [date, text] of Object.entries(input.log ?? {}))
         if (text !== null && !facts.sessions.some(s => s.date === date)) field(['log', date], '当天没有训练');
-      const saved = mergeCuration(
-        facts.curations.find(c => c.week === input.week),
-        input,
-        revision,
-        now.toISOString(),
-      );
+      const previous = facts.curations.find(c => c.week === input.week);
+      const saved = mergeCuration(previous, input, revision, now.toISOString());
+      if (news)
+        news.letter =
+          !!input.recap?.letter?.length &&
+          JSON.stringify(previous?.recap?.letter ?? null) !== JSON.stringify(saved.recap?.letter ?? null);
       if (input.recap && !Object.hasOwn(input.recap, 'sign'))
         saved.recap = { ...saved.recap, sign: 'AI · ' + today.slice(5).replace('-', '.') };
       const json = JSON.stringify(saved),

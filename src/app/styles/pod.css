@@ -56,9 +56,37 @@ html[data-theme='gold'] {
 .brandrow,
 .page-viewport,
 .connection-notice,
-.setup-resume {
+.setup-resume,
+.home-hint {
   position: relative;
   z-index: 1;
+}
+/* 一次性的、有礼貌的主屏幕提示：第二次打开出现，关掉就不再来。 */
+.home-hint {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  margin-top: var(--s4);
+  padding: var(--s3) var(--s4);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surf);
+  font-size: var(--t-small);
+  line-height: 1.6;
+  color: var(--ink2);
+}
+.home-hint p {
+  flex: 1;
+  min-width: 0;
+}
+.home-hint button {
+  flex: none;
+  min-width: 32px;
+  min-height: 32px;
+  margin: -8px -8px -8px 0;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
 }
 .mood {
   display: inline-flex;

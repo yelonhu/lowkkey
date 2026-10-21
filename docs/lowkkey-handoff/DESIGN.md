@@ -47,6 +47,14 @@ AI 的每段文字（`.cl`、周信正文）统一以一枚 5–6px 渐变墨点
 
 生产构建注册 `public/sw.js`：壳（index.html）、它引用的 `/assets/*` 和 Google 字体留在本机，导航先用本机的壳、后台再取新的并预热新壳引用的资源，所以旧壳不会指向服务器已替换的文件；下次打开就是新版本。`/api`、`/v1`、`/mcp`、`/oauth`、`/authorize`、`/.well-known`、`/healthz` 永远走网络。改 sw.js 时提升 VERSION，激活时清掉旧缓存。开发与 e2e 服务不注册。
 
+## 信到了
+
+设置里的「信到了」一节（`account/Push.tsx`）只在能工作的地方出现：有已注册的 service worker、服务端配了密钥；iPhone 上未从主屏幕打开时，先提示添加到主屏幕。开启即 `Notification.requestPermission` → `pushManager.subscribe` → `POST /v1/push`；关闭反之。`sw.js` 收到推送显示一条通知（标题、一句话、应用图标），点开直接到那封信或那枚章。`shell/HomeHint.tsx` 是一次性的主屏幕提示：iPhone Safari 第二次打开时出现一次，关掉不再来，计数只在本机。
+
+## 分享成图
+
+`ui/share.ts` 用 Canvas 2D 把一枚章（`medalImage`：章、名字、汉字日期、缘由、故事）或一封信（`letterImage`：周次、标题、正文块、署名）画到 1080 宽的纸上，颜色与字体直接读当前主题的 token，所以水墨与鎏金各有一张；`shareImage` 走系统分享面板（`navigator.share` 带文件），没有的环境存为 PNG。入口是成就墙故事下和周信末尾的 `ShareButton`。奖章的样式在 `styles/medal.css`。
+
 ## 成就
 
 奖章由 AI 授予（`award`），不是固定目录：名字由它起，雅一点；章上只有一个图样（数字用 Bodoni Moda，否则一个宋体字，填主题的金属渐变并勾一圈极细墨线）；一到三段很短的小故事，题材随意。`src/app/ui/Medal.tsx` 画章：主题材质的金属圈、六十道分钟刻度、名字在章下、日期用汉字；date 为空的是约定好、还在等的一枚，画成一圈线。recap 页末尾的成就墙（`#recap-medals`）列出全部，按下一枚在下方讲它的缘由与故事；`#recap?medal=<key>` 定位到那一枚。

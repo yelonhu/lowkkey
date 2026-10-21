@@ -16,6 +16,7 @@ export type AuthBindings = {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   PRIVACY_CONTACT_EMAIL?: string;
+  VAPID_PRIVATE_JWK?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
 };

@@ -7,6 +7,7 @@ import { createApi } from './api.ts';
 import type { Bindings } from './api.ts';
 import { ownerForRequest, customerAuth } from './customer-auth.ts';
 import { mcpResponse } from './mcp.ts';
+import { notify } from './push.ts';
 import { oauthClient, registerOAuthClient, revokeClient } from './store.ts';
 
 type OAuthEnv = Bindings & { OAUTH_KV: KVNamespace; OAUTH_PROVIDER: OAuthHelpers };
@@ -193,7 +194,11 @@ export default {
             }
           const granted = JSON.parse(client.scopes_json) as string[];
           const effective = context.auth.scope.filter((scope: string) => granted.includes(scope));
-          return mcpResponse(req, bindings.DB, { ownerId: props.ownerId, clientId: client.id, scopes: effective });
+          const ownerId = props.ownerId;
+          // The device hears about a letter or a medal after the reply is on its way.
+          return mcpResponse(req, bindings.DB, { ownerId, clientId: client.id, scopes: effective }, notice =>
+            context.waitUntil(notify(bindings.DB, bindings, ownerId, notice).catch(() => {})),
+          );
         },
       },
       defaultHandler: {

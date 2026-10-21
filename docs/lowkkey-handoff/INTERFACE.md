@@ -46,6 +46,12 @@ v5 使用 showroom_sessions/showroom_weights/showroom_plans、profiles、prefere
 
 隐私：`/privacy` 公开阅读；登录前 `/api/privacy/intent` 建立短期一次性确认意图，登录后绑定实际账户。`POST /v1/account/consent` 保存指定版本的明确确认，未确认时客户业务与新 OAuth 授权受阻，仍可导出、撤销或注销。`GET /v1/account` 返回 privacy 版本及确认时间。详见 `../productization.md`。
 
+## 信到了（Web Push）
+
+网页在设置里登记本设备的订阅：`GET /v1/push` 返回 `{key, subscriptions}`（key 为 VAPID 公钥，服务端未配置时为 null，设置里不显示开关）；`POST /v1/push` 提交浏览器的 `PushSubscription.toJSON()`，同 endpoint 覆盖；`POST /v1/push/unsubscribe` 按 endpoint 删除。存于 `push_subscriptions(owner_id,endpoint)`。
+
+只有两种事会推：AI 通过 `curate.recap.letter` 写下或改写了周信（「信到了」），以及 `award` 让一枚奖章从约定变为达成（「一枚新的奖章」）。推送在 MCP 响应发出后由 `waitUntil` 执行，失败不影响已保存的事实。安静规则：同一账户十分钟内只推一条，七天内最多三条，记录在 `push_sends`；404/410 的订阅自动遗忘。加密为 RFC 8291 aes128gcm，签名为 VAPID ES256，密钥只有一个 `VAPID_PRIVATE_JWK`（`./scripts/release vapid` 生成到本地密钥文件），公钥由它派生。
+
 ## 随手记
 
 随手记提供 `read_notes` 和独立授权的 `write_note`。`daily_notes` 按 `(owner_id,date)` 唯一，保存完整纯文字、独立递增 revision 和 updated_at。每天最多 20,000 个 Unicode 码点，允许 emoji、感叹号、空格和换行。空正文保留版本墓碑，列表不返回空记录；不进入力量计算。

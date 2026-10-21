@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as Reac
 import type { ClientPublic } from '@lowkkey/protocol';
 import type { useShowroom } from '../shell/useShowroom.ts';
 import { call, errorLabel, returnPath, type AuthConfig, type Account } from './customer-api.ts';
+import { PushSection } from './Push.tsx';
 export function LoginGate({
   chamber,
   preview = false,
@@ -395,6 +396,7 @@ export function CustomerAccount({
               保存时区
             </button>
           </section>
+          <PushSection />
           <section className="settings-section">
             <h3>隐私</h3>
             <a className="privacy-settings-link" href="/privacy" target="_blank" rel="noreferrer">

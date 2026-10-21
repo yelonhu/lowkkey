@@ -447,3 +447,12 @@ export const ConsentInput = z.strictObject({ version: z.literal(PRIVACY_VERSION)
 export const ConsentStatus = z.object({ version: z.literal(PRIVACY_VERSION), acceptedAt: Instant.nullable() });
 
 export const PrivacyInfo = z.object({ version: z.literal(PRIVACY_VERSION), contact: z.string().nullable() });
+
+// 信到了: a device's Web Push subscription, exactly as the browser hands it over.
+export const PushSubscriptionInput = z.strictObject({
+  endpoint: z.url().max(2048),
+  expirationTime: z.number().nullable().optional(),
+  keys: z.strictObject({ p256dh: z.string().min(80).max(128), auth: z.string().min(16).max(32) }),
+});
+export const PushStatus = z.object({ key: z.string().nullable(), subscriptions: z.number().int().nonnegative() });
+export type PushStatus = z.infer<typeof PushStatus>;

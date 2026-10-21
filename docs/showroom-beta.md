@@ -25,6 +25,12 @@
 
 上述命令生成 `.local/config/showroom-beta.secrets.json`，权限为 0600，已被 Git 忽略。`BETTER_AUTH_SECRET` 自动生成；手动填入 Google Web 客户端的 `GOOGLE_CLIENT_ID` 和 `GOOGLE_CLIENT_SECRET`。再次执行不会覆盖已有密钥。不要把此文件上传到 Git、聊天或 CI 产物。
 
+```sh
+./scripts/release vapid
+```
+
+为「信到了」（Web Push）生成 VAPID 私钥 `VAPID_PRIVATE_JWK` 并写入同一密钥文件；已有则保留，换钥会让现有订阅失效。部署时随其他密钥一起上传。
+
 ### Google OAuth 配置
 
 在 Google Cloud Console 为内测创建独立项目及 Google Auth Platform 应用：

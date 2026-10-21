@@ -8,6 +8,7 @@ import * as store from './store.ts';
 import { readNotes, saveNote } from './notes.ts';
 import { toolSuccess, event } from './lifecycle.ts';
 import { StoreError } from './account.ts';
+import type { Notice } from './push.ts';
 
 type Principal = { ownerId: string; clientId: string; scopes: string[] };
 // Schema metadata is identical for every account. Generate it once per isolate;
@@ -23,7 +24,13 @@ const response = (value: unknown, view_url?: string) => {
   const structuredContent = { result: value, ...(view_url ? { view_url } : {}) };
   return { content: [{ type: 'text' as const, text: JSON.stringify(structuredContent) }], structuredContent };
 };
-export async function mcpResponse(request: Request, db: D1Database, principal: Principal): Promise<Response> {
+/** `notify` receives the one or two things worth telling the device: a letter written, a medal earned. */
+export async function mcpResponse(
+  request: Request,
+  db: D1Database,
+  principal: Principal,
+  notify?: (notice: Notice) => void,
+): Promise<Response> {
   const success = async (name: string, value: unknown, url?: string, activates = false) => {
     try {
       await toolSuccess(db, principal.ownerId, principal.clientId, name, url, activates);
@@ -114,12 +121,30 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
                 new URL(request.url).origin + '/#next',
               );
             case 'curate': {
-              const saved = await store.curate(db, principal.ownerId, args);
-              return success(tool.name, saved, view('recap', 'week', saved.week));
+              const news: { letter?: boolean } = {};
+              const saved = await store.curate(db, principal.ownerId, args, new Date(), news);
+              const url = view('recap', 'week', saved.week);
+              if (news.letter && notify)
+                notify({
+                  kind: 'letter',
+                  title: '信到了',
+                  body: saved.recap?.title ?? saved.recap?.letter?.[0]?.slice(0, 60) ?? '',
+                  url,
+                });
+              return success(tool.name, saved, url);
             }
             case 'award': {
-              const saved = await store.award(db, principal.ownerId, args);
-              return success(tool.name, saved, view('recap', 'medal', saved.key));
+              const news: { earned?: boolean } = {};
+              const saved = await store.award(db, principal.ownerId, args, new Date(), news);
+              const url = view('recap', 'medal', saved.key);
+              if (news.earned && notify)
+                notify({
+                  kind: 'medal',
+                  title: '一枚新的奖章',
+                  body: saved.name + (saved.occasion ? ' · ' + saved.occasion : ''),
+                  url,
+                });
+              return success(tool.name, saved, url);
             }
             case 'delete': {
               const saved = await store.deleteFact(db, principal.ownerId, args);

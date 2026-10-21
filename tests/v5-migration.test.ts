@@ -67,6 +67,7 @@ it('migrates legacy facts, blocks interleaved old writes, rolls back, imports at
     await migration('0004_notes.sql');
     await migration('0005_medals.sql');
     await migration('0006_contexts.sql');
+    await migration('0007_push.sql');
     const migrated = await state(db, 'one');
     expect(migrated.profile).toEqual({
       body_notes: null,

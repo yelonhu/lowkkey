@@ -10,6 +10,7 @@ import type { IdentityVerifier } from './auth.ts';
 import { accountFor, StoreError } from './account.ts';
 import * as store from './store.ts';
 import * as notes from './notes.ts';
+import * as push from './push.ts';
 
 export type Bindings = AuthBindings & { OAUTH_PROVIDER?: OAuthHelpers };
 type Environment = { Bindings: Bindings; Variables: { ownerId: string } };
@@ -189,6 +190,13 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
       snapshot: await store.state(c.env.DB, c.get('ownerId')),
       notes: await notes.exportNotes(c.env.DB, c.get('ownerId')),
     }),
+  );
+  app.get('/v1/push', async c => c.json(await push.status(c.env.DB, c.env, c.get('ownerId'))));
+  app.post('/v1/push', async c =>
+    c.json(await push.subscribe(c.env.DB, c.env, c.get('ownerId'), await jsonBody(c.req.raw, 8 * 1024))),
+  );
+  app.post('/v1/push/unsubscribe', async c =>
+    c.json(await push.unsubscribe(c.env.DB, c.env, c.get('ownerId'), await jsonBody(c.req.raw, 8 * 1024))),
   );
   app.get('/v1/clients', async c => c.json(await store.listClients(c.env.DB, c.get('ownerId'))));
   app.post('/v1/clients/:id/revoke', async c => {

@@ -24,6 +24,7 @@ import { CustomerAccount, LoginGate } from '../account/CustomerAccount.tsx';
 import { aiHosts, Onboarding, useProduct } from '../account/Onboarding.tsx';
 import { ConsentGate } from '../account/Privacy.tsx';
 import { SessionLoading } from '../account/Welcome.tsx';
+import { HomeHint } from './HomeHint.tsx';
 
 export function Showroom() {
   const chamber = useShowroom();
@@ -248,6 +249,7 @@ export function Showroom() {
         <div className="navbar">
           <PageTabs screen={screen} />
         </div>
+        <HomeHint />
         {chamber.error && (
           <div className="wrap connection-notice" role="alert">
             {chamber.error}

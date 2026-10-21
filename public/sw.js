@@ -1,6 +1,6 @@
 /* lowkkey 的即开。壳（index.html）、它引用的静态资源和字体在本机留一份：打开先用本机的，
    后台再悄悄更新，下次打开就是新的。账户、事实与 AI 的接口永远走网络，从不缓存。 */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = 'lowkkey-shell-' + VERSION,
   ASSETS = 'lowkkey-assets-' + VERSION,
   FONTS = 'lowkkey-fonts-' + VERSION;
@@ -22,6 +22,36 @@ self.addEventListener('activate', event => {
       .keys()
       .then(keys => Promise.all(keys.filter(key => ![SHELL, ASSETS, FONTS].includes(key)).map(key => caches.delete(key))))
       .then(() => self.clients.claim()),
+  );
+});
+// 信到了：a letter or a medal arrives as one quiet notification; tapping it opens that page.
+self.addEventListener('push', event => {
+  let notice;
+  try {
+    notice = event.data ? event.data.json() : {};
+  } catch {
+    notice = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(
+    self.registration.showNotification(notice.title || 'lowkkey', {
+      body: notice.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: notice.kind || 'lowkkey',
+      data: { url: notice.url || '/' },
+    }),
+  );
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || '/', location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async windows => {
+      const open = windows.find(w => new URL(w.url).origin === location.origin);
+      if (!open) return self.clients.openWindow(url);
+      await open.focus();
+      return open.navigate ? open.navigate(url).catch(() => {}) : undefined;
+    }),
   );
 });
 self.addEventListener('fetch', event => {

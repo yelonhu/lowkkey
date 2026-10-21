@@ -1078,3 +1078,25 @@ button:disabled {
   color: var(--ink2);
   text-wrap: pretty;
 }
+/* 分享成图：一枚章或一封信画到纸上，交给系统的分享面板。安静的一行小字。 */
+.share {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin: var(--s3) 0 0 -8px;
+  padding: 0 8px;
+  font: 400 var(--t-micro) / 1 var(--sans);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  transition: color var(--d-tap);
+}
+.share:hover {
+  color: var(--ink2);
+}
+.share[data-pressed] {
+  color: var(--ink);
+}
+.letter .share {
+  margin-left: 0;
+}
