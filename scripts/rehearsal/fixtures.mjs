@@ -101,6 +101,18 @@ export const fixtureCuration = {
   body: { date: fixtureToday, text: '看趋势，不用追着每天的变化走。' },
   log: { [fixtureToday]: '最后一组比上次稳。' },
 };
+export const fixtureMedal = {
+  key: 'first-plate',
+  date: dateAt(-6),
+  name: '一片冰心',
+  motif: '135',
+  unit: 'lb',
+  occasion: '深蹲第一次挂上一片',
+  story: [
+    '她把片挂上去的时候，没有人看。杠铃沉了一下，像一句终于说出口的话。',
+    '后来她说，那天其实什么都没想，只是觉得该挂了。',
+  ],
+};
 export async function seedShowroom(tool) {
   for (const args of fixturePlans) await tool('set_plan', args);
   await tool('set_profile', {
@@ -110,4 +122,5 @@ export async function seedShowroom(tool) {
   for (const args of fixtureWeights) await tool('log_weight', args);
   for (const args of fixtureSessions) await tool('log_session', args);
   await tool('curate', fixtureCuration);
+  await tool('award', fixtureMedal);
 }

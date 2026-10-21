@@ -120,7 +120,8 @@
                         "session",
                         "weight",
                         "week_letter",
-                        "body_note"
+                        "body_note",
+                        "medal"
                       ]
                     }
                   },
@@ -170,23 +171,9 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "how": {
-                      "type": "string"
-                    },
-                    "lore": {
-                      "type": "string"
-                    },
-                    "motif": {
-                      "type": "string"
-                    },
-                    "unit": {
-                      "type": "string"
+                    "key": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
                     },
                     "date": {
                       "anyOf": [
@@ -199,15 +186,43 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "motif": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "occasion": {
+                      "type": "string"
+                    },
+                    "story": {
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
                     }
                   },
                   "required": [
-                    "id",
+                    "key",
+                    "date",
                     "name",
-                    "how",
-                    "lore",
                     "motif",
-                    "date"
+                    "story",
+                    "updated_at"
                   ],
                   "additionalProperties": false
                 }
@@ -1084,30 +1099,6 @@
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "first_date": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "format": "date",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "date_30": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "format": "date",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   },
                   {
                     "type": "null"
@@ -3743,9 +3734,164 @@
       }
     },
     {
+      "name": "award",
+      "title": "授予一枚奖章",
+      "description": "何时用：用户真的做到了什么值得记住的事——第一次训练、第一次挂上一片、一个纪录、停滞后的突破、连续几周没落、第一封信、一段艰难的日子还是练了。一周最多一两枚，宁缺毋滥。画到 recap 页末尾的成就墙，本周新得的会出现在首页。key 是稳定的小写标识（同 key 覆盖）；name 是你起的名字，雅一点，二到八个字，不用「第一次」「成就」这类说明文字；motif 是章上唯一的图样：数字是重点时用数字（135、4、100），否则一个字；occasion 一句话说明因何而得；story 是一到三段很短的小故事，题材随意——一个片段、一段小说、她和他、一个清晨——不必和训练有关，但要配得上这个时刻。date 为 null 表示一枚和用户约定、尚未达成的奖章，达成时补上日期并写故事。全部文字不用 emoji 或感叹号。",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "motif": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string"
+          },
+          "occasion": {
+            "type": "string"
+          },
+          "story": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "key",
+          "date",
+          "name",
+          "motif",
+          "story"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "motif": {
+                "type": "string",
+                "minLength": 1
+              },
+              "unit": {
+                "type": "string"
+              },
+              "occasion": {
+                "type": "string"
+              },
+              "story": {
+                "minItems": 1,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              }
+            },
+            "required": [
+              "key",
+              "date",
+              "name",
+              "motif",
+              "story",
+              "updated_at"
+            ],
+            "additionalProperties": false
+          },
+          "view_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "result",
+          "view_url"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "write"
+          ]
+        }
+      ],
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "write"
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "delete",
       "title": "删除某日训练或体重",
-      "description": "何时用：仅当用户明确要求删除。删除 kind=session 或 weight 的指定日期，返回被删除内容和页面链接。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。",
+      "description": "何时用：仅当用户明确要求删除。kind=session 或 weight 按 date 删除，kind=medal 按 key 删除，返回被删除内容和页面链接。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -3754,18 +3900,21 @@
             "type": "string",
             "enum": [
               "session",
-              "weight"
+              "weight",
+              "medal"
             ]
           },
           "date": {
             "type": "string",
             "format": "date",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "key": {
+            "type": "string"
           }
         },
         "required": [
-          "kind",
-          "date"
+          "kind"
         ],
         "additionalProperties": false
       },
@@ -3780,13 +3929,17 @@
                 "type": "string",
                 "enum": [
                   "session",
-                  "weight"
+                  "weight",
+                  "medal"
                 ]
               },
               "date": {
                 "type": "string",
                 "format": "date",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "key": {
+                "type": "string"
               },
               "deleted": {
                 "anyOf": [
@@ -3795,13 +3948,70 @@
                   },
                   {
                     "$ref": "#/definitions/Weight"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+                      },
+                      "date": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "motif": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "unit": {
+                        "type": "string"
+                      },
+                      "occasion": {
+                        "type": "string"
+                      },
+                      "story": {
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "date",
+                      "name",
+                      "motif",
+                      "story",
+                      "updated_at"
+                    ],
+                    "additionalProperties": false
                   }
                 ]
               }
             },
             "required": [
               "kind",
-              "date",
               "deleted"
             ],
             "additionalProperties": false

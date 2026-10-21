@@ -8,6 +8,7 @@ import type {
   Fact,
   Facts,
   GuideMissing,
+  Medal,
   Pick,
   Plan,
   PlanItem,
@@ -418,6 +419,7 @@ export function getBrief(
   return {
     generated_at: generatedAt,
     today: { date: today, weekday: weekday(today) },
+    medals: facts.medals,
     next: next ? { date: next.date, rel: next.rel, title: next.plan.title } : null,
     plans: facts.plans,
     profile: facts.profile,
@@ -512,6 +514,8 @@ export function briefGuide(
   const letterDue = week.planned > 0 && (week.done >= week.planned || [0, 6].includes(weekday(today)));
   if (hasSession && letterDue && !currentCuration(facts, today)?.recap?.letter?.length) missing.push('week_letter');
   if (weightRate(facts.weights, today) != null && !datedCuration(facts, 'body', today)) missing.push('body_note');
+  const notable = weekFacts(facts, today).some(f => ['pr', 'threshold', 'first', 'unstuck', 'streak'].includes(f.kind));
+  if (hasSession && notable && !medalsThisWeek(facts.medals, today).length) missing.push('medal');
   const canWrite = permissions.includes('write');
   let next_step: string;
   if (!canWrite)
@@ -538,9 +542,16 @@ export function briefGuide(
             ? '体重已有趋势但没有批注：用 curate.body 写一句，引用 get_brief.weight 的速度与状态。'
             : first === 'training_context'
               ? '尚未保存训练背景：把用户明确表达的目标、时间、器械写入 set_profile.training_context。'
-              : '接续已有事实。用户发来训练就整理保存；修改旧训练前用 session_date 读取该日完整组。';
+              : first === 'medal'
+                ? '本周有值得记住的事（见 week_facts），还没有奖章：用 award 起一个名字，配一个图样和一段小故事。'
+                : '接续已有事实。用户发来训练就整理保存；修改旧训练前用 session_date 读取该日完整组。';
   }
   return { stage, next_step, missing, week };
+}
+/** Medals dated inside the current week, for the board and the letter. */
+export function medalsThisWeek(medals: Medal[], today: string) {
+  const start = monday(today);
+  return medals.filter(m => m.date && m.date >= start && m.date <= today);
 }
 export function mergeCuration(
   previous: Curation | undefined,

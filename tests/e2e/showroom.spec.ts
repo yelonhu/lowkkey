@@ -84,7 +84,7 @@ async function connect(request: APIRequestContext, origin: string) {
     rpc('tools/call', { name, arguments: args }).then(value => value.structuredContent.result);
 }
 
-test('empty → eight tools → five pages, all themes, narrow layout, refresh and settings', async ({
+test('empty → ten tools → five pages, all themes, narrow layout, refresh and settings', async ({
   page,
   baseURL,
 }, testInfo) => {

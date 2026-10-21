@@ -29,9 +29,7 @@ import {
   weightMean,
   weightRate,
   weekFacts,
-  medals,
   medalsThisWeek,
-  ACHIEVEMENTS,
 } from '../src/index.ts';
 const stamp = '2026-10-08T15:00:00Z',
   today = '2026-10-08';
@@ -45,6 +43,7 @@ const empty = () =>
     curations: [],
     annotations: {},
     plan_history: [],
+    medals: [],
   });
 const set = (patch: Record<string, unknown> = {}) =>
   TrainingSet.parse({ ex: 'bench_press', load: 100, unit: 'lb', kind: 'external', reps: 10, ...patch });
@@ -302,65 +301,15 @@ describe('v5 shared calculations', () => {
     expect(settled.missing).toEqual([]);
     expect(settled.next_step).toContain('接续已有事实');
   });
-  it('derives every medal from facts, dating the first day the condition was met', () => {
+  it('asks for a medal only when the week holds something notable and none was awarded', () => {
     const f = empty();
-    const all = medals(f, today);
-    expect(all).toHaveLength(ACHIEVEMENTS.length);
-    expect(all.every(m => m.date === null)).toBe(true);
-    f.weights = weights;
-    f.sessions = [
-      session('2026-09-29', [set({ load: 95 })]),
-      session('2026-10-01', [set({ load: 100 })]),
-      session('2026-10-03', [set({ load: 135, role: 'warmup' }), set({ load: 135 })]),
-      session('2026-10-06', [
-        set({ ex: 'pull_up', kind: 'assist', load: 20, unit: 'kg' }),
-        set({ ex: 'pull_up', kind: 'assist', load: 10, unit: 'kg' }),
-      ]),
-      session(today, [set({ ex: 'pull_up', kind: 'bodyweight', load: 0, reps: 8 }), set({ load: 150 })]),
-    ];
-    f.curations = [
-      {
-        week: '2026-09-28',
-        theme: { id: 'gold', why: '第一周' },
-        recap: { letter: ['第一封'] },
-        revision: 1,
-        updated_at: stamp,
-      },
-    ];
-    const notes = { count: 31, first_date: '2026-09-30', date_30: today };
-    const got = Object.fromEntries(medals(f, today, notes).map(m => [m.id, m.date]));
-    expect(got.first_session).toBe('2026-09-29');
-    expect(got.sessions_10).toBeNull();
-    expect(got.plate_1).toBe('2026-10-03');
-    expect(got.plate_2).toBeNull();
-    expect(got.bench_bodyweight).toBe(today);
-    expect(got.first_pr).toBe('2026-10-01');
-    expect(got.pullup_free).toBe(today);
-    expect(got.assist_halved).toBe('2026-10-06');
-    expect(got.letter_1).toBe('2026-10-04');
-    expect(got.gold_week).toBe('2026-09-28');
-    expect(got.weigh_1).toBe(weights[0].date);
-    expect(got.trend).toBe(weights[7].date);
-    expect(got.note_1).toBe('2026-09-30');
-    expect(got.notes_30).toBe(today);
-    expect(medalsThisWeek(medals(f, today, notes), today).map(m => m.id)).toEqual(
-      expect.arrayContaining(['bench_bodyweight', 'pullup_free', 'assist_halved', 'notes_30']),
-    );
-  });
-  it('judges weeks only once they are over, against the plan in force at the time', () => {
-    const f = empty();
-    const plan = { ...PlanInput.parse({ title: '胸', weekday: 2, items: [item] }), updated_at: stamp };
-    f.plans = [plan];
-    f.plan_history = [{ effective_date: '2026-09-07', revision: 1, plans: [plan] }];
-    f.sessions = ['2026-09-08', '2026-09-15', '2026-09-22', '2026-09-29'].map(d => session(d));
-    const got = Object.fromEntries(medals(f, today).map(m => [m.id, m.date]));
-    expect(got.first_plan).toBe('2026-09-07');
-    expect(got.week_full).toBe('2026-09-13');
-    expect(got.rest_kept).toBe('2026-09-13');
-    expect(got.streak_4).toBe('2026-10-04');
-    expect(got.streak_12).toBeNull();
-    f.sessions.push(session('2026-09-10'));
-    expect(Object.fromEntries(medals(f, today).map(m => [m.id, m.date])).rest_kept).toBe('2026-09-20');
+    f.sessions = [session('2026-10-01', [set({ load: 90 })]), session(today, [set({ load: 150 })])];
+    const medal = { key: 'first-pr', date: today, name: '更上一层', motif: '上', story: ['一段。'], updated_at: stamp };
+    expect(briefGuide(f, today, ['read', 'write'], { entry: 'start' }).missing).toContain('medal');
+    f.medals = [medal];
+    expect(briefGuide(f, today, ['read', 'write'], { entry: 'start' }).missing).not.toContain('medal');
+    expect(medalsThisWeek(f.medals, today).map(m => m.key)).toEqual(['first-pr']);
+    expect(medalsThisWeek([{ ...medal, date: null }], today)).toEqual([]);
   });
   it('rejects deprecated inputs, invalid borrowed reps and invalid curation', () => {
     expect(SessionInput.safeParse({ date: today, title: '胸', sets: [], raw_text: 'old' }).success).toBe(false);

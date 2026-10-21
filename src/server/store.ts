@@ -4,6 +4,8 @@ import {
   Curation,
   CurationInput,
   DeleteInput,
+  Medal,
+  MedalInput,
   Plan,
   PlanInput,
   Profile,
@@ -19,7 +21,7 @@ import {
   type Facts,
   exerciseById,
 } from '@lowkkey/protocol';
-import { addDays, briefGuide, getBrief, localToday, medals, mergeCuration, themeState, weekday } from '@lowkkey/core';
+import { addDays, briefGuide, getBrief, localToday, mergeCuration, themeState, weekday } from '@lowkkey/core';
 import { notesSummary } from './notes.ts';
 import { onboarding } from './lifecycle.ts';
 import { StoreError } from './account.ts';
@@ -33,6 +35,17 @@ const sessionValue = (r: Row) =>
     updated_at: r.updated_at,
   });
 const weightValue = (r: Row) => Weight.parse({ date: r.date, lb: r.lb, updated_at: r.updated_at });
+const medalValue = (r: Row) =>
+  Medal.parse({
+    key: r.key,
+    date: r.date ?? null,
+    name: r.name,
+    motif: r.motif,
+    ...(r.unit == null ? {} : { unit: r.unit }),
+    ...(r.occasion == null ? {} : { occasion: r.occasion }),
+    story: JSON.parse(String(r.story_json)),
+    updated_at: r.updated_at,
+  });
 const planValue = (r: Row) =>
   Plan.parse({
     title: r.title,
@@ -52,6 +65,7 @@ async function snapshot(db: D1Database, owner: string, now = new Date()) {
     'SELECT * FROM curations WHERE owner_id=? ORDER BY week DESC',
     'SELECT * FROM annotations WHERE owner_id=?',
     'SELECT * FROM plan_history WHERE owner_id=? ORDER BY revision',
+    'SELECT * FROM medals WHERE owner_id=? ORDER BY date,key',
   ];
   const rows = await db.batch<Row>(queries.map(sql => db.prepare(sql).bind(owner)));
   if (!rows[0].results.length) throw new StoreError('not_found', 404);
@@ -59,6 +73,7 @@ async function snapshot(db: D1Database, owner: string, now = new Date()) {
     prefs = rows[5].results[0];
   const facts: Facts = {
     sessions: rows[1].results.map(sessionValue),
+    medals: rows[9].results.map(medalValue),
     weights: rows[2].results.map(weightValue),
     plans: rows[3].results.map(planValue),
     profile: Profile.parse({
@@ -80,14 +95,12 @@ async function snapshot(db: D1Database, owner: string, now = new Date()) {
   return { facts, revision: Number(rows[0].results[0].data_revision), today, timezone };
 }
 export async function state(db: D1Database, owner: string, now = new Date()): Promise<StateResponse> {
-  const [{ facts, today, timezone }, notes] = await Promise.all([snapshot(db, owner, now), notesSummary(db, owner)]);
+  const { facts, today, timezone } = await snapshot(db, owner, now);
   return {
     ...facts,
     accountId: owner,
     protocol: PROTOCOL_VERSION,
     today,
-    notes,
-    medals: medals(facts, today, notes),
     timezone,
     theme_state: themeState(facts, today),
   };
@@ -107,8 +120,7 @@ export async function brief(
     ...getBrief(facts, now.toISOString(), sessions, facts.timezone),
     timezone: facts.timezone,
     permissions,
-    notes: facts.notes,
-    medals: facts.medals,
+    notes: await notesSummary(db, owner),
     guide,
     onboarding: {
       completed: !!setup.completedAt || setup.hasContent,
@@ -264,14 +276,59 @@ export async function setProfile(db: D1Database, owner: string, value: unknown) 
     };
   });
 }
+export async function award(db: D1Database, owner: string, value: unknown, now = new Date()) {
+  const input = MedalInput.parse(value);
+  return mutate(db, owner, (facts, _revision, today) => {
+    if (input.date && input.date > today) field(['date'], '日期不能在今天之后');
+    const prior = facts.medals.find(m => m.key === input.key);
+    const same =
+      prior &&
+      JSON.stringify({ ...prior, updated_at: undefined }) === JSON.stringify({ ...input, updated_at: undefined });
+    const saved: Medal = { ...input, updated_at: same ? prior.updated_at : now.toISOString() };
+    return {
+      result: saved,
+      statements: [
+        db
+          .prepare(
+            'INSERT INTO medals(owner_id,key,date,name,motif,unit,occasion,story_json,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(owner_id,key) DO UPDATE SET date=excluded.date,name=excluded.name,motif=excluded.motif,unit=excluded.unit,occasion=excluded.occasion,story_json=excluded.story_json,updated_at=excluded.updated_at',
+          )
+          .bind(
+            owner,
+            saved.key,
+            saved.date,
+            saved.name,
+            saved.motif,
+            saved.unit ?? null,
+            saved.occasion ?? null,
+            JSON.stringify(saved.story),
+            saved.updated_at,
+          ),
+      ],
+    };
+  });
+}
+type DeletedFact = {
+  kind: 'session' | 'weight' | 'medal';
+  date?: string;
+  key?: string;
+  deleted: TrainingSession | Weight | Medal;
+};
 export async function deleteFact(db: D1Database, owner: string, value: unknown) {
   const input = DeleteInput.parse(value);
-  return mutate(db, owner, facts => {
+  return mutate<DeletedFact>(db, owner, facts => {
+    if (input.kind === 'medal') {
+      const deleted = facts.medals.find(m => m.key === input.key);
+      if (!deleted) throw new StoreError('not_found', 404);
+      return {
+        result: { kind: input.kind, key: input.key, deleted },
+        statements: [db.prepare('DELETE FROM medals WHERE owner_id=? AND key=?').bind(owner, input.key)],
+      };
+    }
     const deleted = (input.kind === 'session' ? facts.sessions : facts.weights).find(x => x.date === input.date);
     if (!deleted) throw new StoreError('not_found', 404);
     const table = input.kind === 'session' ? 'showroom_sessions' : 'showroom_weights';
     return {
-      result: { ...input, deleted },
+      result: { kind: input.kind, date: input.date, deleted },
       statements: [
         db.prepare(`DELETE FROM ${table} WHERE owner_id=? AND date=?`).bind(owner, input.date),
         ...(input.kind === 'session'

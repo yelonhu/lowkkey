@@ -14,7 +14,9 @@ export function screenFromHash(): Screen {
 }
 export function targetFromHash(): string | null {
   const q = new URLSearchParams(location.hash.split('?')[1] ?? ''),
-    screen = screenFromHash(),
-    value = screen === 'next' ? (q.get('title') ?? q.get('day')) : screen === 'recap' ? q.get('week') : q.get('date');
+    screen = screenFromHash();
+  if (screen === 'recap' && q.get('medal')) return 'medal-' + q.get('medal');
+  const value =
+    screen === 'next' ? (q.get('title') ?? q.get('day')) : screen === 'recap' ? q.get('week') : q.get('date');
   return value ? screen + '-' + value : null;
 }

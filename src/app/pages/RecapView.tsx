@@ -157,37 +157,39 @@ function PickCard({ pick, facts, today }: { pick: Pick; facts: Facts; today: str
     </article>
   );
 }
-/** Every medal, earned with its date or waiting as an outline; one tap tells the story. */
+/** Every medal the AI has awarded, with its date, or agreed on and still waiting; one tap tells the story. */
 function MedalWall({ medals }: { medals: StateResponse['medals'] }) {
   const [open, setOpen] = useState<string | null>(null);
   const earned = medals.filter(m => m.date).length;
-  const chosen = medals.find(m => m.id === open);
+  const chosen = medals.find(m => m.key === open);
   return (
     <section className="sec" id="recap-medals">
       <div className="sh">
         <h2>medals</h2>
-        <span>
-          {earned} / {medals.length}
-        </span>
+        <span>{earned === medals.length ? `${earned} 枚` : `${earned} / ${medals.length}`}</span>
       </div>
       <div className="wall" role="list">
         {medals.map(m => (
           <button
-            key={m.id}
+            key={m.key}
+            id={'medal-' + m.key}
             role="listitem"
             className="wall-item"
-            aria-pressed={open === m.id}
-            aria-label={m.name + (m.date ? '，' + m.date : '，未获得')}
-            onClick={() => setOpen(open === m.id ? null : m.id)}
+            aria-pressed={open === m.key}
+            aria-label={m.name + (m.date ? '，' + m.date : '，还在等')}
+            onClick={() => setOpen(open === m.key ? null : m.key)}
           >
             <Medal motif={m.motif} unit={m.unit} name={m.name} date={m.date ?? undefined} locked={!m.date} size={84} />
           </button>
         ))}
       </div>
       {chosen && (
-        <p className="cl sm wall-story" key={chosen.id}>
-          {chosen.how}。{chosen.lore}
-        </p>
+        <div className="wall-story" key={chosen.key}>
+          {chosen.occasion && <p className="meta">{chosen.occasion}</p>}
+          {chosen.story.map((paragraph, i) => (
+            <p key={i}>{paragraph}</p>
+          ))}
+        </div>
       )}
     </section>
   );

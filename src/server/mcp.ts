@@ -111,9 +111,19 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
               const saved = await store.curate(db, principal.ownerId, args);
               return success(tool.name, saved, view('recap', 'week', saved.week));
             }
+            case 'award': {
+              const saved = await store.award(db, principal.ownerId, args);
+              return success(tool.name, saved, view('recap', 'medal', saved.key));
+            }
             case 'delete': {
               const saved = await store.deleteFact(db, principal.ownerId, args);
-              return success(tool.name, saved, view(saved.kind === 'session' ? 'log' : 'body', 'date', saved.date));
+              return success(
+                tool.name,
+                saved,
+                saved.kind === 'medal'
+                  ? new URL(request.url).origin + '/#recap'
+                  : view(saved.kind === 'session' ? 'log' : 'body', 'date', saved.date!),
+              );
             }
             case 'write_note': {
               const input = args as { date: string; text: string; revision: number };

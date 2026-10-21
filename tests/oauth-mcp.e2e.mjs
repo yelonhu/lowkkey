@@ -6,6 +6,7 @@ const origin = process.env.LOWKKEY_TEST_ORIGIN ?? 'http://127.0.0.1:5174';
 const client = await rehearsalClient(Number(new URL(origin).port), ['read', 'write', 'notes:write']);
 const tools = await client.rpc('tools/list', {});
 assert.deepEqual(tools.tools.map(t => t.name).sort(), [
+  'award',
   'curate',
   'delete',
   'get_brief',
@@ -38,7 +39,7 @@ for (const declared of contract.tools) {
 }
 assert.match(client.consentHtml, /name="scope" value="notes:write"\s*>/);
 const legacy = await rehearsalClient(Number(new URL(origin).port), ['read', 'write']);
-assert.equal((await legacy.rpc('tools/list', {})).tools.length, 8);
+assert.equal((await legacy.rpc('tools/list', {})).tools.length, 9);
 assert.equal(
   (
     await legacy.rpc('tools/call', {
@@ -143,7 +144,7 @@ assert.equal(renewed.ok, true);
 const renewedToken = await renewed.json();
 Object.assign(client.token, renewedToken);
 client.headers.Authorization = 'Bearer ' + renewedToken.access_token;
-assert.equal((await client.rpc('tools/list', {})).tools.length, 9);
+assert.equal((await client.rpc('tools/list', {})).tools.length, 10);
 const deniedWrite = await readonly.rpc('tools/call', {
   name: 'log_weight',
   arguments: { date: '2026-10-07', lb: 999 },
@@ -175,4 +176,4 @@ const refresh = await fetch(origin + '/oauth/token', {
   }),
 });
 assert.equal(refresh.ok, false);
-console.log('Nine-tool OAuth/MCP end-to-end passed');
+console.log('Ten-tool OAuth/MCP end-to-end passed');

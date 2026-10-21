@@ -10,6 +10,8 @@ import {
   CurationInput,
   Deleted,
   DeleteInput,
+  Medal,
+  MedalInput,
   Plan,
   PlanInput,
   Profile,
@@ -93,12 +95,20 @@ export const MCP_TOOLS = [
       '何时用：这是你在页面上的声音。next：下一次训练的一句提示（画到 next 页顶部，须指向今天或以后有计划的日期）。recap：周信 title/letter（1–5段）、picks（引用本周真实记录的 1–2 个亮点）、focus（主项与理由），画到 recap 页。body：对体重趋势的一句话，画到 body 页。log：按日期对某次训练的一句批注，画到 log 页。theme：本周主题 ink（水墨，日常）或 gold（鎏金，值得庆祝的一周）与理由，跨周延续。week 必须是周一。省略字段保留、null 清空；recap 按字段合并，log 按日期合并。所有文本不用 emoji 或感叹号。每次写入保存版本。',
   },
   {
+    name: 'award',
+    scope: 'write',
+    title: '授予一枚奖章',
+    input: MedalInput,
+    description:
+      '何时用：用户真的做到了什么值得记住的事——第一次训练、第一次挂上一片、一个纪录、停滞后的突破、连续几周没落、第一封信、一段艰难的日子还是练了。一周最多一两枚，宁缺毋滥。画到 recap 页末尾的成就墙，本周新得的会出现在首页。key 是稳定的小写标识（同 key 覆盖）；name 是你起的名字，雅一点，二到八个字，不用「第一次」「成就」这类说明文字；motif 是章上唯一的图样：数字是重点时用数字（135、4、100），否则一个字；occasion 一句话说明因何而得；story 是一到三段很短的小故事，题材随意——一个片段、一段小说、她和他、一个清晨——不必和训练有关，但要配得上这个时刻。date 为 null 表示一枚和用户约定、尚未达成的奖章，达成时补上日期并写故事。全部文字不用 emoji 或感叹号。',
+  },
+  {
     name: 'delete',
     scope: 'write',
     title: '删除某日训练或体重',
     input: DeleteInput,
     description:
-      '何时用：仅当用户明确要求删除。删除 kind=session 或 weight 的指定日期，返回被删除内容和页面链接。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。',
+      '何时用：仅当用户明确要求删除。kind=session 或 weight 按 date 删除，kind=medal 按 key 删除，返回被删除内容和页面链接。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。',
   },
 ] as const;
 export const MCP_OUTPUTS = {
@@ -110,6 +120,7 @@ export const MCP_OUTPUTS = {
   set_plan: Plan.nullable(),
   set_profile: Profile,
   curate: Curation,
+  award: Medal,
   delete: Deleted,
 };
 export type ToolName = keyof typeof MCP_OUTPUTS;
@@ -154,7 +165,7 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 
 ## 页面地图：你写的东西出现在哪里
 - next：下一次训练。由 set_plan（按星期几的计划）和 curate.next（你对下一次的一句提示）组成。
-- recap：本周回顾。由 curate.recap（周信 letter、title、picks 亮点、focus 焦点主项）和 curate.theme（本周主题与理由）组成；四项主项的力量曲线、最重记录和训练日历由代码从记录自动生成。
+- recap：本周回顾。由 curate.recap（周信 letter、title、picks 亮点、focus 焦点主项）和 curate.theme（本周主题与理由）组成；页末是成就墙，奖章由 award 授予；四项主项的力量曲线、最重记录和训练日历由代码从记录自动生成。
 - body：体重。由 log_weight、set_profile.gain_target（目标带）和 curate.body（你对趋势的一句话）组成；均值和速度由代码计算。
 - log：训练记录。由 log_session（title、各组、用户原话 note）和 curate.log（你对某一天的一句批注）组成。
 - notes：用户自己写的随手记。以读为主；write_note 需用户单独授权并在对话中明确要求。
@@ -179,7 +190,7 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 - 用户发来体重：log_weight，单位 lb；训练重量保留用户的原单位。
 - 本周训练完成或到了周末：写周信 curate.recap，像朋友的短笺，1–5 段，记下值得记住的变化和可行的下一步；picks 引用本周真实记录；focus 指向一个主项并说明原因；没有实际计划时不写 next。
 - 主题：只有两种。ink（水墨）是日常，安静、专注，默认如此；gold（鎏金）留给值得庆祝的一周：主项纪录、里程碑、连续完成。只在真有这样的事时选 gold 并给短理由，下一周按情况回到 ink。选择跨周延续，未来周到期生效；省略保持，null 移除该周选择并回退。主题不是对完成度的奖惩，不为换色而换色。
-- 成就（get_brief.medals）由代码从事实派生：有日期的已获得，null 的还在等。本周新得的可以在周信或批注里提一句它的名字；你不能授予，也不要编造条件之外的成就。
+- 奖章由你授予（award）。get_brief.medals 列出已有的；week_facts 里的纪录、门槛、突破、连续，是授予的好时机，guide.missing 出现 medal 时说明本周有这样的事却还没有章。名字由你起，雅一点；章上只有一个图样；配一到三段很短的小故事，题材随意，不必和训练有关。一周最多一两枚。也可以和用户约定一枚尚未达成的（date 为 null），达成时补日期、写故事。
 - 忙碌、疲劳、受伤：先理解用户表达的限制，缩短、调整或休息，不责备、不施压；身体不适时不鼓励硬撑，也不作诊断。不把漏练解释成意志力问题，不凭漏记推测情绪，休息不等于失败。不要把临时忙碌永久当作用户特征。
 - 日期以档案时区和 today 为准，不确定的历史日期先问。事实已保存但策展失败时清楚说明，只重试失败部分。
 

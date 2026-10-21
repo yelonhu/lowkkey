@@ -1050,6 +1050,31 @@ button:disabled {
   font-size: 12px;
 }
 .wall-story {
-  margin-top: 16px;
+  margin-top: 18px;
+  padding: 16px 18px 16px 30px;
+  border-radius: 16px;
+  background: var(--wash-bg);
+  position: relative;
   animation: quiet-feedback 0.2s ease-out;
+}
+.wall-story::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: calc(16px + 1em - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--g0), var(--g2));
+}
+.wall-story .meta {
+  margin-bottom: 8px;
+}
+.wall-story p + p {
+  margin-top: 10px;
+}
+.wall-story p:not(.meta) {
+  font: 400 15px / 1.95 var(--font);
+  color: var(--ink2);
+  text-wrap: pretty;
 }

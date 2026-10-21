@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { themeNames } from '../shell/theme.ts';
 import { Medal } from '../ui/Medal.tsx';
-import { ACHIEVEMENTS } from '@lowkkey/core';
 import './styleguide.css';
 
 type Theme = keyof typeof themeNames;
@@ -9,19 +8,45 @@ const themes = Object.keys(themeNames) as Theme[];
 const displayFont =
   'https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600&family=Cormorant+Garamond:wght@500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Serif&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap';
 
-// A few are shown as earned with dates; the rest wait as outlines. Names come from the catalog.
-const earnedDates: Record<string, string> = {
-  first_session: '2026-09-23',
-  first_plan: '2026-09-22',
-  plate_1: '2026-10-03',
-  letter_1: '2026-10-05',
-  weigh_1: '2026-09-23',
-  first_pr: '2026-10-10',
-  streak_4: '2026-10-26',
-  week_full: '2026-10-12',
-  note_1: '2026-10-14',
-  rest_kept: '2026-10-18',
-};
+// Medals are written by the AI: a name of its choosing, one motif, a short story. These are samples of the form.
+const sampleMedals = [
+  {
+    key: 'first-plate',
+    motif: '135',
+    unit: 'lb',
+    name: '一片冰心',
+    date: '2026-10-03',
+    story: ['她把片挂上去的时候，没有人看。杠铃沉了一下，像一句终于说出口的话。'],
+  },
+  {
+    key: 'first-letter',
+    motif: '信',
+    name: '见字如面',
+    date: '2026-10-05',
+    story: ['第一封信很短。他读了两遍，把手机扣在桌上，出门跑了一圈。'],
+  },
+  {
+    key: 'four-weeks',
+    motif: '4',
+    name: '不落',
+    date: '2026-10-26',
+    story: ['四个星期。雨天去了，加班的那天也去了。没有人颁奖，所以这里有一枚。'],
+  },
+  {
+    key: 'unstuck',
+    motif: '越',
+    name: '翻山',
+    date: '2026-11-02',
+    story: ['停了三次的数字，这周往前走了一格。山不高，但确实翻过去了。'],
+  },
+  {
+    key: 'bodyweight-bench',
+    motif: '身',
+    name: '举起自己',
+    date: null,
+    story: ['约定好了：推起和自己一样重的那天，写一个关于「重」的故事。'],
+  },
+];
 
 function useDisplayFont() {
   useEffect(() => {
@@ -349,27 +374,24 @@ export function Styleguide() {
 
       <section className="sg-sec">
         <h2>
-          成就<span>奖章 · 有典有梗的名字 · 一个图样 · 条件只说一次</span>
+          成就<span>奖章 · AI 起的名字 · 一个图样 · 一个小故事</span>
         </h2>
         <div className="sg-medals">
-          {ACHIEVEMENTS.map(m => (
-            <Medal key={m.id} motif={m.motif} unit={m.unit} name={m.name} how={m.how} locked={!earnedDates[m.id]} />
+          {sampleMedals.map(m => (
+            <Medal
+              key={m.key}
+              motif={m.motif}
+              unit={m.unit}
+              name={m.name}
+              date={m.date ?? undefined}
+              locked={!m.date}
+            />
           ))}
         </div>
         <p className="sg-note">
-          名字是趣味所在：欧洲史里的故事、奢侈品牌的起家、健身房里的梗、被反用的中文句子。章上只有一个图样，名字在章下，条件只说一次；典故在下面。未获得的是一圈线，等着被刻上。
+          奖章由 AI 授予：名字由它起，雅一点；章上只有一个图样；配一到三段很短的小故事，题材随意。date
+          为空的是约定好、还在等的一枚。金属随主题：水墨是铂金，鎏金是金。
         </p>
-        <details className="sg-lore">
-          <summary>每一枚的典故</summary>
-          <dl>
-            {ACHIEVEMENTS.map(m => (
-              <div key={m.id}>
-                <dt>{m.name}</dt>
-                <dd>{m.lore}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
       </section>
 
       <section className="sg-sec">
@@ -458,10 +480,10 @@ export function Styleguide() {
               </a>
             </article>
             <article className="bd-card bd-medal">
-              <Medal motif="犊" name="米洛的牛犊" date="2026-10-10" size={96} />
+              <Medal motif="135" unit="lb" name="一片冰心" date="2026-10-03" size={96} />
               <p>
                 <b>本周落下一枚</b>
-                卧推的第一个纪录。它会留在 recap 页末尾的成就墙上。
+                她把片挂上去的时候，没有人看。
               </p>
             </article>
           </div>

@@ -159,8 +159,22 @@ export const PlanHistory = z.strictObject({
   plans: z.array(Plan),
 });
 export type PlanHistory = z.infer<typeof PlanHistory>;
+// A medal is awarded by the AI for a real moment: a name of its choosing, one motif, a short story.
+// date null is a medal agreed on but not yet earned.
+export const MedalInput = z.strictObject({
+  key: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, 'key 用小写字母、数字和连字符'),
+  date: LocalDate.nullable(),
+  name: prose(12).trim().min(1),
+  motif: text(4).trim().min(1),
+  unit: text(6).trim().optional(),
+  occasion: prose(60).trim().optional(),
+  story: z.array(prose(300).min(1)).min(1).max(3),
+});
+export const Medal = MedalInput.extend({ updated_at: Instant });
+export type Medal = z.infer<typeof Medal>;
 export const Facts = z.strictObject({
   sessions: z.array(TrainingSession),
+  medals: z.array(Medal).default([]),
   weights: z.array(Weight),
   plans: z.array(Plan),
   profile: Profile,
@@ -189,8 +203,16 @@ export const ClientPublic = z.strictObject({
   firstWriteAt: Instant.nullable(),
 });
 export type ClientPublic = z.infer<typeof ClientPublic>;
-export const DeleteInput = z.strictObject({ kind: z.enum(['session', 'weight']), date: LocalDate });
-export const Deleted = DeleteInput.extend({ deleted: z.union([TrainingSession, Weight]) });
+const DeleteFields = z.strictObject({
+  kind: z.enum(['session', 'weight', 'medal']),
+  date: LocalDate.optional(),
+  key: z.string().optional(),
+});
+export const DeleteInput = DeleteFields.refine(v => (v.kind === 'medal' ? !!v.key : !!v.date), {
+  message: '训练和体重按 date 删除，奖章按 key 删除',
+  path: ['date'],
+});
+export const Deleted = DeleteFields.extend({ deleted: z.union([TrainingSession, Weight, Medal]) });
 export const BriefInput = z.strictObject({
   sessions: z.number().int().min(0).max(30).default(6),
   session_date: LocalDate.optional(),
@@ -264,21 +286,8 @@ export const NotesSummary = z.strictObject({
   count: z.number().int().nonnegative(),
   latest_date: LocalDate.nullable(),
   updated_at: Instant.nullable(),
-  first_date: LocalDate.nullable().optional(),
-  date_30: LocalDate.nullable().optional(),
 });
 export type NotesSummary = z.infer<typeof NotesSummary>;
-// A medal is a milestone derived from facts; date is the day it was first met, null while waiting.
-export const Medal = z.strictObject({
-  id: z.string(),
-  name: z.string(),
-  how: z.string(),
-  lore: z.string(),
-  motif: z.string(),
-  unit: z.string().optional(),
-  date: LocalDate.nullable(),
-});
-export type Medal = z.infer<typeof Medal>;
 
 // The keeper's stateful to-do list. Computed from saved facts, never from the conversation.
 export const GuideMissing = z.enum([
@@ -289,6 +298,7 @@ export const GuideMissing = z.enum([
   'weight',
   'week_letter',
   'body_note',
+  'medal',
 ]);
 export type GuideMissing = z.infer<typeof GuideMissing>;
 export const WeekStatus = z.strictObject({

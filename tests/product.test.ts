@@ -116,7 +116,7 @@ describe('product onboarding and continuity', () => {
         icons: [{ src: 'https://lowkkey.test/icon-512.png', mimeType: 'image/png', sizes: ['512x512'] }],
       },
     });
-    expect((await rpc('tools/list', {})).result.tools).toHaveLength(8);
+    expect((await rpc('tools/list', {})).result.tools).toHaveLength(9);
     expect((await life.onboarding(db, owner)).clients[0].firstReadAt).toBeNull();
     const brief = await rpc('tools/call', { name: 'get_brief', arguments: {} });
     expect(Brief.parse(brief.result.structuredContent.result).onboarding?.entry).toBe('existing');
@@ -138,10 +138,40 @@ describe('product onboarding and continuity', () => {
       }),
     );
     for (let i = 0; i < results.length; i++) {
-      expect(results[i]).toHaveLength([2, 8, 9, 0][i % 4]);
+      expect(results[i]).toHaveLength([2, 9, 10, 0][i % 4]);
       expect(results[i].includes('write_note')).toBe(i % 4 === 2);
       if (i % 4 === 0) expect(results[i]).toEqual(['get_brief', 'read_notes']);
     }
+  });
+  it('awards medals the AI writes, lists them in state and brief, and deletes by key', async () => {
+    const owner = await accountFor(db, { issuer: 'product', subject: 'medals', email: 'medals@example.com' });
+    const medal = {
+      key: 'first-plate',
+      date: '2026-10-08',
+      name: '一片冰心',
+      motif: '135',
+      unit: 'lb',
+      occasion: '深蹲第一次挂上一片',
+      story: ['她把片挂上去的时候，没有人看。'],
+    };
+    const saved = await store.award(db, owner, medal, stamp);
+    expect(saved).toMatchObject(medal);
+    expect(await store.award(db, owner, medal, new Date('2026-10-09T00:00:00Z'))).toEqual(saved);
+    await expect(store.award(db, owner, { ...medal, key: 'Bad Key' })).rejects.toThrow();
+    await expect(store.award(db, owner, { ...medal, key: 'later', date: '2027-01-01' }, stamp)).rejects.toThrow(
+      'invalid_arguments',
+    );
+    const waiting = await store.award(db, owner, { ...medal, key: 'bodyweight', date: null, name: '举起自己' }, stamp);
+    expect(waiting.date).toBeNull();
+    expect((await store.state(db, owner, stamp)).medals.map(m => m.key)).toEqual(['bodyweight', 'first-plate']);
+    expect((await store.brief(db, owner, {}, stamp)).medals?.map(m => m.name)).toEqual(['举起自己', '一片冰心']);
+    expect(await store.deleteFact(db, owner, { kind: 'medal', key: 'bodyweight' })).toMatchObject({
+      kind: 'medal',
+      key: 'bodyweight',
+    });
+    await expect(store.deleteFact(db, owner, { kind: 'medal', key: 'bodyweight' })).rejects.toThrow('not_found');
+    await expect(store.deleteFact(db, owner, { kind: 'medal' })).rejects.toThrow();
+    expect((await store.state(db, owner, stamp)).medals).toHaveLength(1);
   });
   it('failed calls and profile writes do not complete first-content onboarding', async () => {
     expect(

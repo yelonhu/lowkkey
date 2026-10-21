@@ -21,21 +21,22 @@
 
 开发服务使用独立 `.data/showroom`，迁移入口 `db/showroom-migrations`；旧 `db/migrations` 和旧公网库不参与。演练只写入临时 D1 的合成数据，生产包没有示例数据。私密原稿与备份不进 Git；本地原稿验收使用 `.local/v5/reference-facts.json`，CI 自动跳过这项私人数据测试。
 
-## 九工具 MCP
+## 十工具 MCP
 
-地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。全权限九项，只读提供 `get_brief` 和 `read_notes`。
+地址为应用域名下的 `/mcp`，使用 Streamable HTTP + OAuth。全权限十项，只读提供 `get_brief` 和 `read_notes`。
 
-| 工具          | 参数与行为                                                                  |
-| ------------- | --------------------------------------------------------------------------- |
-| `log_session` | `date/title/sets/note`，整体覆盖当日；note 只保存用户的话，拒绝 raw_text    |
-| `log_weight`  | `date/lb`，按日期覆盖                                                       |
-| `set_plan`    | `title/weekday/items/coach`，同星期唯一，空 items 删除                      |
-| `set_profile` | 目标和身体备注，省略保留、null 清空                                         |
-| `curate`      | 周主题、周信、picks、next/body 与 log 批注；递归 patch，每次保存版本        |
-| `delete`      | `kind/date`，返回删除的训练或体重                                           |
-| `get_brief`   | 默认六次训练，可选 0–30；紧凑组、计划、领域读数、week_facts 与四周策展摘要  |
-| `read_notes`  | 单日（包含空记录版本）或范围分页，默认 14 个非空日期、最多 30，不截断       |
-| `write_note`  | `date/text/revision`，独立 `notes:write` 权限；仅按用户明确要求提交整日原文 |
+| 工具          | 参数与行为                                                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `log_session` | `date/title/sets/note`，整体覆盖当日；note 只保存用户的话，拒绝 raw_text                                                         |
+| `log_weight`  | `date/lb`，按日期覆盖                                                                                                            |
+| `set_plan`    | `title/weekday/items/coach`，同星期唯一，空 items 删除                                                                           |
+| `set_profile` | 目标和身体备注，省略保留、null 清空                                                                                              |
+| `curate`      | 周主题、周信、picks、next/body 与 log 批注；递归 patch，每次保存版本                                                             |
+| `award`       | `key/date/name/motif/story`，AI 授予的奖章：名字由它起，一个图样，一到三段小故事；date 为 null 是约定好还在等的一枚；同 key 覆盖 |
+| `delete`      | `kind/date`，返回删除的训练或体重                                                                                                |
+| `get_brief`   | 默认六次训练，可选 0–30；紧凑组、计划、领域读数、week_facts 与四周策展摘要                                                       |
+| `read_notes`  | 单日（包含空记录版本）或范围分页，默认 14 个非空日期、最多 30，不截断                                                            |
+| `write_note`  | `date/text/revision`，独立 `notes:write` 权限；仅按用户明确要求提交整日原文                                                      |
 
 `get_brief` 同时返回 `guide`：`stage`（empty / setup / active）、`missing`（档案还缺什么：训练背景、计划、next 提示、训练、体重、本周周信、体重批注）、`next_step` 与 `week`（本周第几周、完成几次、计划几次），全部由已保存事实和实际权限推导。MCP instructions 是一本「管理者手册」：身份、页面地图（哪个工具画哪一页）、读写边界三档、首次会话剧本和日常例程。另提供三个 prompts：`start`、`log_today`、`weekly_letter`，把管理者角色放进用户自己的消息里。
 

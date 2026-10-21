@@ -165,6 +165,7 @@ export async function cleanupDeletions(db: D1Database, revokeGrant?: (grant: str
       if (revokeGrant) for (const client of clients.results) await revokeGrant(client.grant_id, job.owner_id);
       const owned = [
         'daily_notes',
+        'medals',
         'showroom_sessions',
         'showroom_weights',
         'showroom_plans',

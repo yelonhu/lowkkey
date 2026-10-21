@@ -4,7 +4,7 @@
 
 ## 权限与工具
 
-网页仅使用 Google 登录，开放注册且无需邀请；按 Google 身份关联账户。MCP 使用 OAuth `read/write/notes:write`，账户来自令牌，不接受调用方指定 owner。全权限九项：`get_brief`、`read_notes`、`log_session`、`log_weight`、`set_plan`、`set_profile`、`curate`、`delete`、`write_note`。没有业务审批；客户端自己的确认独立存在。
+网页仅使用 Google 登录，开放注册且无需邀请；按 Google 身份关联账户。MCP 使用 OAuth `read/write/notes:write`，账户来自令牌，不接受调用方指定 owner。全权限十项：`get_brief`、`read_notes`、`log_session`、`log_weight`、`set_plan`、`set_profile`、`curate`、`award`、`delete`、`write_note`。没有业务审批；客户端自己的确认独立存在。
 
 每个写工具返回 `{result: 保存后的对象, view_url}`。删除返回被删对象；不存在报错。校验失败不提交任何字段。训练和体重按日期覆盖；计划按 title 更新，weekday 0 为周日、同星期唯一，空 items 删除。
 
@@ -23,7 +23,7 @@
 - focus 仅四个主项；body.text 160 字；log 每条 100 字且对应已有训练。
 - 策展文字拒绝 emoji、感叹号，字数按 Unicode 码点计算。
 
-MCP instructions 是管理者手册：身份宣言、页面地图（set_plan 与 curate.next 画 next，curate.recap/theme 画 recap，log_weight、gain_target 与 curate.body 画 body，log_session 与 curate.log 画 log，notes 为用户原文）、读写边界三档（直接做 / 先确认 / 绝不做）、首次会话剧本与日常例程，不含模型手算。`get_brief` 与 `/v1/state` 额外返回 `medals`：28 枚成就，每枚 `{id,name,how,lore,motif,unit?,date}`，`date` 是条件首次满足的日期、null 为未获得，全部由 `packages/core/src/achievements.ts` 从事实（训练、体重、计划历史、周信、主题）与随手记摘要（`notes.first_date`、`notes.date_30`）派生，AI 不能授予。`get_brief` 额外返回 `guide:{stage,next_step,missing,week}`：stage 为 empty（无任何事实）、setup（有背景、计划或体重但无训练）或 active；missing 取值 training_context、plan、next_note、session、weight、week_letter、body_note，只由已保存事实与实际权限推导；week 为 `{start,index,done,planned}`。服务端另注册三个 prompts（`start`、`log_today(text)`、`weekly_letter`），返回单条 user 消息，需 read 权限。`get_brief({sessions?:0..30})` 默认 6，完整数据优先，不静默截断。返回生成时间、账户时区的今天、下一安排、全部计划/profile、生效主题、source_week、reason（兼容 manual_this_week 固定 false）、体重均线截止日期/样本数、四项力量、各动作最近两次紧凑记录、训练摘要、week_facts、当前策展及最近四周标题/主题。
+MCP instructions 是管理者手册：身份宣言、页面地图（set_plan 与 curate.next 画 next，curate.recap/theme 画 recap，log_weight、gain_target 与 curate.body 画 body，log_session 与 curate.log 画 log，notes 为用户原文）、读写边界三档（直接做 / 先确认 / 绝不做）、首次会话剧本与日常例程，不含模型手算。奖章由 AI 通过 `award({key,date|null,name,motif,unit?,occasion?,story[1..3]})` 授予，存于 `medals(owner_id,key)`，同 key 覆盖，`delete({kind:'medal',key})` 删除；`date` 为 null 表示约定好尚未达成。`/v1/state` 的 facts 与 `get_brief.medals` 原样返回。guide.missing 在本周 week_facts 有纪录、门槛、突破、连续而尚无本周奖章时给出 `medal`。`get_brief` 额外返回 `guide:{stage,next_step,missing,week}`：stage 为 empty（无任何事实）、setup（有背景、计划或体重但无训练）或 active；missing 取值 training_context、plan、next_note、session、weight、week_letter、body_note，只由已保存事实与实际权限推导；week 为 `{start,index,done,planned}`。服务端另注册三个 prompts（`start`、`log_today(text)`、`weekly_letter`），返回单条 user 消息，需 read 权限。`get_brief({sessions?:0..30})` 默认 6，完整数据优先，不静默截断。返回生成时间、账户时区的今天、下一安排、全部计划/profile、生效主题、source_week、reason（兼容 manual_this_week 固定 false）、体重均线截止日期/样本数、四项力量、各动作最近两次紧凑记录、训练摘要、week_facts、当前策展及最近四周标题/主题。
 
 ## 领域计算
 
