@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { PRIVACY_VERSION } from '@lowkkey/protocol';
 import { Welcome } from './Welcome.tsx';
 import { call, type Account, returnPath, errorLabel } from './customer-api.ts';
-import type { useShowroom } from './useShowroom.ts';
+import type { useShowroom } from '../shell/useShowroom.ts';
 import { CustomerAccount } from './CustomerAccount.tsx';
 export function PrivacyCheck({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   return (

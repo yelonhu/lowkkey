@@ -1,0 +1,246 @@
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.6 var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'kern', 'calt';
+  transition:
+    background-color 0.25s,
+    color 0.25s;
+}
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+figure,
+dl,
+dd {
+  margin: 0;
+  padding: 0;
+}
+ul,
+ol {
+  list-style: none;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+a,
+summary,
+.chartbox,
+.chartbox svg {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.tn {
+  font-variant-numeric: tabular-nums;
+}
+.u {
+  font-size: 0.78em;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 0.18em;
+  letter-spacing: 0;
+}
+.mu {
+  color: var(--muted);
+}
+.wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* ── 头部：品牌与主题点会滚走，导航吸顶 ── */
+.brandrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: max(18px, env(safe-area-inset-top));
+  height: calc(48px + max(18px, env(safe-area-inset-top)) - 18px);
+}
+.brand {
+  font: 600 15px/1 var(--font);
+  letter-spacing: -0.01em;
+}
+/* 品牌后的句点是这个舱的心跳：平时缓慢呼吸，同步时加快。 */
+.brand::after {
+  content: '.';
+  font: inherit;
+  letter-spacing: 0;
+  color: var(--acc-ink);
+  display: inline-block;
+  animation: breathe 3.8s ease-in-out infinite;
+}
+html[data-syncing] .brand::after {
+  animation-duration: 0.9s;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.navbar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 20;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: saturate(1.5) blur(14px);
+  backdrop-filter: saturate(1.5) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+body::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 21;
+  pointer-events: none;
+  background: var(--bg);
+}
+.tabs {
+  display: flex;
+  gap: 24px;
+}
+.tabs a {
+  position: relative;
+  padding: 12px 0 11px;
+  font: 500 15px/1 var(--font);
+  color: var(--muted);
+  letter-spacing: -0.005em;
+  transition: color 0.15s;
+}
+.tabs a[aria-current] {
+  color: var(--ink);
+}
+.tabs a[aria-current]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--g0), var(--g1), var(--g2));
+}
+
+/* ── 通用 ── */
+.pg {
+  padding-top: 28px;
+  padding-bottom: 72px;
+}
+.meta {
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.sec {
+  margin-top: 44px;
+}
+.sh {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+.sh h2 {
+  font: 600 13px/1 var(--font);
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+.sh span {
+  font-size: 12px;
+  color: var(--muted);
+}
+/* AI 的声音：一枚安静的墨点在每段前面，页面上只有这一个声音。 */
+.cl {
+  position: relative;
+  padding: 11px 14px 11px 26px;
+  border-radius: 12px;
+  background: var(--wash-bg);
+  font: 400 15px/1.85 var(--font);
+  color: var(--ink2);
+}
+.cl::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: calc(11px + 0.925em - 2.5px);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--g0), var(--g2));
+}
+.cl.sm {
+  font-size: 13.5px;
+  line-height: 1.8;
+  padding: 9px 12px 9px 24px;
+}
+.cl.sm::before {
+  left: 11px;
+  top: calc(9px + 0.9em - 2.5px);
+}
+.card {
+  background: var(--surf);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--depth);
+}
+.chev {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  stroke: var(--faint);
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s;
+}
+svg {
+  display: block;
+  overflow: visible;
+}
+svg text {
+  font-family: var(--font);
+  fill: var(--muted);
+  font-size: 10px;
+}

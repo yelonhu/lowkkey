@@ -16,7 +16,7 @@ import {
   weekStatus,
   weekday,
 } from '@lowkkey/core';
-import { Barbell, Chev, Glyph } from './Graphics.tsx';
+import { Barbell, Chev, Glyph } from '../ui/Graphics.tsx';
 
 /** Where today sits: weekday, week number, this week's progress, the latest weight. */
 export function StatusLine({ facts, today }: { facts: Facts; today: string }) {

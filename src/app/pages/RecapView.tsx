@@ -21,9 +21,8 @@ import {
   toLb,
   weekday,
 } from '@lowkkey/core';
-import { Equipment } from './Graphics.tsx';
-import { StrengthChart, WeightChart } from './TrendChart.tsx';
-export const themeNames = { ink: '水墨', gold: '鎏金', pearl: '珍珠' };
+import { Equipment } from '../ui/Graphics.tsx';
+import { StrengthChart, WeightChart } from '../ui/TrendChart.tsx';
 function ContactSheet({ facts, today, weekOnly }: { facts: Facts; today: string; weekOnly?: string }) {
   const scored = scoredSessions(facts),
     by = new Map(scored.map(s => [s.date, s])),

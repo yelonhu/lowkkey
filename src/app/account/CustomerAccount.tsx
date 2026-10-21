@@ -1,11 +1,11 @@
 import { Connections } from './Connections.tsx';
-import { animate } from './motion.tsx';
-import { clearPendingNotes, downloadPendingNotes, hasPendingNotes } from './notes-model.ts';
+import { animate } from '../shell/motion.tsx';
+import { clearPendingNotes, downloadPendingNotes, hasPendingNotes } from '../pages/notes-model.ts';
 import { PRIVACY_VERSION } from '@lowkkey/protocol';
 import { Welcome } from './Welcome.tsx';
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { ClientPublic } from '@lowkkey/protocol';
-import type { useShowroom } from './useShowroom.ts';
+import type { useShowroom } from '../shell/useShowroom.ts';
 import { call, errorLabel, returnPath, type AuthConfig, type Account } from './customer-api.ts';
 export function LoginGate({
   chamber,

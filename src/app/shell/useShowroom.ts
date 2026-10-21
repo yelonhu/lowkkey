@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { hasPendingNotes, clearPendingNotes } from './notes-model.ts';
+import { hasPendingNotes, clearPendingNotes } from '../pages/notes-model.ts';
 import { StateResponse } from '@lowkkey/protocol';
 
 export function useShowroom() {

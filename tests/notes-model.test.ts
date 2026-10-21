@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { NotesModel } from '../src/app/notes-model.ts';
+import { NotesModel } from '../src/app/pages/notes-model.ts';
 import type { DailyNote } from '@lowkkey/protocol';
 const date = '2026-10-12';
 let model: NotesModel,

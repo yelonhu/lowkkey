@@ -1,7 +1,7 @@
 import { AuthorizationError, CimdFetchError, OAuthProvider, OAuthError } from '@cloudflare/workers-oauth-provider';
 import type { OAuthHelpers, OAuthResourceContext } from '@cloudflare/workers-oauth-provider';
 import type { ExecutionContext, KVNamespace } from '@cloudflare/workers-types';
-import pageCSS from '../app/style.css?raw';
+import pageCSS from '../app/styles/index.css?inline';
 import { requireConsent } from './privacy.ts';
 import { createApi } from './api.ts';
 import type { Bindings } from './api.ts';

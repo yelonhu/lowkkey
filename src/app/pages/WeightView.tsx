@@ -1,8 +1,8 @@
 import type { Facts } from '@lowkkey/protocol';
 import { LB_PER_KG } from '@lowkkey/protocol';
 import { datedCuration, fmt, md, monday, targetStatus, weightMean, weightRate, weeklyWeights } from '@lowkkey/core';
-import { WeightChart } from './TrendChart.tsx';
-import { useSettle } from './motion.tsx';
+import { WeightChart } from '../ui/TrendChart.tsx';
+import { useSettle } from '../shell/motion.tsx';
 export function WeightView({ facts, today }: { facts: Facts; today: string }) {
   const weights = [...facts.weights].filter(w => w.date <= today).sort((a, b) => a.date.localeCompare(b.date)),
     latest = weights.at(-1);

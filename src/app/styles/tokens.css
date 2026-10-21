@@ -1,0 +1,133 @@
+/* ──────────────────────────────────────────────────────────────
+   lowkkey · 最终设计稿
+   一套字体栈：Inter 在前，Noto Serif SC 在后。
+   数字和英文自动落在 Inter，汉字自动落在宋体，不需要逐段标记。
+   ────────────────────────────────────────────────────────────── */
+:root {
+  --font: 'Inter', 'Noto Serif SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  --r-card: 14px;
+  --r-sm: 8px;
+}
+/* 三套主题：水墨是日常，鎏金是庆祝，珍珠是突破。
+   浅色由用户选，特别的一周 Claude 可以换；深色跟系统。
+   --acc 用于图形，--acc-ink 用于文字，--wash-bg 是 Claude 写的字底下那层浅色。 */
+html[data-theme='ink'] {
+  --bg: #ffffff;
+  --surf: #f7f7f7;
+  --ink: #0b0b0b;
+  --ink2: #333333;
+  --muted: #787878;
+  --faint: #b2b2b2;
+  --line: #e6e6e6;
+  --line2: #f0f0f0;
+  --acc: #0b0b0b;
+  --acc-ink: #0b0b0b;
+  --g0: #0b0b0b;
+  --g1: #0b0b0b;
+  --g2: #0b0b0b;
+  --wash: rgba(0, 0, 0, 0.045);
+  --wash2: rgba(0, 0, 0, 0.03);
+  --wash-bg: rgba(0, 0, 0, 0.035);
+}
+html[data-theme='gold'] {
+  --bg: #fcfbf8;
+  --surf: #ffffff;
+  --ink: #1b1915;
+  --ink2: #45413a;
+  --muted: #827b70;
+  --faint: #b9b2a7;
+  --line: #e9e5dd;
+  --line2: #f2efe9;
+  --acc: #b08d4f;
+  --acc-ink: #8a6b32;
+  --g0: #cdae70;
+  --g1: #b08d4f;
+  --g2: #8f6e35;
+  --wash: rgba(176, 141, 79, 0.12);
+  --wash2: rgba(176, 141, 79, 0.065);
+  --wash-bg: linear-gradient(115deg, rgba(205, 174, 112, 0.15), rgba(176, 141, 79, 0.08));
+}
+html[data-theme='pearl'] {
+  --bg: #fafafb;
+  --surf: #ffffff;
+  --ink: #18181b;
+  --ink2: #3f3f46;
+  --muted: #71717a;
+  --faint: #a9a9b1;
+  --line: #e4e4e8;
+  --line2: #efeff2;
+  --acc: #6f78d3;
+  --acc-ink: #5560c0;
+  --g0: #8a7bd8;
+  --g1: #5b9bd5;
+  --g2: #9aa7b8;
+  --wash: rgba(111, 120, 211, 0.11);
+  --wash2: rgba(111, 120, 211, 0.06);
+  --wash-bg: linear-gradient(
+    115deg,
+    rgba(138, 123, 216, 0.12),
+    rgba(91, 155, 213, 0.09) 55%,
+    rgba(154, 167, 184, 0.08)
+  );
+}
+@media (prefers-color-scheme: dark) {
+  html[data-theme='ink'] {
+    --bg: #0d0d0d;
+    --surf: #161616;
+    --ink: #f2f2f2;
+    --ink2: #cfcfcf;
+    --muted: #8a8a8a;
+    --faint: #4d4d4d;
+    --line: #262626;
+    --line2: #1b1b1b;
+    --acc: #f2f2f2;
+    --acc-ink: #f2f2f2;
+    --g0: #f2f2f2;
+    --g1: #f2f2f2;
+    --g2: #f2f2f2;
+    --wash: rgba(255, 255, 255, 0.07);
+    --wash2: rgba(255, 255, 255, 0.04);
+    --wash-bg: rgba(255, 255, 255, 0.05);
+  }
+  html[data-theme='gold'] {
+    --bg: #131210;
+    --surf: #1b1a17;
+    --ink: #eeeae2;
+    --ink2: #cac4b8;
+    --muted: #8e877b;
+    --faint: #58534a;
+    --line: #2b2925;
+    --line2: #211f1c;
+    --acc: #d2b072;
+    --acc-ink: #e2c48c;
+    --g0: #e4c88e;
+    --g1: #d2b072;
+    --g2: #b8954f;
+    --wash: rgba(210, 176, 114, 0.14);
+    --wash2: rgba(210, 176, 114, 0.07);
+    --wash-bg: linear-gradient(115deg, rgba(228, 200, 142, 0.13), rgba(210, 176, 114, 0.07));
+  }
+  html[data-theme='pearl'] {
+    --bg: #111113;
+    --surf: #18181b;
+    --ink: #ededf0;
+    --ink2: #c4c4cc;
+    --muted: #85858f;
+    --faint: #4f4f58;
+    --line: #27272b;
+    --line2: #1d1d20;
+    --acc: #8f96e8;
+    --acc-ink: #a9aef0;
+    --g0: #a595f0;
+    --g1: #74b2ea;
+    --g2: #b4bfce;
+    --wash: rgba(143, 150, 232, 0.14);
+    --wash2: rgba(143, 150, 232, 0.07);
+    --wash-bg: linear-gradient(
+      115deg,
+      rgba(165, 149, 240, 0.13),
+      rgba(116, 178, 234, 0.09) 55%,
+      rgba(180, 191, 206, 0.07)
+    );
+  }
+}
