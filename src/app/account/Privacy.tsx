@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PRIVACY_VERSION } from '@lowkkey/protocol';
+import { PRIVACY_VERSION } from '@lowkkey/protocol/constants';
 import { Welcome } from './Welcome.tsx';
 import { call, type Account, returnPath, errorLabel } from './customer-api.ts';
 import type { useShowroom } from '../shell/useShowroom.ts';

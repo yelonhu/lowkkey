@@ -5,7 +5,9 @@
   "type": "module",
   "description": "lowkkey 标准协议：实体、API、MCP 工具定义。所有端（前端、后端、MCP）共享的唯一事实来源。",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
+    "./catalog": "./src/catalog.ts"
   },
   "dependencies": {
     "zod": "^4.6.0"

@@ -1,5 +1,6 @@
 import type { Facts, Pick } from '@lowkkey/protocol';
-import { LB_PER_KG, STRENGTH_EXERCISES } from '@lowkkey/protocol';
+import { STRENGTH_EXERCISES } from '@lowkkey/protocol/catalog';
+import { LB_PER_KG } from '@lowkkey/protocol/constants';
 import {
   addDays,
   bodyweightOn,

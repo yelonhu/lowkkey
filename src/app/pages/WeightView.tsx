@@ -1,5 +1,5 @@
 import type { Facts } from '@lowkkey/protocol';
-import { LB_PER_KG } from '@lowkkey/protocol';
+import { LB_PER_KG } from '@lowkkey/protocol/constants';
 import { datedCuration, fmt, md, monday, targetStatus, weightMean, weightRate, weeklyWeights } from '@lowkkey/core';
 import { WeightChart } from '../ui/TrendChart.tsx';
 import { useSettle } from '../shell/motion.tsx';

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { EXERCISE_LIBRARY } from './catalog.ts';
 import { Id, Instant, LocalDate, Unit } from './primitives.ts';
+import { NOTE_LIMIT, PRIVACY_VERSION } from './constants.ts';
+export { NOTE_LIMIT, PRIVACY_VERSION };
 const text = (max: number) => z.string().refine(v => Array.from(v).length <= max, `最多 ${max} 字`);
 const prose = (max: number) =>
   text(max).refine(
@@ -225,7 +227,6 @@ export const Fact = z.union([
 ]);
 export type Fact = z.infer<typeof Fact>;
 const briefPoint = StrengthPoint.omit({ set_index: true });
-export const NOTE_LIMIT = 20_000;
 export const DailyNote = z.strictObject({
   date: LocalDate,
   text: text(NOTE_LIMIT),
@@ -385,7 +386,6 @@ export const ProductEventInput = z.strictObject({
   event: z.enum(['returned', 'connection_help', 'connection_timeout', 'copy_failed']),
 });
 
-export const PRIVACY_VERSION = '2026-10-13-notes-write';
 export const ConsentInput = z.strictObject({ version: z.literal(PRIVACY_VERSION), accepted: z.literal(true) });
 export const ConsentStatus = z.object({ version: z.literal(PRIVACY_VERSION), acceptedAt: Instant.nullable() });
 

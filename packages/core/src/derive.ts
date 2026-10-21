@@ -1,22 +1,21 @@
-import {
-  STRENGTH_EXERCISES,
-  exerciseById,
-  LB_PER_KG,
-  type Brief,
-  type BriefGuide,
-  type Curation,
-  type CurationInput,
-  type Fact,
-  type Facts,
-  type GuideMissing,
-  type Pick,
-  type Plan,
-  type PlanItem,
-  type StrengthSeries,
-  type TrainingSession,
-  type TrainingSet,
-  type Weight,
-  type WeekStatus,
+import { STRENGTH_EXERCISES, exerciseById } from '@lowkkey/protocol/catalog';
+import { LB_PER_KG } from '@lowkkey/protocol/constants';
+import type {
+  Brief,
+  BriefGuide,
+  Curation,
+  CurationInput,
+  Fact,
+  Facts,
+  GuideMissing,
+  Pick,
+  Plan,
+  PlanItem,
+  StrengthSeries,
+  TrainingSession,
+  TrainingSet,
+  Weight,
+  WeekStatus,
 } from '@lowkkey/protocol';
 import { addDays, diffDays, fmt, localToday, monday, relativeDay, round, toLb, weekday } from './util.ts';
 import { bodyweightOn, scoreSet, strictReps, targetStatus, weightMean, weightRate } from './verifiers.ts';

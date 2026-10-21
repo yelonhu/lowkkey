@@ -1,7 +1,7 @@
 import { Connections } from './Connections.tsx';
 import { animate } from '../shell/motion.tsx';
 import { clearPendingNotes, downloadPendingNotes, hasPendingNotes } from '../pages/notes-model.ts';
-import { PRIVACY_VERSION } from '@lowkkey/protocol';
+import { PRIVACY_VERSION } from '@lowkkey/protocol/constants';
 import { Welcome } from './Welcome.tsx';
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { ClientPublic } from '@lowkkey/protocol';

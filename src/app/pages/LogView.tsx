@@ -15,7 +15,7 @@ import {
   weekday,
   addDays,
 } from '@lowkkey/core';
-import { STRENGTH_EXERCISES } from '@lowkkey/protocol';
+import { STRENGTH_EXERCISES } from '@lowkkey/protocol/catalog';
 import { Glyph } from '../ui/Graphics.tsx';
 const main = (ex: string) => STRENGTH_EXERCISES.some(id => id === ex);
 function ExerciseRow({

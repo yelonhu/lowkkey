@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { OnboardingState, type OnboardingState as Setup } from '@lowkkey/protocol';
+import type { OnboardingState as Setup } from '@lowkkey/protocol';
 import { Welcome, ProviderMark } from './Welcome.tsx';
 import { call, type Account } from './customer-api.ts';
 
@@ -63,7 +63,7 @@ export function useProduct(owner: string | undefined, onRefresh: () => Promise<v
     if (!owner) return;
     const epoch = generation.current;
     try {
-      const next = OnboardingState.parse(await call('/v1/onboarding'));
+      const next = (await call('/v1/onboarding')) as Setup;
       if (epoch === generation.current) {
         setSetup(next);
         setLoadedOwner(owner);
@@ -142,7 +142,7 @@ export function useProduct(owner: string | undefined, onRefresh: () => Promise<v
   async function update(value: unknown) {
     if (!owner) return;
     const epoch = generation.current;
-    const next = OnboardingState.parse(await call('/v1/onboarding', value, owner));
+    const next = (await call('/v1/onboarding', value, owner)) as Setup;
     if (epoch === generation.current) setSetup(next);
   }
   const report = (name: 'copy_failed' | 'connection_help') => {

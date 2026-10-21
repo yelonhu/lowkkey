@@ -1,4 +1,5 @@
-import { LB_PER_KG, type LocalDate, type Unit } from '@lowkkey/protocol';
+import { LB_PER_KG } from '@lowkkey/protocol/constants';
+import type { LocalDate, Unit } from '@lowkkey/protocol';
 export const dayIndex = (date: LocalDate) => Date.parse(date + 'T00:00:00Z') / 86400000;
 export const addDays = (date: LocalDate, days: number): LocalDate =>
   new Date((dayIndex(date) + days) * 86400000).toISOString().slice(0, 10);

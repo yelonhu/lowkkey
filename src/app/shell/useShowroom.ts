@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { hasPendingNotes, clearPendingNotes } from '../pages/notes-model.ts';
-import { StateResponse } from '@lowkkey/protocol';
+import type { StateResponse } from '@lowkkey/protocol';
 
 export function useShowroom() {
   const [state, setState] = useState<StateResponse | null>(null);
@@ -39,7 +39,7 @@ export function useShowroom() {
         }
       }
       if (!response.ok) throw new Error('暂时无法读取记录。');
-      const value = StateResponse.parse(await response.json());
+      const value = (await response.json()) as StateResponse;
       if (epoch !== generation.current) return;
       setState(value);
       setAuth('ready');

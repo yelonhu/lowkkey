@@ -1,5 +1,9 @@
-import { DailyNote, LocalDate, NOTE_LIMIT, NotesPage } from '@lowkkey/protocol';
-import type { NotesPage as Page } from '@lowkkey/protocol';
+import { NOTE_LIMIT } from '@lowkkey/protocol/constants';
+import type { DailyNote, NotesPage, NotesPage as Page } from '@lowkkey/protocol';
+
+// Responses come from our own API; a shape check on stored drafts is all the browser needs.
+const isLocalDate = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T00:00:00Z'));
 
 export type NoteEntry = {
   server: DailyNote;
@@ -33,8 +37,9 @@ function drafts(owner: string): Draft[] {
     const key = localStorage.key(i)!;
     if (!key.startsWith(prefix(owner))) continue;
     const raw = JSON.parse(localStorage.getItem(key)!);
-    if (typeof raw.text !== 'string') throw new Error('Unreadable draft');
-    const base = DailyNote.parse(raw.base);
+    if (typeof raw.text !== 'string' || typeof raw.base?.date !== 'string' || typeof raw.base?.text !== 'string')
+      throw new Error('Unreadable draft');
+    const base = raw.base as DailyNote;
     result.push({ date: base.date, text: raw.text, base, key });
   }
   return result;
@@ -268,16 +273,14 @@ export class NotesModel {
     this.loading = true;
     this.emit();
     try {
-      const page = NotesPage.parse(await this.request('/v1/notes?limit=30'));
+      const page = (await this.request('/v1/notes?limit=30')) as NotesPage;
       if (!this.loaded) this.cursor = page.next_cursor;
       const included = new Set(page.notes.map(n => n.date));
       page.notes.forEach(n => this.absorb(n));
       this.entry(today);
       // Fetch known missing dates too: an absent list row may be a cleared note.
       const missing = [...this.entries.keys()].filter(date => !included.has(date));
-      await Promise.all(
-        missing.map(async date => this.absorb(DailyNote.parse(await this.request('/v1/notes/' + date)))),
-      );
+      await Promise.all(missing.map(async date => this.absorb((await this.request('/v1/notes/' + date)) as DailyNote)));
       this.loaded = true;
       this.error = '';
       this.emit();
@@ -293,8 +296,8 @@ export class NotesModel {
   async loadDate(date: string) {
     if (this.disposed || this.entries.has(date)) return;
     try {
-      LocalDate.parse(date);
-      this.absorb(DailyNote.parse(await this.request('/v1/notes/' + date)));
+      if (!isLocalDate(date)) throw new Error('invalid_date');
+      this.absorb((await this.request('/v1/notes/' + date)) as DailyNote);
       this.emit();
     } catch {
       if (!this.disposed) {
@@ -308,7 +311,7 @@ export class NotesModel {
     this.loading = true;
     this.emit();
     try {
-      const page = NotesPage.parse(await this.request('/v1/notes?limit=30&before=' + this.cursor));
+      const page = (await this.request('/v1/notes?limit=30&before=' + this.cursor)) as NotesPage;
       page.notes.forEach(n => this.absorb(n));
       this.cursor = page.next_cursor;
       this.error = '';
@@ -343,13 +346,11 @@ export class NotesModel {
     e.error = '';
     this.emit();
     try {
-      const saved = DailyNote.parse(
-        await this.request('/v1/notes/' + date, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'X-Lowkkey-Account': this.owner },
-          body: JSON.stringify({ text, revision }),
-        }),
-      );
+      const saved = (await this.request('/v1/notes/' + date, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Lowkkey-Account': this.owner },
+        body: JSON.stringify({ text, revision }),
+      })) as DailyNote;
       e.server = saved;
       e.dirty = e.text !== saved.text;
       e.conflict = null;
@@ -360,7 +361,7 @@ export class NotesModel {
       if (this.disposed || epoch !== this.epoch) return;
       if ((cause as { status?: number }).status === 409) {
         try {
-          e.conflict = DailyNote.parse(await this.request('/v1/notes/' + date));
+          e.conflict = (await this.request('/v1/notes/' + date)) as DailyNote;
         } catch {
           e.error = '无法读取另一份内容，请重试。';
         }
@@ -379,7 +380,7 @@ export class NotesModel {
     const e = this.entry(date);
     try {
       // Refresh the version immediately before resolving; a subsequent race still gets a 409.
-      const remote = DailyNote.parse(await this.request('/v1/notes/' + date));
+      const remote = (await this.request('/v1/notes/' + date)) as DailyNote;
       const text = choice === 'remote' ? remote.text : choice === 'local' ? e.text : choice.text;
       for (const draft of e.recovered) {
         const keys = this.draftKeys.get(date) ?? new Map<string, string>();
