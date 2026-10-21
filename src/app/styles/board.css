@@ -186,7 +186,7 @@
   stroke-linecap: round;
   transform: rotate(-90deg);
   transform-origin: 50% 50%;
-  transition: stroke-dashoffset 0.6s cubic-bezier(0.22, 0.8, 0.25, 1);
+  transition: stroke-dashoffset var(--d-spring) var(--spring);
 }
 .bd-ring b {
   font: 600 var(--t-display) / 1 var(--font);
@@ -296,7 +296,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: var(--float);
-  animation: toast-in 0.26s cubic-bezier(0.22, 0.8, 0.25, 1);
+  animation: toast-in var(--d-snap) var(--spring-snap);
 }
 @keyframes toast-in {
   from {

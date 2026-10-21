@@ -8,3 +8,7 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>,
 );
+
+// Instant open: a service worker keeps the shell, assets and fonts on the device. Facts always come live.
+if (import.meta.env.PROD && 'serviceWorker' in navigator)
+  addEventListener('load', () => void navigator.serviceWorker.register('/sw.js').catch(() => {}));

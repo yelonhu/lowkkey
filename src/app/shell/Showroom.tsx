@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePageSwipe } from './usePageSwipe.ts';
 import {
-  animate,
   PageTabs,
+  animate,
+  turnPage,
   useArrivalMotion,
-  useMotion,
   useFactMotion,
+  useMotion,
   usePullRefresh,
   useRecordMotion,
 } from './motion.tsx';
@@ -44,7 +45,8 @@ export function Showroom() {
   const product = useProduct(chamber.state?.accountId, chamber.refresh, starting);
   const positions = useRef<Partial<Record<Screen, number>>>({}),
     activeScreen = useRef(screen);
-  const swipeCompleted = useRef(false);
+  const swipeCompleted = useRef(false),
+    turned = useRef(false);
   const showingOnboarding =
     screen !== 'notes' &&
     (starting ||
@@ -55,7 +57,7 @@ export function Showroom() {
   const interactive = ready && !settings && !showingOnboarding;
   const swipeViewport = usePageSwipe(screen, interactive, chamber.state?.accountId, positions, swipeCompleted);
   usePullRefresh(interactive, chamber.refresh);
-  useArrivalMotion(interactive, screen, chamber.state?.accountId, swipeCompleted);
+  useArrivalMotion(interactive, screen, chamber.state?.accountId, swipeCompleted, turned);
   useEffect(() => installPressFeedback(document.body), []);
   useEffect(() => {
     if (chamber.refreshing) document.documentElement.dataset.syncing = '';
@@ -75,12 +77,13 @@ export function Showroom() {
     const key = chamber.state.accountId + ':' + screen,
       first = !visited.current.has(key);
     visited.current.add(key);
-    if (screen !== 'notes' && !swipeCompleted.current && !first)
+    if (screen !== 'notes' && !swipeCompleted.current && !turned.current && !first)
       pageMotion.current = animate(document.getElementById('v-' + screen), [
         { opacity: 0.65, transform: 'translateY(6px)' },
         { opacity: 1, transform: 'translateY(0)' },
       ]);
     swipeCompleted.current = false;
+    turned.current = false;
   }, [screen, ready, chamber.state, target]);
 
   const targetPositioned = useRef<string | null>(null);
@@ -112,14 +115,19 @@ export function Showroom() {
   }, [product.setup]);
   useEffect(() => {
     const route = () => {
-      targetPositioned.current = null;
-      setStarting(location.hash === '#start');
       const next = screenFromHash();
-      positions.current[activeScreen.current] = window.scrollY;
-      activeScreen.current = next;
-      setScreen(next);
-      setTarget(targetFromHash());
-      if (location.hash === '#settings') setSettings(true);
+      const apply = () => {
+        targetPositioned.current = null;
+        setStarting(location.hash === '#start');
+        positions.current[activeScreen.current] = window.scrollY;
+        activeScreen.current = next;
+        setScreen(next);
+        setTarget(targetFromHash());
+        if (location.hash === '#settings') setSettings(true);
+      };
+      // A swipe has already moved the page by hand; a tab or a card turns it inside a view transition.
+      if (next === activeScreen.current || swipeCompleted.current) apply();
+      else turned.current = turnPage(apply);
     };
     window.addEventListener('hashchange', route);
     return () => window.removeEventListener('hashchange', route);

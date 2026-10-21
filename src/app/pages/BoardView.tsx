@@ -294,7 +294,15 @@ function MedalCard({ medals, today, door }: { medals: MedalFact[]; today: string
       </div>
       <div className="bd-medals">
         {shown.map(m => (
-          <Medal key={m.key} motif={m.motif} unit={m.unit} name={m.name} date={m.date ?? undefined} size={92} />
+          <Medal
+            key={m.key}
+            motif={m.motif}
+            unit={m.unit}
+            name={m.name}
+            date={m.date ?? undefined}
+            size={92}
+            transition={'medal-' + m.key}
+          />
         ))}
         <p>{shown.length === 1 ? (lead.occasion ?? lead.story[0]) : `${shown.length} 枚新的奖章。`}</p>
       </div>

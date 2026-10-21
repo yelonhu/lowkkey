@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { screenFromHash, screens, type Screen } from './navigation.ts';
-import { ease, reducedMotion } from './motion.tsx';
+import { reducedMotion, spring } from './motion.tsx';
 
 const protectedArea =
   'a,button,input,textarea,select,summary,[contenteditable],.chartbox,.glyph,.note-conflict,.connection-address,.note-status,[role="alert"]';
@@ -148,9 +148,11 @@ export function usePageSwipe(
       }
       const from = destination ? Math.max(-width, Math.min(width, x)) : x * 0.16,
         to = next ? -direction * width : 0;
-      const duration = Math.max(180, Math.min(280, 180 + (Math.abs(to - from) / width) * 100));
+      // Released, the page settles on the snap spring; a longer travel takes a little longer.
+      const duration = Math.max(320, Math.min(460, 320 + (Math.abs(to - from) / width) * 140)),
+        easing = spring('snap');
       const motion = (el: HTMLElement, frames: Keyframe[]) => {
-        const a = el.animate(frames, { duration, easing: ease, fill: 'forwards' });
+        const a = el.animate(frames, { duration, easing, fill: 'forwards' });
         running.push(a);
         return a;
       };

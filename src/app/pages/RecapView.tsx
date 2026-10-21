@@ -179,7 +179,15 @@ function MedalWall({ medals }: { medals: StateResponse['medals'] }) {
             aria-label={m.name + (m.date ? '，' + m.date : '，还在等')}
             onClick={() => setOpen(open === m.key ? null : m.key)}
           >
-            <Medal motif={m.motif} unit={m.unit} name={m.name} date={m.date ?? undefined} locked={!m.date} size={84} />
+            <Medal
+              motif={m.motif}
+              unit={m.unit}
+              name={m.name}
+              date={m.date ?? undefined}
+              locked={!m.date}
+              size={84}
+              transition={'medal-' + m.key}
+            />
           </button>
         ))}
       </div>

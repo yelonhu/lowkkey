@@ -1,10 +1,32 @@
 import type { StateResponse } from '@lowkkey/protocol';
 import { strengthSeries } from '@lowkkey/core';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { flushSync } from 'react-dom';
 import { screens, type Screen } from './navigation.ts';
 
 export const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const ease = 'cubic-bezier(.22,.8,.25,1)';
+// The design system's springs live in tokens.css; scripts read the same curves so CSS and
+// script motion settle alike. An engine without linear() easing keeps the ease.
+const supportsLinear = typeof CSS !== 'undefined' && CSS.supports('animation-timing-function', 'linear(0, 1)');
+export const spring = (kind: 'gentle' | 'snap' = 'snap') =>
+  (supportsLinear &&
+    getComputedStyle(document.documentElement)
+      .getPropertyValue(kind === 'snap' ? '--spring-snap' : '--spring')
+      .trim()) ||
+  ease;
+/**
+ * Turn to another page inside a view transition when the engine offers one: the old page fades,
+ * named pieces (a card, the tab mark) travel to where they stand on the new page. Otherwise turn plainly.
+ */
+export function turnPage(update: () => void) {
+  if (reducedMotion() || document.visibilityState !== 'visible' || typeof document.startViewTransition !== 'function') {
+    update();
+    return false;
+  }
+  document.startViewTransition(() => flushSync(update));
+  return true;
+}
 export function animate(element: Element | null, frames: Keyframe[], duration = 240) {
   if (!element || reducedMotion()) return null;
   return element.animate(frames, { duration, easing: ease });
@@ -176,14 +198,20 @@ export function useRecordMotion(facts: StateResponse | null, screen: Screen) {
 }
 
 // First arrival on a page: its blocks rise in sequence. Later visits keep the quiet fade.
-export function useArrivalMotion(ready: boolean, screen: Screen, owner: string | undefined, skip: RefObject<boolean>) {
+export function useArrivalMotion(
+  ready: boolean,
+  screen: Screen,
+  owner: string | undefined,
+  skip: RefObject<boolean>,
+  turned: RefObject<boolean>,
+) {
   const seen = useRef(new Set<string>());
   useLayoutEffect(() => {
     if (!ready || !owner) return;
     const key = owner + ':' + screen;
     if (seen.current.has(key)) return;
     seen.current.add(key);
-    if (skip.current || reducedMotion()) return;
+    if (skip.current || turned.current || reducedMotion()) return;
     const page = document.getElementById('v-' + screen);
     if (!page) return;
     const blocks = [...page.children]
@@ -197,7 +225,7 @@ export function useArrivalMotion(ready: boolean, screen: Screen, owner: string |
           { opacity: 0, transform: 'translateY(10px)' },
           { opacity: 1, transform: 'translateY(0)' },
         ],
-        { duration: 380, delay: i * 48, easing: ease, fill: 'backwards' },
+        { duration: 380, delay: i * 48, easing: spring('snap'), fill: 'backwards' },
       ),
     );
     const settle = () => animations.forEach(a => a.playState !== 'finished' && a.finish());
@@ -207,7 +235,7 @@ export function useArrivalMotion(ready: boolean, screen: Screen, owner: string |
       clearTimeout(guard);
       document.removeEventListener('visibilitychange', settle);
     };
-  }, [ready, screen, owner, skip]);
+  }, [ready, screen, owner, skip, turned]);
 }
 
 // Pull past the top to sync. Touch events keep firing through native overscroll, so the

@@ -27,8 +27,55 @@ body,
   background: linear-gradient(90deg, var(--g0), var(--g1), var(--g2));
   pointer-events: none;
   transition:
-    transform 0.24s cubic-bezier(0.22, 0.8, 0.25, 1),
-    width 0.24s cubic-bezier(0.22, 0.8, 0.25, 1);
+    transform var(--d-snap) var(--spring-snap),
+    width var(--d-snap) var(--spring-snap);
+}
+
+/* 翻页：有 View Transitions 的引擎里，旧页淡出、新页淡入；有名字的东西各走各的路——
+   标签下的那道线滑到新标签，首页的体重卡长成 body 页的大数字，信卡长成信，奖章从卡落到成就墙。
+   没有的引擎照旧换页。减少动态效果时不动。 */
+.tab-indicator {
+  view-transition-name: tab-indicator;
+}
+.bd-body,
+#v-body .bw {
+  view-transition-name: body-hero;
+}
+.bd-letter,
+#v-recap .letter {
+  view-transition-name: letter;
+}
+::view-transition-old(root) {
+  animation: vt-leave 140ms ease-out both;
+}
+::view-transition-new(root) {
+  animation: vt-arrive 300ms var(--spring-snap) both;
+}
+::view-transition-group(*) {
+  animation-duration: var(--d-snap);
+  animation-timing-function: var(--spring-snap);
+}
+::view-transition-old(tab-indicator),
+::view-transition-new(tab-indicator) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+@keyframes vt-leave {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-arrive {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 .brand,
 .lift,

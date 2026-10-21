@@ -27,6 +27,7 @@ export function Medal({
   date,
   size = 112,
   locked = false,
+  transition,
 }: {
   motif: string;
   unit?: string;
@@ -34,6 +35,8 @@ export function Medal({
   date?: string;
   size?: number;
   locked?: boolean;
+  /** A view-transition name, so the same medal travels from a board card to the wall. */
+  transition?: string;
 }) {
   const id = useId();
   const numeral = /^[\d.]+$/.test(motif);
@@ -54,7 +57,11 @@ export function Medal({
     );
   });
   return (
-    <figure className="medal" data-locked={locked ? '' : undefined} style={{ width: size }}>
+    <figure
+      className="medal"
+      data-locked={locked ? '' : undefined}
+      style={{ width: size, viewTransitionName: transition }}
+    >
       <svg
         viewBox="0 0 120 120"
         width={size}
