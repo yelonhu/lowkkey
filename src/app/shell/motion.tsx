@@ -187,7 +187,9 @@ export function useArrivalMotion(ready: boolean, screen: Screen, owner: string |
     const blocks = [...page.children]
       .filter((el): el is HTMLElement => el instanceof HTMLElement && !el.hidden)
       .slice(0, 7);
-    blocks.forEach((el, i) =>
+    // Only a visible document may hold content at opacity 0; a throttled timeline must never leave it there.
+    if (document.visibilityState !== 'visible') return;
+    const animations = blocks.map((el, i) =>
       el.animate(
         [
           { opacity: 0, transform: 'translateY(10px)' },
@@ -196,6 +198,13 @@ export function useArrivalMotion(ready: boolean, screen: Screen, owner: string |
         { duration: 380, delay: i * 48, easing: ease, fill: 'backwards' },
       ),
     );
+    const settle = () => animations.forEach(a => a.playState !== 'finished' && a.finish());
+    const guard = window.setTimeout(settle, 380 + blocks.length * 48 + 400);
+    document.addEventListener('visibilitychange', settle, { once: true });
+    return () => {
+      clearTimeout(guard);
+      document.removeEventListener('visibilitychange', settle);
+    };
   }, [ready, screen, owner, skip]);
 }
 
