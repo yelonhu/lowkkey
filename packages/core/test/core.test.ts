@@ -30,6 +30,7 @@ import {
   weightRate,
   weekFacts,
   medalsThisWeek,
+  activeContexts,
 } from '../src/index.ts';
 const stamp = '2026-10-08T15:00:00Z',
   today = '2026-10-08';
@@ -44,6 +45,7 @@ const empty = () =>
     annotations: {},
     plan_history: [],
     medals: [],
+    contexts: [],
   });
 const set = (patch: Record<string, unknown> = {}) =>
   TrainingSet.parse({ ex: 'bench_press', load: 100, unit: 'lb', kind: 'external', reps: 10, ...patch });
@@ -301,6 +303,18 @@ describe('v5 shared calculations', () => {
     const settled = briefGuide(f, today, ['read', 'write'], { entry: 'start' });
     expect(settled.missing).toEqual([]);
     expect(settled.next_step).toContain('接续已有事实');
+  });
+  it('shows the everyday context in force or starting this week, and briefs every unexpired entry', () => {
+    const f = empty();
+    const entry = (date: string, until: string, text: string) => ({ date, until, text, updated_at: stamp });
+    f.contexts = [
+      entry('2026-10-20', '2026-10-22', '太远'),
+      entry('2026-10-10', '2026-10-10', '出差一天'),
+      entry('2026-10-01', '2026-10-05', '过去的'),
+      entry('2026-10-06', '2026-10-12', '考试周'),
+    ];
+    expect(activeContexts(f.contexts, today).map(c => c.text)).toEqual(['考试周', '出差一天']);
+    expect(getBrief(f, stamp, 6, 'UTC').contexts?.map(c => c.text)).toEqual(['考试周', '出差一天', '太远']);
   });
   it('asks for a medal only when the week holds something notable and none was awarded', () => {
     const f = empty();

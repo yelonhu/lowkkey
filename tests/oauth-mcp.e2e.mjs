@@ -10,6 +10,7 @@ assert.deepEqual(tools.tools.map(t => t.name).sort(), [
   'curate',
   'delete',
   'get_brief',
+  'log_context',
   'log_session',
   'log_weight',
   'read_notes',
@@ -39,7 +40,7 @@ for (const declared of contract.tools) {
 }
 assert.match(client.consentHtml, /name="scope" value="notes:write"\s*>/);
 const legacy = await rehearsalClient(Number(new URL(origin).port), ['read', 'write']);
-assert.equal((await legacy.rpc('tools/list', {})).tools.length, 9);
+assert.equal((await legacy.rpc('tools/list', {})).tools.length, 10);
 assert.equal(
   (
     await legacy.rpc('tools/call', {
@@ -144,7 +145,7 @@ assert.equal(renewed.ok, true);
 const renewedToken = await renewed.json();
 Object.assign(client.token, renewedToken);
 client.headers.Authorization = 'Bearer ' + renewedToken.access_token;
-assert.equal((await client.rpc('tools/list', {})).tools.length, 10);
+assert.equal((await client.rpc('tools/list', {})).tools.length, 11);
 const deniedWrite = await readonly.rpc('tools/call', {
   name: 'log_weight',
   arguments: { date: '2026-10-07', lb: 999 },

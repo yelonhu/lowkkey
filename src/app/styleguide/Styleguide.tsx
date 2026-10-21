@@ -417,6 +417,12 @@ export function Styleguide() {
               <b>本周</b>1 / 2
             </span>
           </p>
+          <ul className="bd-now" aria-label="这几天">
+            <li>
+              <small>到周日</small>
+              <span>考试周，晚上只有一小时能练。</span>
+            </li>
+          </ul>
           <div className="bd-cards">
             <article className="bd-card">
               <div className="bd-kind">

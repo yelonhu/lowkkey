@@ -1,16 +1,18 @@
-# lowkkey protocol v5
+# lowkkey protocol v6
 
 唯一机器契约在 `packages/protocol`。运行 `./scripts/run protocol:emit` 生成本目录 `protocol/{schema,openapi,mcp-tools}.json`；CI 检查生成结果一致。旧 V1–V10、提议、审批、事件流均为历史。
 
 ## 权限与工具
 
-网页仅使用 Google 登录，开放注册且无需邀请；按 Google 身份关联账户。MCP 使用 OAuth `read/write/notes:write`，账户来自令牌，不接受调用方指定 owner。全权限十项：`get_brief`、`read_notes`、`log_session`、`log_weight`、`set_plan`、`set_profile`、`curate`、`award`、`delete`、`write_note`。没有业务审批；客户端自己的确认独立存在。
+网页仅使用 Google 登录，开放注册且无需邀请；按 Google 身份关联账户。MCP 使用 OAuth `read/write/notes:write`，账户来自令牌，不接受调用方指定 owner。全权限十一项：`get_brief`、`read_notes`、`log_session`、`log_weight`、`set_plan`、`set_profile`、`log_context`、`curate`、`award`、`delete`、`write_note`。协议版本 6.0.0。没有业务审批；客户端自己的确认独立存在。
 
 每个写工具返回 `{result: 保存后的对象, view_url}`。删除返回被删对象；不存在报错。校验失败不提交任何字段。训练和体重按日期覆盖；计划按 title 更新，weekday 0 为周日、同星期唯一，空 items 删除。
 
 训练格式为 `{date,title,sets,note?}`；拒绝 raw_text。每组使用 `ex/load/unit/kind/reps/rir/role`，可加 `cheat/partial/per`；`per:side` 为单边未知总重。`custom` 必须给 name，以名称归并。kind 为 external、assist、bodyweight；引体/双杠的 bodyweight load 是额外负重，0 即徒手。热身、递减、不完整组不参与 e1RM，降重组参与。单位可为 lb/kg；哑铃按单只。
 
-计划 items 使用 `ex/load/unit/loadKind/sets/min/max`，支持 `name/per/optional/note/restSec/targetRir/nextLoad/progressRule`；coach 省略保留、null 清空。profile 独立保存 `gain_target:{start,startLb,min,max}` 、body_notes 与 training_context（用户明确表达的训练背景，≤4000 字符），省略保留、null 清空，原始目标精度不改。
+计划 items 使用 `ex/load/unit/loadKind/sets/min/max`，支持 `name/per/optional/note/restSec/targetRir/nextLoad/progressRule`；coach 省略保留、null 清空。profile 独立保存 `gain_target:{start,startLb,min,max}` 、body_notes 与 training_context（用户明确表达的长期训练背景，≤4000 字符），省略保留、null 清空，原始目标精度不改。
+
+有日期的日常背景用 `log_context({date,until?,text})`：考试周、出差、搬家、一夜没睡好。存于 `contexts(owner_id,date)`，同 date 覆盖；until 省略为当天，不早于 date，最长 90 天；text ≤ 80 字，拒绝 emoji 与感叹号。`/v1/state` 原样返回全部，`get_brief.contexts` 只返回 until ≥ today 的条目（按 date 升序）；首页状态行下由 `activeContexts` 显示仍有效、且六天内开始的条目。`delete({kind:'context',date})` 删除；到期的不必删除。
 
 ## 策展
 

@@ -166,6 +166,7 @@ export async function cleanupDeletions(db: D1Database, revokeGrant?: (grant: str
       const owned = [
         'daily_notes',
         'medals',
+        'contexts',
         'showroom_sessions',
         'showroom_weights',
         'showroom_plans',

@@ -117,6 +117,7 @@ export const fixtureMedal = {
     '后来她说，那天其实什么都没想，只是觉得该挂了。',
   ],
 };
+export const fixtureContext = { date: dateAt(-1), until: dateAt(4), text: '考试周，晚上只有一小时能练。' };
 export async function seedShowroom(tool) {
   for (const args of fixturePlans) await tool('set_plan', args);
   await tool('set_profile', {
@@ -127,4 +128,5 @@ export async function seedShowroom(tool) {
   for (const args of fixtureSessions) await tool('log_session', args);
   await tool('curate', fixtureCuration);
   await tool('award', fixtureMedal);
+  await tool('log_context', fixtureContext);
 }

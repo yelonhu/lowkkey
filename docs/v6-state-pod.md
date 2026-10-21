@@ -86,11 +86,11 @@ v5 把「AI 写、网页看」跑通了，v5.1（本周）补上了管理者手�
 ## 4. 协议 v6（AI 侧）
 
 - `curate.board`：`{line?, cards?:[{kind, note?}], week}`，省略保留、null 清空；服务端校验 kind 在目录内。
-- `log_context`：有日期的日常背景条目，`contexts(owner,date,until,text)`；`get_brief.contexts` 返回仍有效的条目，到期不再返回。
+- `log_context`：有日期的日常背景条目，`contexts(owner,date,until,text)`；`get_brief.contexts` 返回仍有效的条目，到期不再返回。首页状态行下显示。已落地（2026-10-21，迁移 0006_contexts）。
 - `award`：AI 授予奖章，`medals(owner_id,key)` 表，同 key 覆盖；`delete({kind:'medal',key})`。`get_brief.medals` 原样返回。
 - `guide` 成为唯一的引导对象，`onboarding.next_step` 退役；`missing` 新增 `board`。
 - prompts 增加「整理板面」；管理者手册增加「先回应信号」「每周布置板面」两条例程。
-- 协议版本 6.0.0，新增迁移 0005_contexts、0006_push。
+- 协议版本 6.0.0（已切换），迁移 0005_medals、0006_contexts、0007_push。
 
 ## 5. 工程清洗（Phase 0，行为不变）
 

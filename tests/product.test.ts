@@ -116,7 +116,7 @@ describe('product onboarding and continuity', () => {
         icons: [{ src: 'https://lowkkey.test/icon-512.png', mimeType: 'image/png', sizes: ['512x512'] }],
       },
     });
-    expect((await rpc('tools/list', {})).result.tools).toHaveLength(9);
+    expect((await rpc('tools/list', {})).result.tools).toHaveLength(10);
     expect((await life.onboarding(db, owner)).clients[0].firstReadAt).toBeNull();
     const brief = await rpc('tools/call', { name: 'get_brief', arguments: {} });
     expect(Brief.parse(brief.result.structuredContent.result).onboarding?.entry).toBe('existing');
@@ -138,7 +138,7 @@ describe('product onboarding and continuity', () => {
       }),
     );
     for (let i = 0; i < results.length; i++) {
-      expect(results[i]).toHaveLength([2, 9, 10, 0][i % 4]);
+      expect(results[i]).toHaveLength([2, 10, 11, 0][i % 4]);
       expect(results[i].includes('write_note')).toBe(i % 4 === 2);
       if (i % 4 === 0) expect(results[i]).toEqual(['get_brief', 'read_notes']);
     }
@@ -172,6 +172,29 @@ describe('product onboarding and continuity', () => {
     await expect(store.deleteFact(db, owner, { kind: 'medal', key: 'bodyweight' })).rejects.toThrow('not_found');
     await expect(store.deleteFact(db, owner, { kind: 'medal' })).rejects.toThrow();
     expect((await store.state(db, owner, stamp)).medals).toHaveLength(1);
+  });
+  it('keeps dated everyday context until it expires and deletes it by date', async () => {
+    const owner = await accountFor(db, { issuer: 'product', subject: 'contexts', email: 'contexts@example.com' });
+    const week = { date: '2026-10-06', until: '2026-10-12', text: '考试周，晚上只有一小时能练。' };
+    const saved = await store.logContext(db, owner, week, stamp);
+    expect(saved).toMatchObject(week);
+    expect(await store.logContext(db, owner, week, new Date('2026-10-09T00:00:00Z'))).toEqual(saved);
+    expect((await store.logContext(db, owner, { date: '2026-10-01', text: '一夜没睡好。' }, stamp)).until).toBe(
+      '2026-10-01',
+    );
+    await expect(store.logContext(db, owner, { ...week, until: '2026-10-05' })).rejects.toThrow();
+    await expect(store.logContext(db, owner, { ...week, until: '2027-02-01' })).rejects.toThrow();
+    await expect(store.logContext(db, owner, { ...week, text: '太兴奋了！' })).rejects.toThrow();
+    expect((await store.state(db, owner, stamp)).contexts.map(c => c.date)).toEqual(['2026-10-01', '2026-10-06']);
+    expect((await store.brief(db, owner, {}, stamp)).contexts?.map(c => c.date)).toEqual(['2026-10-06']);
+    expect(await store.deleteFact(db, owner, { kind: 'context', date: '2026-10-06' })).toMatchObject({
+      kind: 'context',
+      date: '2026-10-06',
+      deleted: saved,
+    });
+    await expect(store.deleteFact(db, owner, { kind: 'context', date: '2026-10-06' })).rejects.toThrow('not_found');
+    await expect(store.deleteFact(db, owner, { kind: 'context' })).rejects.toThrow();
+    expect((await store.brief(db, owner, {}, stamp)).contexts).toEqual([]);
   });
   it('failed calls and profile writes do not complete first-content onboarding', async () => {
     expect(

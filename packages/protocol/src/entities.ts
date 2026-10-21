@@ -179,9 +179,23 @@ export const MedalInput = z.strictObject({
 });
 export const Medal = MedalInput.extend({ updated_at: Instant });
 export type Medal = z.infer<typeof Medal>;
+// A dated piece of everyday life the user mentioned: exam week, a trip, a bad night. It colours the
+// board and the plan while it lasts, then fades on its own. until defaults to the same day.
+const contextFields = { date: LocalDate, text: prose(80).trim().min(1) };
+const spanDays = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
+export const ContextInput = z
+  .strictObject({ ...contextFields, until: LocalDate.nullable().optional() })
+  .refine(v => !v.until || v.until >= v.date, { message: 'until 不能早于 date', path: ['until'] })
+  .refine(v => !v.until || spanDays(v.date, v.until) <= 90, {
+    message: '最长 90 天；更长的背景放 training_context',
+    path: ['until'],
+  });
+export const Context = z.strictObject({ ...contextFields, until: LocalDate, updated_at: Instant });
+export type Context = z.infer<typeof Context>;
 export const Facts = z.strictObject({
   sessions: z.array(TrainingSession),
   medals: z.array(Medal).default([]),
+  contexts: z.array(Context).default([]),
   weights: z.array(Weight),
   plans: z.array(Plan),
   profile: Profile,
@@ -211,15 +225,15 @@ export const ClientPublic = z.strictObject({
 });
 export type ClientPublic = z.infer<typeof ClientPublic>;
 const DeleteFields = z.strictObject({
-  kind: z.enum(['session', 'weight', 'medal']),
+  kind: z.enum(['session', 'weight', 'context', 'medal']),
   date: LocalDate.optional(),
   key: z.string().optional(),
 });
 export const DeleteInput = DeleteFields.refine(v => (v.kind === 'medal' ? !!v.key : !!v.date), {
-  message: '训练和体重按 date 删除，奖章按 key 删除',
+  message: '训练、体重和背景按 date 删除，奖章按 key 删除',
   path: ['date'],
 });
-export const Deleted = DeleteFields.extend({ deleted: z.union([TrainingSession, Weight, Medal]) });
+export const Deleted = DeleteFields.extend({ deleted: z.union([TrainingSession, Weight, Context, Medal]) });
 export const BriefInput = z.strictObject({
   sessions: z.number().int().min(0).max(30).default(6),
   session_date: LocalDate.optional(),
@@ -334,6 +348,7 @@ export const Brief = z.strictObject({
     .optional(),
   guide: BriefGuide.optional(),
   medals: z.array(Medal).optional(),
+  contexts: z.array(Context).optional(),
   session: TrainingSession.nullable().optional(),
   today: z.object({ date: LocalDate, weekday: z.number().int() }),
   next: z.object({ date: LocalDate, rel: z.string(), title: z.string() }).nullable(),

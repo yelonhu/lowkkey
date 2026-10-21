@@ -332,6 +332,9 @@ export function CustomerAccount({
                     保存、修改和删除训练记录、计划与策展；“写随手记”需另外授权一次，AI
                     仅在你明确要求时转录、追加、改写或清空。撤销授权不会删除档案。
                   </p>
+                  <p className="settings-hint">
+                    lowkkey 增加新工具后，已连接的 AI 可能仍只看到旧的工具列表；在 AI 那边断开再重新连接一次即可。
+                  </p>
                 </details>
               )}
             </section>

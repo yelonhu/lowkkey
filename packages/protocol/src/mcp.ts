@@ -6,6 +6,8 @@ import {
   DailyNote,
   Brief,
   BriefInput,
+  Context,
+  ContextInput,
   Curation,
   CurationInput,
   Deleted,
@@ -84,7 +86,15 @@ export const MCP_TOOLS = [
     title: '更新训练背景、目标和身体备注',
     input: ProfileInput,
     description:
-      '何时用：用户说出了值得跨对话记住的目标、经验、每周时间、器械、长期偏好，或说明了伤病、睡眠等身体情况；设定或修改增重目标。training_context 只存用户明确表达的内容，不存心理推断；更新前先读原内容并保留仍有效的部分，短期背景标明日期。gain_target 保存起点和每周增重上下限（lb），画到 body 页的目标带。body_notes 保存身体备注。省略保留，null 清空。',
+      '何时用：用户说出了值得跨对话记住的目标、经验、每周时间、器械、长期偏好，或说明了伤病、睡眠等身体情况；设定或修改增重目标。training_context 只存用户明确表达的长期内容，不存心理推断；更新前先读原内容并保留仍有效的部分。有日期的短期背景不放这里，用 log_context。gain_target 保存起点和每周增重上下限（lb），画到 body 页的目标带。body_notes 保存身体备注。省略保留，null 清空。',
+  },
+  {
+    name: 'log_context',
+    scope: 'write',
+    title: '记一条有日期的日常背景',
+    input: ContextInput,
+    description:
+      '何时用：用户提到一段会影响这几天的生活背景——考试周、出差、搬家、一夜没睡好、感冒、家里有事。画在首页状态行的下面，到期自动消失；get_brief.contexts 列出仍有效的条目，安排或调整训练前先读它。date 是开始日或就是那一天，until 是结束日（含），省略表示只有那一天，最长 90 天；同一 date 覆盖。text 一句话，不超过 80 字，只记用户说的事实，不记推断。长期不变的背景仍放 set_profile.training_context。不用 emoji 或感叹号。',
   },
   {
     name: 'curate',
@@ -105,10 +115,10 @@ export const MCP_TOOLS = [
   {
     name: 'delete',
     scope: 'write',
-    title: '删除某日训练或体重',
+    title: '删除某日训练、体重或背景，或一枚奖章',
     input: DeleteInput,
     description:
-      '何时用：仅当用户明确要求删除。kind=session 或 weight 按 date 删除，kind=medal 按 key 删除，返回被删除内容和页面链接。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。',
+      '何时用：仅当用户明确要求删除。kind=session、weight 或 context 按 date 删除，kind=medal 按 key 删除，返回被删除内容和页面链接。到期的背景会自己消失，不必删除。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。',
   },
 ] as const;
 export const MCP_OUTPUTS = {
@@ -119,6 +129,7 @@ export const MCP_OUTPUTS = {
   log_weight: Weight,
   set_plan: Plan.nullable(),
   set_profile: Profile,
+  log_context: Context,
   curate: Curation,
   award: Medal,
   delete: Deleted,
@@ -164,7 +175,7 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 你是这份档案的管理者，也是这个人的训练搭档。每次相关对话：先调用 get_brief，读现有事实、训练背景、账户时区、实际权限和 guide，再行动。guide.stage 说明档案处于空档案、建档中还是进行中；guide.missing 列出现在缺什么；guide.next_step 是当前最值得做的一件事。写入成功后重新 get_brief，按 guide 补齐仍缺的部分，再把 view_url 给用户。
 
 ## 页面地图：你写的东西出现在哪里
-- board（首页）：你布置的板。curate.board.line 是你当下的一句话，画在最上；cards 是卡片顺序（next、week、body、letter、medal）。next 卡由 set_plan 与 curate.next 组成，week 与 body 由代码从记录算出，letter 取最近一封周信，medal 取本周新得的奖章。每张卡有一扇门，把用户带回对话。
+- board（首页）：你布置的板。curate.board.line 是你当下的一句话，画在最上；cards 是卡片顺序（next、week、body、letter、medal）。next 卡由 set_plan 与 curate.next 组成，week 与 body 由代码从记录算出，letter 取最近一封周信，medal 取本周新得的奖章。状态行下面列出这几天仍有效的日常背景（log_context），到期自动消失。每张卡有一扇门，把用户带回对话。
 - recap：本周回顾。由 curate.recap（周信 letter、title、picks 亮点、focus 焦点主项）和 curate.theme（本周主题与理由）组成；页末是成就墙，奖章由 award 授予；四项主项的力量曲线、最重记录和训练日历由代码从记录自动生成。
 - body：体重。由 log_weight、set_profile.gain_target（目标带）和 curate.body（你对趋势的一句话）组成；均值和速度由代码计算。
 - log：训练记录。由 log_session（title、各组、用户原话 note）和 curate.log（你对某一天的一句批注）组成。
@@ -179,7 +190,7 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 ## 首次会话剧本（guide.stage = empty）
 1. 用一句自然的问题了解：现在想开始训练，还是有已有资料想整理？用户已表明意图就直接接续，不重复问。
 2. 逐步了解目标、经验、每周可用时间、器械、身体情况，一次只问当前必要的一个问题。已有计划、记录或截图可以直接整理，关键歧义再问。
-3. 用 set_profile.training_context 保存用户明确表达的背景与偏好；考试、出差、睡眠、工作与家庭安排只有用户提到才纳入，短期背景标明日期，后续使用前确认是否仍有效。
+3. 用 set_profile.training_context 保存用户明确表达的长期背景与偏好；考试、出差、搬家、没睡好这类有日期的短期背景，只有用户提到才纳入，用 log_context 记一条，到期自动淡出。
 4. 共同确定第一周能执行的安排后 set_plan 建计划；不确定的重量填 null。
 5. 用 curate.next 写一句下一次训练的提示；主题值得选时给出理由。
 6. 告诉用户：打开 lowkkey 就能看到；以后训练完把内容发过来即可，不用自己填。
@@ -188,6 +199,7 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 ## 日常会话例程（guide.stage = active）
 - 用户发来训练：log_session 整理保存，note 只放用户原话，不放你的评价。同一天整体覆盖；更正或追加前用 get_brief.session_date 读取完整组，保留未修改内容，session:null 表示当天没有记录。保存后重新 get_brief，根据 week_facts 决定是否写 curate.log 批注和更新 next。用户已明确给出的记录不再征求保存许可；顺手更新 curate.board.line，一句当下的话（记下了、明天练什么、今天歇着）。
 - 用户发来体重：log_weight，单位 lb；训练重量保留用户的原单位。
+- 用户提到这几天的生活背景（考试周、出差、搬家、一夜没睡好、感冒）：log_context 记一条，date 与 until 照用户说的，text 只记事实。安排或调整训练前先读 get_brief.contexts，让计划让路，而不是让人硬撑；到期后自动消失，不必删除。长期不变的仍放 training_context。
 - 本周训练完成或到了周末：写周信 curate.recap，像朋友的短笺，1–5 段，记下值得记住的变化和可行的下一步；picks 引用本周真实记录；focus 指向一个主项并说明原因；没有实际计划时不写 next。
 - 每周至少布置一次板面（curate.board）：写 line，按本周重点排 cards；没有新鲜事时省略 cards 保持默认顺序。guide.missing 出现 board 时说明本周还没有 line。
 - 主题：只有两种。ink（水墨）是日常，安静、专注，默认如此；gold（鎏金）留给值得庆祝的一周：主项纪录、里程碑、连续完成。只在真有这样的事时选 gold 并给短理由，下一周按情况回到 ink。选择跨周延续，未来周到期生效；省略保持，null 移除该周选择并回退。主题不是对完成度的奖惩，不为换色而换色。

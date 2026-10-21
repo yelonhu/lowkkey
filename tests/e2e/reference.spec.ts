@@ -11,7 +11,7 @@ test('private reference: fixed October 8, exact type, tokens, content and expans
   const state = StateResponse.parse({
     ...facts,
     accountId: 'private-reference',
-    protocol: '5.0.0',
+    protocol: '6.0.0',
     today,
     theme_state: themeState(facts, today),
   });

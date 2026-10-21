@@ -9,6 +9,33 @@
   width: 6px;
   height: 6px;
 }
+/* 这几天：用户提过的、有日期的背景。状态行下一两行小字，到期自己消失。 */
+.bd-now {
+  display: grid;
+  gap: var(--s1);
+  margin: -12px 0 var(--s5);
+  font-size: var(--t-small);
+  line-height: 1.6;
+  color: var(--ink2);
+}
+.bd-now li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  min-width: 0;
+}
+.bd-now small {
+  flex: none;
+  min-width: 3.2em;
+  font: 400 var(--t-micro) / 1.7 var(--sans);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.bd-now span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .bd-cards {
   display: grid;
   gap: var(--s3);

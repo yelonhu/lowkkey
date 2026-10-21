@@ -107,6 +107,12 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
                 await store.setProfile(db, principal.ownerId, args),
                 new URL(request.url).origin + '/#body',
               );
+            case 'log_context':
+              return success(
+                tool.name,
+                await store.logContext(db, principal.ownerId, args),
+                new URL(request.url).origin + '/#next',
+              );
             case 'curate': {
               const saved = await store.curate(db, principal.ownerId, args);
               return success(tool.name, saved, view('recap', 'week', saved.week));
@@ -122,7 +128,9 @@ export async function mcpResponse(request: Request, db: D1Database, principal: P
                 saved,
                 saved.kind === 'medal'
                   ? new URL(request.url).origin + '/#recap'
-                  : view(saved.kind === 'session' ? 'log' : 'body', 'date', saved.date!),
+                  : saved.kind === 'context'
+                    ? new URL(request.url).origin + '/#next'
+                    : view(saved.kind === 'session' ? 'log' : 'body', 'date', saved.date!),
               );
             }
             case 'write_note': {

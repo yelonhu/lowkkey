@@ -1,6 +1,8 @@
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import {
   BriefInput,
+  Context,
+  ContextInput,
   Curation,
   CurationInput,
   DeleteInput,
@@ -46,6 +48,8 @@ const medalValue = (r: Row) =>
     story: JSON.parse(String(r.story_json)),
     updated_at: r.updated_at,
   });
+const contextValue = (r: Row) =>
+  Context.parse({ date: r.date, until: r.until, text: r.text, updated_at: r.updated_at });
 const planValue = (r: Row) =>
   Plan.parse({
     title: r.title,
@@ -66,6 +70,7 @@ async function snapshot(db: D1Database, owner: string, now = new Date()) {
     'SELECT * FROM annotations WHERE owner_id=?',
     'SELECT * FROM plan_history WHERE owner_id=? ORDER BY revision',
     'SELECT * FROM medals WHERE owner_id=? ORDER BY date,key',
+    'SELECT * FROM contexts WHERE owner_id=? ORDER BY date',
   ];
   const rows = await db.batch<Row>(queries.map(sql => db.prepare(sql).bind(owner)));
   if (!rows[0].results.length) throw new StoreError('not_found', 404);
@@ -74,6 +79,7 @@ async function snapshot(db: D1Database, owner: string, now = new Date()) {
   const facts: Facts = {
     sessions: rows[1].results.map(sessionValue),
     medals: rows[9].results.map(medalValue),
+    contexts: rows[10].results.map(contextValue),
     weights: rows[2].results.map(weightValue),
     plans: rows[3].results.map(planValue),
     profile: Profile.parse({
@@ -276,6 +282,25 @@ export async function setProfile(db: D1Database, owner: string, value: unknown) 
     };
   });
 }
+export async function logContext(db: D1Database, owner: string, value: unknown, now = new Date()) {
+  const input = ContextInput.parse(value);
+  return mutate(db, owner, facts => {
+    const entry = { date: input.date, until: input.until ?? input.date, text: input.text };
+    const prior = facts.contexts.find(c => c.date === entry.date);
+    const same = prior && prior.until === entry.until && prior.text === entry.text;
+    const saved: Context = { ...entry, updated_at: same ? prior.updated_at : now.toISOString() };
+    return {
+      result: saved,
+      statements: [
+        db
+          .prepare(
+            'INSERT INTO contexts(owner_id,date,until,text,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(owner_id,date) DO UPDATE SET until=excluded.until,text=excluded.text,updated_at=excluded.updated_at',
+          )
+          .bind(owner, saved.date, saved.until, saved.text, saved.updated_at),
+      ],
+    };
+  });
+}
 export async function award(db: D1Database, owner: string, value: unknown, now = new Date()) {
   const input = MedalInput.parse(value);
   return mutate(db, owner, (facts, _revision, today) => {
@@ -308,11 +333,12 @@ export async function award(db: D1Database, owner: string, value: unknown, now =
   });
 }
 type DeletedFact = {
-  kind: 'session' | 'weight' | 'medal';
+  kind: 'session' | 'weight' | 'context' | 'medal';
   date?: string;
   key?: string;
-  deleted: TrainingSession | Weight | Medal;
+  deleted: TrainingSession | Weight | Context | Medal;
 };
+const datedTables = { session: 'showroom_sessions', weight: 'showroom_weights', context: 'contexts' } as const;
 export async function deleteFact(db: D1Database, owner: string, value: unknown) {
   const input = DeleteInput.parse(value);
   return mutate<DeletedFact>(db, owner, facts => {
@@ -324,9 +350,11 @@ export async function deleteFact(db: D1Database, owner: string, value: unknown) 
         statements: [db.prepare('DELETE FROM medals WHERE owner_id=? AND key=?').bind(owner, input.key)],
       };
     }
-    const deleted = (input.kind === 'session' ? facts.sessions : facts.weights).find(x => x.date === input.date);
+    const deleted = (
+      input.kind === 'session' ? facts.sessions : input.kind === 'weight' ? facts.weights : facts.contexts
+    ).find(x => x.date === input.date);
     if (!deleted) throw new StoreError('not_found', 404);
-    const table = input.kind === 'session' ? 'showroom_sessions' : 'showroom_weights';
+    const table = datedTables[input.kind];
     return {
       result: { kind: input.kind, date: input.date, deleted },
       statements: [

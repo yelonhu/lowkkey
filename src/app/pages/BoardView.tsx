@@ -1,15 +1,18 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { Medal as MedalFact, StateResponse } from '@lowkkey/protocol';
+import type { Context, Medal as MedalFact, StateResponse } from '@lowkkey/protocol';
 import { BOARD_CARDS, type BoardCard } from '@lowkkey/protocol/constants';
 import {
+  activeContexts,
   boardOf,
   datedCuration,
+  diffDays,
   fmt,
   latestRecap,
   md,
   medalsThisWeek,
   monday,
   planSummary,
+  relativeDay,
   upcoming,
   weekStatus,
   weekday,
@@ -37,6 +40,29 @@ function DoorButton({ door, text, label = '聊这个' }: { door: Door; text: str
 function targetTitle() {
   const q = new URLSearchParams(location.hash.split('?')[1] ?? '');
   return q.get('title') ?? q.get('day');
+}
+
+/** When a piece of everyday context applies: starting later this week, today only, or until a day. */
+function contextWhen(c: Context, today: string) {
+  if (c.date > today) return relativeDay(c.date, today) + '起';
+  if (c.until === c.date) return '今天';
+  return '到' + (diffDays(c.until, today) <= 6 ? relativeDay(c.until, today) : md(c.until));
+}
+
+/** The dated background the user mentioned, in force this week. It fades out on its own. */
+function Contexts({ contexts, today }: { contexts: Context[]; today: string }) {
+  const active = activeContexts(contexts, today);
+  if (!active.length) return null;
+  return (
+    <ul className="bd-now" aria-label="这几天">
+      {active.map(c => (
+        <li key={c.date}>
+          <small>{contextWhen(c, today)}</small>
+          <span>{c.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function NextCard({ facts, today, door }: { facts: StateResponse; today: string; door: Door }) {
@@ -317,6 +343,7 @@ export function BoardView({ facts, today, door }: { facts: StateResponse; today:
     <>
       {line && <p className="cl bd-presence">{line}</p>}
       <StatusLine facts={facts} today={today} />
+      <Contexts contexts={facts.contexts} today={today} />
       <div className="bd-cards">{grouped}</div>
     </>
   );

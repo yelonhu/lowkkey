@@ -8,6 +8,7 @@ import type {
   Fact,
   Facts,
   GuideMissing,
+  Context,
   Medal,
   Pick,
   Plan,
@@ -424,6 +425,7 @@ export function getBrief(
     generated_at: generatedAt,
     today: { date: today, weekday: weekday(today) },
     medals: facts.medals,
+    contexts: facts.contexts.filter(c => c.until >= today).sort((a, b) => a.date.localeCompare(b.date)),
     next: next ? { date: next.date, rel: next.rel, title: next.plan.title } : null,
     plans: facts.plans,
     profile: facts.profile,
@@ -559,6 +561,12 @@ export function briefGuide(
 export function medalsThisWeek(medals: Medal[], today: string) {
   const start = monday(today);
   return medals.filter(m => m.date && m.date >= start && m.date <= today);
+}
+/** Everyday context still in force, or starting within the coming week: what the board shows. */
+export function activeContexts(contexts: Context[], today: string, ahead = 6) {
+  return contexts
+    .filter(c => c.until >= today && c.date <= addDays(today, ahead))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 export function mergeCuration(
   previous: Curation | undefined,

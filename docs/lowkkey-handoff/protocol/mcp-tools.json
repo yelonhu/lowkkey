@@ -228,6 +228,40 @@
                   "additionalProperties": false
                 }
               },
+              "contexts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "until": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "text",
+                    "until",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false
+                }
+              },
               "session": {
                 "anyOf": [
                   {
@@ -2996,7 +3030,7 @@
     {
       "name": "set_profile",
       "title": "更新训练背景、目标和身体备注",
-      "description": "何时用：用户说出了值得跨对话记住的目标、经验、每周时间、器械、长期偏好，或说明了伤病、睡眠等身体情况；设定或修改增重目标。training_context 只存用户明确表达的内容，不存心理推断；更新前先读原内容并保留仍有效的部分，短期背景标明日期。gain_target 保存起点和每周增重上下限（lb），画到 body 页的目标带。body_notes 保存身体备注。省略保留，null 清空。",
+      "description": "何时用：用户说出了值得跨对话记住的目标、经验、每周时间、器械、长期偏好，或说明了伤病、睡眠等身体情况；设定或修改增重目标。training_context 只存用户明确表达的长期内容，不存心理推断；更新前先读原内容并保留仍有效的部分。有日期的短期背景不放这里，用 log_context。gain_target 保存起点和每周增重上下限（lb），画到 body 页的目标带。body_notes 保存身体备注。省略保留，null 清空。",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -3145,6 +3179,113 @@
             "additionalProperties": false
           }
         }
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "write"
+          ]
+        }
+      ],
+      "_meta": {
+        "securitySchemes": [
+          {
+            "type": "oauth2",
+            "scopes": [
+              "write"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "log_context",
+      "title": "记一条有日期的日常背景",
+      "description": "何时用：用户提到一段会影响这几天的生活背景——考试周、出差、搬家、一夜没睡好、感冒、家里有事。画在首页状态行的下面，到期自动消失；get_brief.contexts 列出仍有效的条目，安排或调整训练前先读它。date 是开始日或就是那一天，until 是结束日（含），省略表示只有那一天，最长 90 天；同一 date 覆盖。text 一句话，不超过 80 字，只记用户说的事实，不记推断。长期不变的背景仍放 set_profile.training_context。不用 emoji 或感叹号。",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "until": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              }
+            },
+            "required": [
+              "date",
+              "text",
+              "until",
+              "updated_at"
+            ],
+            "additionalProperties": false
+          },
+          "view_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "result",
+          "view_url"
+        ],
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -4011,8 +4152,8 @@
     },
     {
       "name": "delete",
-      "title": "删除某日训练或体重",
-      "description": "何时用：仅当用户明确要求删除。kind=session 或 weight 按 date 删除，kind=medal 按 key 删除，返回被删除内容和页面链接。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。",
+      "title": "删除某日训练、体重或背景，或一枚奖章",
+      "description": "何时用：仅当用户明确要求删除。kind=session、weight 或 context 按 date 删除，kind=medal 按 key 删除，返回被删除内容和页面链接。到期的背景会自己消失，不必删除。不存在时报 not_found。误记更正优先用 log_session 整体重传，而不是删除。",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -4022,6 +4163,7 @@
             "enum": [
               "session",
               "weight",
+              "context",
               "medal"
             ]
           },
@@ -4051,6 +4193,7 @@
                 "enum": [
                   "session",
                   "weight",
+                  "context",
                   "medal"
                 ]
               },
@@ -4069,6 +4212,37 @@
                   },
                   {
                     "$ref": "#/definitions/Weight"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "until": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      }
+                    },
+                    "required": [
+                      "date",
+                      "text",
+                      "until",
+                      "updated_at"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "object",

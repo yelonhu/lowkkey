@@ -49,4 +49,4 @@ AI 的每段文字（`.cl`、周信正文）统一以一枚 5–6px 渐变墨点
 
 ## board
 
-第一页是 AI 布置的板（`src/app/pages/BoardView.tsx`，hash 仍为 `#next`，标签显示 board）：最上是 `curate.board.line`（没有时退回 curate.next 的提示），其次是状态行，然后是卡。卡片目录固定为 next、week、body、letter、medal，顺序由 `curate.board.cards` 决定，默认 next、week、body、letter、medal；相邻的 week 与 body 并排。next 卡默认只列必做动作与重量，「完整安排」展开成原来的计划页（含 later 列表与 `next-<title>` 定位锚）；收到指向后几天的回执时自动展开。每张卡右下一扇门：复制一句带上下文的话并打开用户的 AI（来自首次连接选择），底部出现两秒回执；未连接 AI 时门通向 `#start`。样式在 `styles/board.css`。
+第一页是 AI 布置的板（`src/app/pages/BoardView.tsx`，hash 仍为 `#next`，标签显示 board）：最上是 `curate.board.line`（没有时退回 curate.next 的提示），其次是状态行，状态行下是这几天的背景（`log_context` 写入，`activeContexts` 取 until ≥ 今天且六天内开始的条目，前缀「到周日」「周四起」「今天」），然后是卡。卡片目录固定为 next、week、body、letter、medal，顺序由 `curate.board.cards` 决定，默认 next、week、body、letter、medal；相邻的 week 与 body 并排。next 卡默认只列必做动作与重量，「完整安排」展开成原来的计划页（含 later 列表与 `next-<title>` 定位锚）；收到指向后几天的回执时自动展开。每张卡右下一扇门：复制一句带上下文的话并打开用户的 AI（来自首次连接选择），底部出现两秒回执；未连接 AI 时门通向 `#start`。样式在 `styles/board.css`。
