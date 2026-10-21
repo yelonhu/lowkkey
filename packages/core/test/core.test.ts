@@ -146,7 +146,7 @@ describe('v5 shared calculations', () => {
       reason: '达成',
     });
     expect(themeState(f, '2026-10-12').active).toBe('gold');
-    expect(themeState(f, '2026-10-19').active).toBe('pearl');
+    expect(themeState(f, '2026-10-19')).toMatchObject({ active: 'ink', source_week: '2026-10-19', reason: null });
     f.curations[1].theme = null;
     expect(themeState(f, '2026-10-19').active).toBe('gold');
     f.curations[0].theme = null;

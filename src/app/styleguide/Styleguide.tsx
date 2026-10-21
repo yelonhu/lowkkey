@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { themeNames } from '../shell/theme.ts';
-import { Mark, type MarkVariant } from '../ui/Mark.tsx';
+import { Medal } from '../ui/Medal.tsx';
 import './styleguide.css';
 
 type Theme = keyof typeof themeNames;
@@ -8,13 +8,20 @@ const themes = Object.keys(themeNames) as Theme[];
 const displayFont =
   'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;1,6..96,400;1,6..96,500&display=swap';
 
-const milestones = [
-  { value: '135', unit: 'lb', caption: '卧推 · 第一片', date: '2026-10-03', serial: 1 },
-  { value: '225', unit: 'lb', caption: '深蹲 · 两片', date: '2026-11-14', serial: 2 },
-  { value: '1.0', unit: '×', caption: '卧推 · 超过体重', date: '2026-12-02', serial: 3 },
-  { value: '徒手', caption: '引体 · 八次', date: '2027-01-09', serial: 4 },
-  { value: '4', unit: '周', caption: '连续四周 · 一次没落', date: '2026-10-26', serial: 5 },
-  { value: '100', caption: '第一百次训练', date: '2027-03-18', serial: 6 },
+// Achievement names are short and read like titles. The motif is a numeral when the number is the point.
+const earned = [
+  { motif: '1', name: '第一次', date: '2026-09-23' },
+  { motif: '135', unit: 'lb', name: '第一片', date: '2026-10-03' },
+  { motif: '信', name: '第一封信', date: '2026-10-05' },
+  { motif: '4', name: '四周不落', date: '2026-10-26' },
+  { motif: '手', name: '徒手', date: '2027-01-09' },
+  { motif: '身', name: '过身', date: '2026-12-02' },
+];
+const locked = [
+  { motif: '225', unit: 'lb', name: '两片' },
+  { motif: '100', name: '一百次' },
+  { motif: '10', name: '徒手十次' },
+  { motif: '年', name: '一年' },
 ];
 
 function useDisplayFont() {
@@ -141,7 +148,6 @@ export function Styleguide() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-  const [variant, setVariant] = useState<MarkVariant>('plaque');
   return (
     <main className="sg">
       <header className="sg-head">
@@ -159,7 +165,7 @@ export function Styleguide() {
 
       <section className="sg-sec">
         <h2>
-          原则<span>取法 Cartier 的精确与 Hermès 的工艺，根仍是水墨</span>
+          原则<span>取法 Cartier 的精确与 Hermès 的工艺 · 两套主题，各有含义</span>
         </h2>
         <ul className="sg-principles">
           <li>
@@ -185,7 +191,11 @@ export function Styleguide() {
 
       <section className="sg-sec">
         <h2>
-          材质与色<span>当前主题 · {themeNames[theme]} · 深色跟随系统</span>
+          材质与色
+          <span>
+            {themeNames[theme]} · {theme === 'ink' ? '日常：冷白的纸、银线、石板灰蓝的签名' : '值得庆祝的一周：鎏金'} ·
+            深色跟随系统
+          </span>
         </h2>
         <div className="sg-swatches">
           {[
@@ -232,13 +242,13 @@ export function Styleguide() {
             </div>
           </div>
           <div className="sg-spec">
-            <span>已定 · 基础数字一律 Inter；Bodoni 只给印记与信末日期</span>
+            <span>已定 · 基础数字一律 Inter；Bodoni 只给奖章与信末日期</span>
             <p className="sg-note" style={{ margin: 0 }}>
-              清楚为先。显示衬线只出现在有纪念意义的数字上，不进入表格、状态行与正文。
+              清楚为先。显示衬线只出现在奖章的数字和信末日期上，不进入表格、状态行与正文。
             </p>
           </div>
           <div className="sg-spec">
-            <span>Bodoni Moda 500 / 56 · 只用于印记</span>
+            <span>Bodoni Moda 500 / 56 · 只用于奖章上的数字</span>
             <div className="sg-hero-bodoni">
               161.8<span className="sg-unit">lb</span>
             </div>
@@ -325,30 +335,18 @@ export function Styleguide() {
 
       <section className="sg-sec">
         <h2>
-          印记研究<span>刻出来的牌，不是徽章 · 字的编排是全部装饰</span>
+          成就<span>奖章 · 金属圈、分钟刻度、一个图样、一个名字</span>
         </h2>
-        <div className="sg-themes" role="group" aria-label="印记做法" style={{ marginBottom: 'var(--s6)' }}>
-          {(
-            [
-              ['plaque', '牌'],
-              ['tablet', '签'],
-              ['inscription', '铭'],
-            ] as const
-          ).map(([v, name]) => (
-            <button key={v} aria-pressed={variant === v} onClick={() => setVariant(v)}>
-              {name}
-            </button>
+        <div className="sg-medals">
+          {earned.map(m => (
+            <Medal key={m.name} {...m} />
           ))}
-        </div>
-        <div className="sg-marks" data-variant={variant}>
-          {milestones.map(m => (
-            <figure key={m.caption}>
-              <Mark variant={variant} width="100%" {...m} />
-            </figure>
+          {locked.map(m => (
+            <Medal key={m.name} {...m} locked />
           ))}
         </div>
         <p className="sg-note">
-          牌：双层发丝框，顶上一行拉开字距的标题，中央一个数字，一条短规则线与一枚句点，底下用汉字写的日期，右下角极小的编号。签：竖向的窄板，标题逐字竖排，像书脊上的题签。铭：两条细线之间的一行字，最安静。材质只在线里：鎏金是鎏金的发丝，珍珠是铂金的发丝，水墨是墨线。
+          章上只有一个图样：数字是重点时用数字，否则用一个字。名字在章下面，像游戏里的成就名，短而有分量。未获得的是一圈线，名字淡着，等着被刻上。金属随主题：水墨是铂金，鎏金是金。
         </p>
       </section>
 
@@ -437,14 +435,17 @@ export function Styleguide() {
                 回信 <span aria-hidden="true">↗</span>
               </a>
             </article>
-            <article className="bd-card bd-plaque">
-              <Mark variant="plaque" width="100%" {...milestones[0]} />
-              <p>本周落下一块牌。它会留在 recap 页末尾。</p>
+            <article className="bd-card bd-medal">
+              <Medal {...earned[1]} size={96} />
+              <p>
+                <b>本周落下一枚</b>
+                卧推第一片。它会留在 recap 页末尾的成就墙上。
+              </p>
             </article>
           </div>
         </div>
         <p className="sg-note">
-          卡片目录固定：presence、next、week、body、letter、mark、focus、rest、context。AI
+          卡片目录固定：presence、next、week、body、letter、medal、focus、rest、context。AI
           只能挑选与排序，不能造卡。门不写入任何事实，只把人带回对话并预填一句话。
         </p>
       </section>

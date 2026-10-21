@@ -135,7 +135,7 @@ test('continuous pages, theme layouts, clear history and rollover without moving
   await expect(page.locator('.note-day').first()).toBeHidden();
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
-    for (const theme of ['ink', 'gold', 'pearl']) {
+    for (const theme of ['ink', 'gold']) {
       await page.evaluate(theme => (document.documentElement.dataset.theme = theme), theme);
       for (const width of [320, 390, 1280]) {
         await page.setViewportSize({ width, height: 844 });

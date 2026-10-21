@@ -1850,16 +1850,14 @@
             "type": "string",
             "enum": [
               "ink",
-              "gold",
-              "pearl"
+              "gold"
             ]
           },
           "active": {
             "type": "string",
             "enum": [
               "ink",
-              "gold",
-              "pearl"
+              "gold"
             ]
           },
           "manual_this_week": {

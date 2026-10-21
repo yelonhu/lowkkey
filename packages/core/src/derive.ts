@@ -181,12 +181,14 @@ export function themeState(facts: Facts, today: string) {
   const source = facts.curations
     .filter(c => c.week <= monday(today) && c.theme)
     .sort((a, b) => b.week.localeCompare(a.week))[0];
+  // A retired pearl choice falls back to ink without carrying its reason forward.
+  const legacy = source?.theme?.id === 'pearl';
   return {
     user: 'ink' as const,
-    active: source?.theme?.id ?? ('ink' as const),
+    active: source?.theme?.id === 'gold' ? ('gold' as const) : ('ink' as const),
     manual_this_week: false,
     source_week: source?.week ?? null,
-    reason: source?.theme?.why ?? null,
+    reason: legacy ? null : (source?.theme?.why ?? null),
   };
 }
 export function weightSeries(weights: Weight[]) {

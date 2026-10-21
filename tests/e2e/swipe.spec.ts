@@ -227,7 +227,7 @@ test('swipe interruption, theme widths and measured frames', async ({ page, base
     await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme });
-      for (const theme of ['ink', 'gold', 'pearl']) {
+      for (const theme of ['ink', 'gold']) {
         await page.evaluate(t => (document.documentElement.dataset.theme = t), theme);
         await gesture(page, [
           [width - 40, 400],

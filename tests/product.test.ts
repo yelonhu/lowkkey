@@ -191,7 +191,7 @@ describe('product onboarding and continuity', () => {
     await store.setProfile(db, owner, { body_notes: '用户明确提供的备注' });
     expect((await store.brief(db, owner, {}, stamp)).profile.training_context).toBe('每周两次；忙时缩短训练');
     const week = '2026-10-12';
-    for (const id of ['ink', 'gold', 'pearl']) {
+    for (const id of ['ink', 'gold']) {
       await store.curate(db, owner, { week, theme: { id, why: '用户希望本周用这个主题' } });
       expect((await store.state(db, owner, stamp)).theme_state.active).toBe(id);
     }

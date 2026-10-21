@@ -1446,16 +1446,14 @@
                 "type": "string",
                 "enum": [
                   "ink",
-                  "gold",
-                  "pearl"
+                  "gold"
                 ]
               },
               "active": {
                 "type": "string",
                 "enum": [
                   "ink",
-                  "gold",
-                  "pearl"
+                  "gold"
                 ]
               },
               "manual_this_week": {
@@ -3073,7 +3071,7 @@
     {
       "name": "curate",
       "title": "写入你的批注、周信、主题与提示",
-      "description": "何时用：这是你在页面上的声音。next：下一次训练的一句提示（画到 next 页顶部，须指向今天或以后有计划的日期）。recap：周信 title/letter（1–5段）、picks（引用本周真实记录的 1–2 个亮点）、focus（主项与理由），画到 recap 页。body：对体重趋势的一句话，画到 body 页。log：按日期对某次训练的一句批注，画到 log 页。theme：本周主题 ink/gold/pearl 与理由，跨周延续。week 必须是周一。省略字段保留、null 清空；recap 按字段合并，log 按日期合并。所有文本不用 emoji 或感叹号。每次写入保存版本。",
+      "description": "何时用：这是你在页面上的声音。next：下一次训练的一句提示（画到 next 页顶部，须指向今天或以后有计划的日期）。recap：周信 title/letter（1–5段）、picks（引用本周真实记录的 1–2 个亮点）、focus（主项与理由），画到 recap 页。body：对体重趋势的一句话，画到 body 页。log：按日期对某次训练的一句批注，画到 log 页。theme：本周主题 ink（水墨，日常）或 gold（鎏金，值得庆祝的一周）与理由，跨周延续。week 必须是周一。省略字段保留、null 清空；recap 按字段合并，log 按日期合并。所有文本不用 emoji 或感叹号。每次写入保存版本。",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -3092,8 +3090,7 @@
                     "type": "string",
                     "enum": [
                       "ink",
-                      "gold",
-                      "pearl"
+                      "gold"
                     ]
                   },
                   "why": {

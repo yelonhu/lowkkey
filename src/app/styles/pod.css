@@ -3,16 +3,6 @@
    AI 每周选的主题不只换线条颜色，而是在页面顶部形成一层天光。
    ────────────────────────────────────────────────────────────── */
 html[data-theme='ink'] {
-  --depth: 0 1px 2px rgba(0, 0, 0, 0.025), 0 12px 32px -20px rgba(0, 0, 0, 0.14);
-  --sky: radial-gradient(120% 70% at 50% -10%, rgba(0, 0, 0, 0.035), transparent 70%);
-}
-html[data-theme='gold'] {
-  --depth: 0 1px 2px rgba(60, 40, 10, 0.03), 0 12px 32px -20px rgba(120, 90, 40, 0.22);
-  --sky:
-    radial-gradient(110% 70% at 30% -10%, rgba(205, 174, 112, 0.34), transparent 64%),
-    radial-gradient(80% 50% at 85% 0%, rgba(176, 141, 79, 0.16), transparent 62%);
-}
-html[data-theme='pearl'] {
   --depth: 0 1px 2px rgba(30, 34, 40, 0.03), 0 12px 32px -20px rgba(60, 68, 80, 0.18);
   /* 珍珠母的虹彩：极淡的玫瑰与青瓷，只在天光里出现。 */
   --sky:
@@ -20,23 +10,25 @@ html[data-theme='pearl'] {
     radial-gradient(90% 60% at 78% -6%, rgba(198, 214, 209, 0.3), transparent 60%),
     radial-gradient(60% 40% at 55% 10%, rgba(201, 208, 215, 0.26), transparent 60%);
 }
+html[data-theme='gold'] {
+  --depth: 0 1px 2px rgba(60, 40, 10, 0.03), 0 12px 32px -20px rgba(120, 90, 40, 0.22);
+  --sky:
+    radial-gradient(110% 70% at 30% -10%, rgba(205, 174, 112, 0.34), transparent 64%),
+    radial-gradient(80% 50% at 85% 0%, rgba(176, 141, 79, 0.16), transparent 62%);
+}
 @media (prefers-color-scheme: dark) {
   html[data-theme='ink'] {
     --depth: none;
-    --sky: radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.04), transparent 70%);
+    --sky:
+      radial-gradient(100% 70% at 22% -10%, rgba(214, 200, 206, 0.1), transparent 62%),
+      radial-gradient(90% 60% at 78% -6%, rgba(198, 214, 209, 0.09), transparent 60%),
+      radial-gradient(60% 40% at 55% 10%, rgba(201, 208, 215, 0.08), transparent 60%);
   }
   html[data-theme='gold'] {
     --depth: none;
     --sky:
       radial-gradient(110% 70% at 30% -10%, rgba(228, 200, 142, 0.16), transparent 64%),
       radial-gradient(80% 50% at 85% 0%, rgba(210, 176, 114, 0.08), transparent 62%);
-  }
-  html[data-theme='pearl'] {
-    --depth: none;
-    --sky:
-      radial-gradient(100% 70% at 22% -10%, rgba(214, 200, 206, 0.1), transparent 62%),
-      radial-gradient(90% 60% at 78% -6%, rgba(198, 214, 209, 0.09), transparent 60%),
-      radial-gradient(60% 40% at 55% 10%, rgba(201, 208, 215, 0.08), transparent 60%);
   }
 }
 .showroom-content {

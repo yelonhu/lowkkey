@@ -30,8 +30,8 @@ test('private reference: fixed October 8, exact type, tokens, content and expans
   expect(styles.font).toContain('Inter');
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
-    for (const theme of ['ink', 'gold', 'pearl']) {
-      state.curations[0].theme = { id: theme as 'ink' | 'gold' | 'pearl', why: '主题验收' };
+    for (const theme of ['ink', 'gold']) {
+      state.curations[0].theme = { id: theme as 'ink' | 'gold', why: '主题验收' };
       state.theme_state = themeState(state, today);
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);

@@ -16,7 +16,7 @@
 
 `curate({week,theme?,next?,recap?,body?,log?})` 中 week 必须周一。递归合并 recap，省略保留、null 清空；log 按训练日期合并，null 删除批注。每次成功写入保存完整版本。文本以纯文本显示，不执行 HTML。
 
-- theme 为 ink/gold/pearl，why 必填、不超过 40 字。
+- theme 为 ink（日常）或 gold（值得庆祝的一周），why 必填、不超过 40 字；历史数据中的 pearl 读作 ink。
 - next 必须今天或未来有计划的日期，text 不超过 120 字。
 - recap.title 12 字；letter 1–5 段、每段 240 字；新 sign 为 `AI · MM.DD`，省略时服务端生成；历史 `claude · MM.DD` 继续兼容。
 - picks 1–2 件，日期在指定周内且有记录；器械 picks 的动作必须当天出现。title 24 字、note 80 字。五种类型：barbell/dumbbell/assist/weight/rhythm。

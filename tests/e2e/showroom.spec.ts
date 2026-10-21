@@ -130,7 +130,7 @@ test('empty → eight tools → five pages, all themes, narrow layout, refresh a
   await expect(page.locator('.bw')).toBeVisible();
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
-    for (const theme of ['ink', 'gold', 'pearl']) {
+    for (const theme of ['ink', 'gold']) {
       await tool('curate', { week: fixtureWeek, theme: { id: theme, why: '主题验收' } });
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
@@ -297,7 +297,7 @@ test('welcome, public privacy and consent recovery preserve the authorization de
   await expect(page.getByText('继续即代表同意《隐私政策》')).toBeInViewport({ ratio: 1 });
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme });
-    for (const theme of ['ink', 'gold', 'pearl']) {
+    for (const theme of ['ink', 'gold']) {
       await page.evaluate(theme => (document.documentElement.dataset.theme = theme), theme);
       for (const width of [320, 390, 1280]) {
         await page.setViewportSize({ width, height: 844 });

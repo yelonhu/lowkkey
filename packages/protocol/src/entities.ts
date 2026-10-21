@@ -78,8 +78,16 @@ export const Profile = z.strictObject({
 });
 export type Profile = z.infer<typeof Profile>;
 export const ProfileInput = Profile.partial().extend({ training_context: text(4000).nullable().optional() });
-export const Theme = z.enum(['ink', 'gold', 'pearl']);
-export const Preferences = z.strictObject({ theme: Theme, manual_week: LocalDate.nullable() });
+// Two themes with meanings: ink is the everyday, gold is a week worth celebrating. pearl is a retired
+// choice that stored rows may still carry; it reads as ink.
+export const Theme = z.enum(['ink', 'gold']);
+export const StoredTheme = z.enum(['ink', 'gold', 'pearl']);
+const themeChoice = (ids: typeof Theme | typeof StoredTheme) =>
+  z
+    .strictObject({ id: ids, why: prose(40).min(1) })
+    .nullable()
+    .optional();
+export const Preferences = z.strictObject({ theme: StoredTheme, manual_week: LocalDate.nullable() });
 export type Preferences = z.infer<typeof Preferences>;
 export const SessionInput = z.strictObject({
   date: LocalDate,
@@ -126,10 +134,7 @@ export const Recap = z.strictObject({
 const mondayDate = LocalDate.refine(d => new Date(d + 'T00:00:00Z').getUTCDay() === 1, 'week 必须为周一');
 export const CurationInput = z.strictObject({
   week: mondayDate,
-  theme: z
-    .strictObject({ id: Theme, why: prose(40).min(1) })
-    .nullable()
-    .optional(),
+  theme: themeChoice(Theme),
   next: z
     .strictObject({ date: LocalDate, text: prose(120).min(1) })
     .nullable()
@@ -142,7 +147,11 @@ export const CurationInput = z.strictObject({
   log: z.record(LocalDate, prose(100).nullable()).optional(),
 });
 export type CurationInput = z.infer<typeof CurationInput>;
-export const Curation = CurationInput.extend({ updated_at: Instant, revision: z.number().int() });
+export const Curation = CurationInput.extend({
+  theme: themeChoice(StoredTheme),
+  updated_at: Instant,
+  revision: z.number().int(),
+});
 export type Curation = z.infer<typeof Curation>;
 export const PlanHistory = z.strictObject({
   effective_date: LocalDate,

@@ -8,26 +8,27 @@
   --r-card: 14px;
   --r-sm: 8px;
 }
-/* 三套主题：水墨是日常，鎏金是庆祝，珍珠是突破。
-   浅色由用户选，特别的一周 Claude 可以换；深色跟系统。
+/* 两套主题：水墨是日常，鎏金是值得庆祝的一周。
+   由 AI 选择并跨周延续；深色跟系统。
    --acc 用于图形，--acc-ink 用于文字，--wash-bg 是 Claude 写的字底下那层浅色。 */
 html[data-theme='ink'] {
-  --bg: #ffffff;
-  --surf: #f7f7f7;
-  --ink: #0b0b0b;
-  --ink2: #333333;
-  --muted: #787878;
-  --faint: #b2b2b2;
-  --line: #e6e6e6;
-  --line2: #f0f0f0;
-  --acc: #0b0b0b;
-  --acc-ink: #0b0b0b;
-  --g0: #0b0b0b;
-  --g1: #0b0b0b;
-  --g2: #0b0b0b;
-  --wash: rgba(0, 0, 0, 0.045);
-  --wash2: rgba(0, 0, 0, 0.03);
-  --wash-bg: rgba(0, 0, 0, 0.035);
+  /* 水墨吸收了珍珠：冷白的纸、银灰的线、石板灰蓝的签名色，墨仍是墨。 */
+  --bg: #fbfbfc;
+  --surf: #ffffff;
+  --ink: #141519;
+  --ink2: #3a3d44;
+  --muted: #6f747d;
+  --faint: #a7acb4;
+  --line: #e4e6ea;
+  --line2: #eef0f3;
+  --acc: #141519;
+  --acc-ink: #5b6573;
+  --g0: #b8bfc7;
+  --g1: #6d7784;
+  --g2: #141519;
+  --wash: rgba(20, 21, 25, 0.045);
+  --wash2: rgba(20, 21, 25, 0.03);
+  --wash-bg: linear-gradient(115deg, rgba(201, 208, 215, 0.28), rgba(142, 151, 163, 0.1));
 }
 html[data-theme='gold'] {
   --bg: #fcfbf8;
@@ -47,43 +48,24 @@ html[data-theme='gold'] {
   --wash2: rgba(176, 141, 79, 0.065);
   --wash-bg: linear-gradient(115deg, rgba(205, 174, 112, 0.15), rgba(176, 141, 79, 0.08));
 }
-html[data-theme='pearl'] {
-  /* 珍珠母与铂金：冷白、银灰、一点点极淡的虹彩，不再有紫蓝。 */
-  --bg: #fbfbfc;
-  --surf: #ffffff;
-  --ink: #15161a;
-  --ink2: #3b3e45;
-  --muted: #70757e;
-  --faint: #a8adb5;
-  --line: #e3e5e9;
-  --line2: #eef0f3;
-  --acc: #8e97a3;
-  --acc-ink: #5b6573;
-  --g0: #c9d0d7;
-  --g1: #8e97a3;
-  --g2: #6b7482;
-  --wash: rgba(110, 119, 132, 0.1);
-  --wash2: rgba(110, 119, 132, 0.055);
-  --wash-bg: linear-gradient(115deg, rgba(201, 208, 215, 0.26), rgba(142, 151, 163, 0.1));
-}
 @media (prefers-color-scheme: dark) {
   html[data-theme='ink'] {
-    --bg: #0d0d0d;
-    --surf: #161616;
-    --ink: #f2f2f2;
-    --ink2: #cfcfcf;
-    --muted: #8a8a8a;
-    --faint: #4d4d4d;
-    --line: #262626;
-    --line2: #1b1b1b;
-    --acc: #f2f2f2;
-    --acc-ink: #f2f2f2;
-    --g0: #f2f2f2;
-    --g1: #f2f2f2;
-    --g2: #f2f2f2;
+    --bg: #0f1012;
+    --surf: #17181b;
+    --ink: #ecedef;
+    --ink2: #c3c6cb;
+    --muted: #858a92;
+    --faint: #4e535b;
+    --line: #292c31;
+    --line2: #1f2226;
+    --acc: #ecedef;
+    --acc-ink: #bfc6cf;
+    --g0: #d6dce3;
+    --g1: #a9b1bb;
+    --g2: #ecedef;
     --wash: rgba(255, 255, 255, 0.07);
     --wash2: rgba(255, 255, 255, 0.04);
-    --wash-bg: rgba(255, 255, 255, 0.05);
+    --wash-bg: linear-gradient(115deg, rgba(214, 220, 227, 0.12), rgba(169, 177, 187, 0.06));
   }
   html[data-theme='gold'] {
     --bg: #131210;
@@ -102,24 +84,6 @@ html[data-theme='pearl'] {
     --wash: rgba(210, 176, 114, 0.14);
     --wash2: rgba(210, 176, 114, 0.07);
     --wash-bg: linear-gradient(115deg, rgba(228, 200, 142, 0.13), rgba(210, 176, 114, 0.07));
-  }
-  html[data-theme='pearl'] {
-    --bg: #111214;
-    --surf: #191b1e;
-    --ink: #ecedef;
-    --ink2: #c3c6cb;
-    --muted: #858a92;
-    --faint: #4e535b;
-    --line: #292c31;
-    --line2: #1f2226;
-    --acc: #a9b1bb;
-    --acc-ink: #bfc6cf;
-    --g0: #d6dce3;
-    --g1: #a9b1bb;
-    --g2: #7f8792;
-    --wash: rgba(169, 177, 187, 0.12);
-    --wash2: rgba(169, 177, 187, 0.06);
-    --wash-bg: linear-gradient(115deg, rgba(214, 220, 227, 0.12), rgba(169, 177, 187, 0.06));
   }
 }
 

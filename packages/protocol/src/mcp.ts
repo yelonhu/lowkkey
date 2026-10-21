@@ -90,7 +90,7 @@ export const MCP_TOOLS = [
     title: '写入你的批注、周信、主题与提示',
     input: CurationInput,
     description:
-      '何时用：这是你在页面上的声音。next：下一次训练的一句提示（画到 next 页顶部，须指向今天或以后有计划的日期）。recap：周信 title/letter（1–5段）、picks（引用本周真实记录的 1–2 个亮点）、focus（主项与理由），画到 recap 页。body：对体重趋势的一句话，画到 body 页。log：按日期对某次训练的一句批注，画到 log 页。theme：本周主题 ink/gold/pearl 与理由，跨周延续。week 必须是周一。省略字段保留、null 清空；recap 按字段合并，log 按日期合并。所有文本不用 emoji 或感叹号。每次写入保存版本。',
+      '何时用：这是你在页面上的声音。next：下一次训练的一句提示（画到 next 页顶部，须指向今天或以后有计划的日期）。recap：周信 title/letter（1–5段）、picks（引用本周真实记录的 1–2 个亮点）、focus（主项与理由），画到 recap 页。body：对体重趋势的一句话，画到 body 页。log：按日期对某次训练的一句批注，画到 log 页。theme：本周主题 ink（水墨，日常）或 gold（鎏金，值得庆祝的一周）与理由，跨周延续。week 必须是周一。省略字段保留、null 清空；recap 按字段合并，log 按日期合并。所有文本不用 emoji 或感叹号。每次写入保存版本。',
   },
   {
     name: 'delete',
@@ -142,7 +142,7 @@ export const MCP_PROMPTS = [
     description: '为本周写一封周信，选亮点并指定焦点主项。',
     arguments: [],
     text: () =>
-      '请先 get_brief，然后为本周写一封周信：用 curate.recap 写 1–5 段像朋友短笺的文字，记下值得记住的变化和下周可行的一步；引用本周真实记录选 1–2 个 picks；指定 focus 并说明理由。如果本周的进展或我的偏好值得换主题，可在 ink、gold、pearl 中选择并给一句理由。写完给我 view_url。',
+      '请先 get_brief，然后为本周写一封周信：用 curate.recap 写 1–5 段像朋友短笺的文字，记下值得记住的变化和下周可行的一步；引用本周真实记录选 1–2 个 picks；指定 focus 并说明理由。如果这一周真的值得庆祝（纪录、里程碑、连续完成），可把主题换成 gold 并给一句理由；否则保持 ink。写完给我 view_url。',
   },
 ] as const;
 export type PromptName = (typeof MCP_PROMPTS)[number]['name'];
@@ -178,7 +178,7 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 - 用户发来训练：log_session 整理保存，note 只放用户原话，不放你的评价。同一天整体覆盖；更正或追加前用 get_brief.session_date 读取完整组，保留未修改内容，session:null 表示当天没有记录。保存后重新 get_brief，根据 week_facts 决定是否写 curate.log 批注和更新 next。用户已明确给出的记录不再征求保存许可。
 - 用户发来体重：log_weight，单位 lb；训练重量保留用户的原单位。
 - 本周训练完成或到了周末：写周信 curate.recap，像朋友的短笺，1–5 段，记下值得记住的变化和可行的下一步；picks 引用本周真实记录；focus 指向一个主项并说明原因；没有实际计划时不写 next。
-- 主题：可在 ink（水墨）、gold（鎏金）、pearl（珍珠）内选择本周主题并给短理由。选择跨周延续，未来周到期生效；不为换色而换色，主题不是对完成度的奖惩。省略保持，null 移除该周选择并回退，ink 明确回到水墨。
+- 主题：只有两种。ink（水墨）是日常，安静、专注，默认如此；gold（鎏金）留给值得庆祝的一周：主项纪录、里程碑、连续完成。只在真有这样的事时选 gold 并给短理由，下一周按情况回到 ink。选择跨周延续，未来周到期生效；省略保持，null 移除该周选择并回退。主题不是对完成度的奖惩，不为换色而换色。
 - 忙碌、疲劳、受伤：先理解用户表达的限制，缩短、调整或休息，不责备、不施压；身体不适时不鼓励硬撑，也不作诊断。不把漏练解释成意志力问题，不凭漏记推测情绪，休息不等于失败。不要把临时忙碌永久当作用户特征。
 - 日期以档案时区和 today 为准，不确定的历史日期先问。事实已保存但策展失败时清楚说明，只重试失败部分。
 
