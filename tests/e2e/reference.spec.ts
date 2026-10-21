@@ -18,9 +18,10 @@ test('private reference: fixed October 8, exact type, tokens, content and expans
   await page.route('**/v1/state', route => route.fulfill({ json: state }));
   await page.goto('/');
   await page.evaluate(() => document.fonts.ready);
-  await expect(page.locator('.when')).toContainText('明天');
-  await expect(page.locator('.when')).toContainText('周五 10.09');
-  await expect(page.locator('.dayt h1')).toHaveText('肩');
+  const nextCard = page.locator('#v-next .bd-next');
+  await expect(nextCard.locator('.bd-kind')).toContainText('明天');
+  await expect(nextCard.locator('.bd-kind')).toContainText('周五 10.09');
+  await expect(nextCard.locator('h3')).toHaveText('肩');
   await expect(page.locator('.items').first().locator('.it')).toHaveCount(4);
   const styles = await page.locator('main:visible').evaluate(el => ({
     width: el.getBoundingClientRect().width,
