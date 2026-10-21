@@ -168,17 +168,58 @@
   margin-left: 0.2em;
   letter-spacing: 0;
 }
-.sg-brand-inter {
-  font: 600 var(--t-title) / 1 var(--font);
-  letter-spacing: -0.01em;
+.sg-brands {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--s5) var(--s6);
 }
-.sg-brand-bodoni {
-  font: italic 500 28px / 1 var(--display);
+.sg-brand .wordmark {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--ink);
 }
-.sg-brand-inter::after,
-.sg-brand-bodoni::after {
+.sg-brand .wordmark::after {
   content: '.';
   color: var(--acc-ink);
+}
+.sg-brand small {
+  display: block;
+  margin-top: var(--s2);
+  font: 400 var(--t-micro) / 1.5 var(--sans);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.sg-brand[data-face='inter'] .wordmark {
+  font-family: var(--font);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sg-brand[data-face='bodoni'] .wordmark {
+  font-family: 'Bodoni Moda', serif;
+  font-weight: 500;
+  font-variation-settings: 'opsz' 48;
+}
+.sg-brand[data-face='newsreader'] .wordmark {
+  font-family: 'Newsreader', serif;
+  font-weight: 600;
+  font-variation-settings: 'opsz' 48;
+  letter-spacing: -0.01em;
+}
+.sg-brand[data-face='fraunces'] .wordmark {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-variation-settings: 'opsz' 144;
+}
+.sg-brand[data-face='cormorant'] .wordmark {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-size: 34px;
+}
+.sg-brand[data-face='instrument'] .wordmark {
+  font-family: 'Instrument Serif', serif;
+  font-weight: 400;
+  font-size: 34px;
 }
 .sg-title {
   font: 600 var(--t-display) / 1.35 var(--font);
@@ -281,9 +322,14 @@
 /* 成就：奖章。金属圈、分钟刻度、一个图样、下面一个名字。 */
 .sg-medals {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: var(--s7) var(--s4);
   justify-items: center;
+}
+.sg-medals .medal span {
+  max-width: 132px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
 }
 .medal {
   display: grid;

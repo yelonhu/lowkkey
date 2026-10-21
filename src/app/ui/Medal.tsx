@@ -25,6 +25,7 @@ export function Medal({
   unit,
   name,
   date,
+  how,
   size = 112,
   locked = false,
 }: {
@@ -32,6 +33,8 @@ export function Medal({
   unit?: string;
   name: string;
   date?: string;
+  /** The condition, stated once; shown in place of the date when given. */
+  how?: string;
   size?: number;
   locked?: boolean;
 }) {
@@ -97,7 +100,7 @@ export function Medal({
       </svg>
       <figcaption>
         <b>{name}</b>
-        {date && !locked && <span>{cnDate(date)}</span>}
+        {how ? <span>{how}</span> : date && !locked && <span>{cnDate(date)}</span>}
       </figcaption>
     </figure>
   );

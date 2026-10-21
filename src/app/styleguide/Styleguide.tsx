@@ -1,28 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { themeNames } from '../shell/theme.ts';
 import { Medal } from '../ui/Medal.tsx';
+import { ACHIEVEMENTS } from '../ui/achievements.ts';
 import './styleguide.css';
 
 type Theme = keyof typeof themeNames;
 const themes = Object.keys(themeNames) as Theme[];
 const displayFont =
-  'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;1,6..96,400;1,6..96,500&display=swap';
+  'https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600&family=Cormorant+Garamond:wght@500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Serif&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap';
 
-// Achievement names are short and read like titles. The motif is a numeral when the number is the point.
-const earned = [
-  { motif: '1', name: '第一次', date: '2026-09-23' },
-  { motif: '135', unit: 'lb', name: '第一片', date: '2026-10-03' },
-  { motif: '信', name: '第一封信', date: '2026-10-05' },
-  { motif: '4', name: '四周不落', date: '2026-10-26' },
-  { motif: '手', name: '徒手', date: '2027-01-09' },
-  { motif: '身', name: '过身', date: '2026-12-02' },
-];
-const locked = [
-  { motif: '225', unit: 'lb', name: '两片' },
-  { motif: '100', name: '一百次' },
-  { motif: '10', name: '徒手十次' },
-  { motif: '年', name: '一年' },
-];
+// A few are shown as earned with dates; the rest wait as outlines. Names come from the catalog.
+const earnedDates: Record<string, string> = {
+  first_session: '2026-09-23',
+  plate_1: '2026-10-03',
+  letter_1: '2026-10-05',
+  weigh_1: '2026-09-23',
+  first_pr: '2026-10-10',
+  streak_4: '2026-10-26',
+  week_full: '2026-10-12',
+  note_1: '2026-10-14',
+};
 
 function useDisplayFont() {
   useEffect(() => {
@@ -260,10 +257,25 @@ export function Styleguide() {
             </div>
           </div>
           <div className="sg-spec">
-            <span>品牌 · 现在 / 候选</span>
-            <div style={{ display: 'flex', gap: 'var(--s7)', alignItems: 'baseline' }}>
-              <span className="sg-brand-inter">lowkkey</span>
-              <span className="sg-brand-bodoni">lowkkey</span>
+            <span>品牌字 · 正体候选 · 现在是 Inter</span>
+            <div className="sg-brands">
+              {(
+                [
+                  ['inter', 'Inter 600', '现在'],
+                  ['bodoni', 'Bodoni Moda 500', '与奖章同一张脸'],
+                  ['newsreader', 'Newsreader 600', '报纸的衬线，稳'],
+                  ['fraunces', 'Fraunces 500', '软一点，有性格'],
+                  ['cormorant', 'Cormorant 600', '细而贵'],
+                  ['instrument', 'Instrument Serif', '轻，当代'],
+                ] as const
+              ).map(([key, face, note]) => (
+                <div key={key} className="sg-brand" data-face={key}>
+                  <span className="wordmark">lowkkey</span>
+                  <small>
+                    {face} · {note}
+                  </small>
+                </div>
+              ))}
             </div>
           </div>
           <div className="sg-spec">
@@ -335,18 +347,15 @@ export function Styleguide() {
 
       <section className="sg-sec">
         <h2>
-          成就<span>奖章 · 金属圈、分钟刻度、一个图样、一个名字</span>
+          成就<span>奖章 · 有典有梗的名字 · 一个图样 · 条件只说一次</span>
         </h2>
         <div className="sg-medals">
-          {earned.map(m => (
-            <Medal key={m.name} {...m} />
-          ))}
-          {locked.map(m => (
-            <Medal key={m.name} {...m} locked />
+          {ACHIEVEMENTS.map(m => (
+            <Medal key={m.id} motif={m.motif} unit={m.unit} name={m.name} how={m.how} locked={!earnedDates[m.id]} />
           ))}
         </div>
         <p className="sg-note">
-          章上只有一个图样：数字是重点时用数字，否则用一个字。名字在章下面，像游戏里的成就名，短而有分量。未获得的是一圈线，名字淡着，等着被刻上。金属随主题：水墨是铂金，鎏金是金。
+          名字是趣味所在：一句诗、一个被反用的成语、对事物本身的双关、对游戏的致意。章上只有一个图样，名字在章下，条件只说一次。未获得的是一圈线，等着被刻上。金属随主题：水墨是铂金，鎏金是金。
         </p>
       </section>
 
@@ -436,10 +445,10 @@ export function Styleguide() {
               </a>
             </article>
             <article className="bd-card bd-medal">
-              <Medal {...earned[1]} size={96} />
+              <Medal motif="135" unit="lb" name="一片冰心" date="2026-10-03" size={96} />
               <p>
                 <b>本周落下一枚</b>
-                卧推第一片。它会留在 recap 页末尾的成就墙上。
+                卧推第一次挂上一片。它会留在 recap 页末尾的成就墙上。
               </p>
             </article>
           </div>
