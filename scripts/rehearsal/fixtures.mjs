@@ -87,6 +87,10 @@ export const fixtureSessions = Array.from({ length: 9 }, (_, i) => ({
 }));
 export const fixtureCuration = {
   week: fixtureWeek,
+  board: {
+    line: '昨天的卧推记下了。今天歇一天，明天腿与肩，深蹲还是 175，不急着加。',
+    cards: ['next', 'week', 'body', 'letter', 'medal'],
+  },
   theme: { id: 'gold', why: '主项稳步前进' },
   next: { date: dateAt(1), text: '先把动作做完整。' },
   recap: {

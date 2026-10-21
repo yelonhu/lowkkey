@@ -76,6 +76,8 @@ export function useMotion() {
   }, []);
 }
 
+// The first page is the board; its hash stays `next` so receipts and old links keep working.
+const labels: Partial<Record<Screen, string>> = { next: 'board' };
 export function PageTabs({ screen }: { screen: Screen }) {
   const ref = useRef<HTMLElement>(null),
     [indicator, setIndicator] = useState({ left: 0, width: 0 });
@@ -96,7 +98,7 @@ export function PageTabs({ screen }: { screen: Screen }) {
     <nav ref={ref} className="wrap tabs" aria-label="页面">
       {screens.map(key => (
         <a key={key} href={'#' + key} aria-current={screen === key ? 'page' : undefined}>
-          {key}
+          {labels[key] ?? key}
         </a>
       ))}
       <span

@@ -570,7 +570,8 @@
                   "weight",
                   "week_letter",
                   "body_note",
-                  "medal"
+                  "medal",
+                  "board"
                 ]
               }
             },
@@ -1616,6 +1617,46 @@
                 "id",
                 "why"
               ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "board": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cards": {
+                  "anyOf": [
+                    {
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "next",
+                          "week",
+                          "body",
+                          "letter",
+                          "medal"
+                        ]
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
               "additionalProperties": false
             },
             {

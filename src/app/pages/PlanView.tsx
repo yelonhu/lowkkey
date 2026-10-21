@@ -2,21 +2,18 @@ import type { Facts, PlanItem } from '@lowkkey/protocol';
 import {
   bodyweightOn,
   compactSets,
-  datedCuration,
   diffDays,
   exerciseName,
   fmt,
   lastExercise,
   md,
-  planSummary,
   plates,
   toLb,
   unitLabel,
-  upcoming,
   weekStatus,
   weekday,
 } from '@lowkkey/core';
-import { Barbell, Chev, Glyph } from '../ui/Graphics.tsx';
+import { Barbell, Glyph } from '../ui/Graphics.tsx';
 
 /** Where today sits: weekday, week number, this week's progress, the latest weight. */
 export function StatusLine({ facts, today }: { facts: Facts; today: string }) {
@@ -105,79 +102,5 @@ export function PlanItems({ items, facts }: { items: PlanItem[]; facts: Facts })
         );
       })}
     </ul>
-  );
-}
-export function PlanView({ facts, today }: { facts: Facts; today: string }) {
-  const up = upcoming(facts, today),
-    first = up[0],
-    rest = up.slice(1),
-    note = datedCuration(facts, 'next', today);
-  if (!first)
-    return (
-      <>
-        <StatusLine facts={facts} today={today} />
-        <div className="empty">
-          <p className="cl">
-            {facts.plans.length
-              ? '这一周没有安排了。休息也是计划的一部分。'
-              : '还没有训练安排。和你的 AI 聊好之后，会出现在这里。'}
-          </p>
-          {!facts.plans.length && (
-            <a className="empty-link" href="#start">
-              去和 AI 聊
-            </a>
-          )}
-        </div>
-      </>
-    );
-  const n = first.plan.items.filter(i => !i.optional);
-  return (
-    <>
-      <StatusLine facts={facts} today={today} />
-      <section id={'next-' + first.plan.title}>
-        <p className="when meta">
-          <span className="rel">{first.rel}</span>
-          <span>
-            周{'日一二三四五六'[weekday(first.date)]} {md(first.date)}
-          </span>
-        </p>
-        <div className="dayt">
-          <h1>{first.plan.title}</h1>
-          <span>
-            {n.length} 个动作 · {n.reduce((a, i) => a + i.sets, 0)} 组
-            {first.plan.items.length > n.length ? ` · 另有 ${first.plan.items.length - n.length} 个可选` : ''}
-          </span>
-        </div>
-        {note?.date === first.date && <p className="cl">{note.text}</p>}
-        <PlanItems items={first.plan.items} facts={facts} />
-      </section>
-      {rest.length > 0 && (
-        <section className="later">
-          <div className="sh">
-            <h2>later</h2>
-            <span>这一周剩下的</span>
-          </div>
-          {rest.map(r => (
-            <details className="dy" key={r.date} id={'next-' + r.plan.title}>
-              <summary>
-                <b>{r.plan.title}</b>
-                <span className="d">
-                  {r.rel} {md(r.date)}
-                </span>
-                <span className="s">
-                  {r.plan.items
-                    .filter(i => !i.optional)
-                    .map(planSummary)
-                    .join(' · ')}
-                </span>
-                <Chev />
-              </summary>
-              {r.plan.coach && <p className="coach cl sm">{r.plan.coach}</p>}
-              <PlanItems items={r.plan.items} facts={facts} />
-            </details>
-          ))}
-        </section>
-      )}
-    </>
   );
 }

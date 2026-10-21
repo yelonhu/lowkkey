@@ -1,5 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fixturePlans, fixtureSessions, fixtureWeek, fixtureWeights } from '../../scripts/rehearsal/fixtures.mjs';
+import {
+  fixtureCuration,
+  fixturePlans,
+  fixtureSessions,
+  fixtureWeek,
+  fixtureWeights,
+} from '../../scripts/rehearsal/fixtures.mjs';
 
 // The state pod: ambient theme light, the one voice, the status line, press feedback,
 // pull-to-sync and the phone settings sheet. Facts are routed, so the account stays empty.
@@ -35,12 +41,20 @@ async function open(page: Page, baseURL: string, curations: unknown[] = []) {
     await r.fulfill({ json: { ...(await response.json()), hasContent: true, completedAt: stamp } });
   });
   await page.goto('/#next');
-  await expect(page.locator('#v-next .dayt')).toBeVisible();
+  await expect(page.locator('#v-next .bd-next')).toBeVisible();
   return { today: state.today as string, reads: () => reads };
 }
 
 test('status line, ambient sky, mood whisper and the single voice', async ({ page, baseURL }) => {
-  await open(page, baseURL!);
+  await open(page, baseURL!, [
+    {
+      week: fixtureWeek,
+      next: fixtureCuration.next,
+      board: fixtureCuration.board,
+      revision: 1,
+      updated_at: new Date().toISOString(),
+    },
+  ]);
   const status = page.locator('#v-next .status');
   await expect(status).toContainText('week');
   await expect(status).toContainText('本周');

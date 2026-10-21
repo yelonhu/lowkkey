@@ -293,6 +293,7 @@ describe('v5 shared calculations', () => {
         recap: { letter: ['写过了'] },
         body: { date: today, text: '稳' },
         next: { date: addDays(today, 7), text: '下次' },
+        board: { line: '记下了' },
         revision: 1,
         updated_at: stamp,
       },

@@ -158,6 +158,10 @@ export function upcoming(facts: { plans: Plan[]; sessions: TrainingSession[] }, 
   }
   return out;
 }
+/** This week's board arrangement, if the AI made one. */
+export function boardOf(facts: Facts, today: string) {
+  return currentCuration(facts, today)?.board ?? null;
+}
 export function currentCuration(facts: Facts, today: string) {
   return facts.curations.find(c => c.week === monday(today)) ?? null;
 }
@@ -516,6 +520,7 @@ export function briefGuide(
   if (weightRate(facts.weights, today) != null && !datedCuration(facts, 'body', today)) missing.push('body_note');
   const notable = weekFacts(facts, today).some(f => ['pr', 'threshold', 'first', 'unstuck', 'streak'].includes(f.kind));
   if (hasSession && notable && !medalsThisWeek(facts.medals, today).length) missing.push('medal');
+  if (stage === 'active' && !boardOf(facts, today)?.line) missing.push('board');
   const canWrite = permissions.includes('write');
   let next_step: string;
   if (!canWrite)
@@ -544,7 +549,9 @@ export function briefGuide(
               ? '尚未保存训练背景：把用户明确表达的目标、时间、器械写入 set_profile.training_context。'
               : first === 'medal'
                 ? '本周有值得记住的事（见 week_facts），还没有奖章：用 award 起一个名字，配一个图样和一段小故事。'
-                : '接续已有事实。用户发来训练就整理保存；修改旧训练前用 session_date 读取该日完整组。';
+                : first === 'board'
+                  ? '本周还没有布置板面：用 curate.board 写一句当下的话，必要时排一下卡片顺序。'
+                  : '接续已有事实。用户发来训练就整理保存；修改旧训练前用 session_date 读取该日完整组。';
   }
   return { stage, next_step, missing, week };
 }
@@ -561,6 +568,7 @@ export function mergeCuration(
 ): Curation {
   const out = { ...previous, ...input, revision, updated_at: stamp };
   if (input.recap && previous?.recap) out.recap = { ...previous.recap, ...input.recap };
+  if (input.board && previous?.board) out.board = { ...previous.board, ...input.board };
   const log = { ...(previous?.log ?? {}) };
   for (const [date, note] of Object.entries(input.log ?? {})) {
     if (note === null) delete log[date];

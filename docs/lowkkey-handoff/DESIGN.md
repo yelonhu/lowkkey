@@ -46,3 +46,7 @@ AI 的每段文字（`.cl`、周信正文）统一以一枚 5–6px 渐变墨点
 ## 成就
 
 奖章由 AI 授予（`award`），不是固定目录：名字由它起，雅一点；章上只有一个图样（数字用 Bodoni Moda，否则一个宋体字，填主题的金属渐变并勾一圈极细墨线）；一到三段很短的小故事，题材随意。`src/app/ui/Medal.tsx` 画章：主题材质的金属圈、六十道分钟刻度、名字在章下、日期用汉字；date 为空的是约定好、还在等的一枚，画成一圈线。recap 页末尾的成就墙（`#recap-medals`）列出全部，按下一枚在下方讲它的缘由与故事；`#recap?medal=<key>` 定位到那一枚。
+
+## board
+
+第一页是 AI 布置的板（`src/app/pages/BoardView.tsx`，hash 仍为 `#next`，标签显示 board）：最上是 `curate.board.line`（没有时退回 curate.next 的提示），其次是状态行，然后是卡。卡片目录固定为 next、week、body、letter、medal，顺序由 `curate.board.cards` 决定，默认 next、week、body、letter、medal；相邻的 week 与 body 并排。next 卡默认只列必做动作与重量，「完整安排」展开成原来的计划页（含 later 列表与 `next-<title>` 定位锚）；收到指向后几天的回执时自动展开。每张卡右下一扇门：复制一句带上下文的话并打开用户的 AI（来自首次连接选择），底部出现两秒回执；未连接 AI 时门通向 `#start`。样式在 `styles/board.css`。

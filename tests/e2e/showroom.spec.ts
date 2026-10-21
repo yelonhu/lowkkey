@@ -137,7 +137,7 @@ test('empty → ten tools → five pages, all themes, narrow layout, refresh and
       for (const width of [320, 390, 1280]) {
         await page.setViewportSize({ width, height: 844 });
         for (const screen of ['next', 'recap', 'body', 'log']) {
-          await page.getByRole('link', { name: screen, exact: true }).click();
+          await page.getByRole('link', { name: screen === 'next' ? 'board' : screen, exact: true }).click();
           await expect(page.locator('main:visible')).toHaveAttribute('id', 'v-' + screen);
           await expect(page.locator('main:visible').locator('input,textarea,form')).toHaveCount(0);
           expect(

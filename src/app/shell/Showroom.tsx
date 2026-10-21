@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePageSwipe } from './usePageSwipe.ts';
 import {
   animate,
@@ -15,12 +15,12 @@ import { useShowroom } from './useShowroom.ts';
 import { applyPageTheme, themeNames } from './theme.ts';
 import { useNotes } from '../pages/useNotes.ts';
 import { NotesView } from '../pages/NotesView.tsx';
-import { PlanView } from '../pages/PlanView.tsx';
+import { BoardView } from '../pages/BoardView.tsx';
 import { RecapView } from '../pages/RecapView.tsx';
 import { WeightView } from '../pages/WeightView.tsx';
 import { LogView } from '../pages/LogView.tsx';
 import { CustomerAccount, LoginGate } from '../account/CustomerAccount.tsx';
-import { Onboarding, useProduct } from '../account/Onboarding.tsx';
+import { aiHosts, Onboarding, useProduct } from '../account/Onboarding.tsx';
 import { ConsentGate } from '../account/Privacy.tsx';
 import { SessionLoading } from '../account/Welcome.tsx';
 
@@ -170,6 +170,42 @@ export function Showroom() {
       />
     );
 
+  // A door copies one sentence and opens the user's AI; the conversation stays there.
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef<number>(0);
+  const ai = product.setup?.ai ?? null;
+  const door = useCallback(
+    (text: string) => {
+      if (!ai) {
+        location.hash = 'start';
+        return;
+      }
+      const host = aiHosts[ai];
+      let tab: Window | null = null;
+      try {
+        tab = window.open('about:blank', '_blank');
+        if (tab) tab.opener = null;
+      } catch {
+        /* Popups may be blocked; the copy still happens. */
+      }
+      const show = (message: string) => {
+        setToast(message);
+        clearTimeout(toastTimer.current);
+        toastTimer.current = window.setTimeout(() => setToast(''), 2600);
+      };
+      navigator.clipboard.writeText(text).then(
+        () => {
+          show('已复制这句话，去 ' + host.name + ' 粘贴');
+          if (tab) tab.location.replace(host.chat);
+        },
+        () => {
+          tab?.close();
+          show('未能复制，去 ' + host.name + ' 直接说也可以');
+        },
+      );
+    },
+    [ai],
+  );
   const facts = chamber.state,
     today = facts.today,
     theme = facts.theme_state;
@@ -225,7 +261,7 @@ export function Showroom() {
               id={'v-' + key}
             >
               {key === 'next' ? (
-                <PlanView facts={facts} today={today} />
+                <BoardView facts={facts} today={today} door={door} />
               ) : key === 'recap' ? (
                 <RecapView facts={facts} today={today} focus={focus} setFocus={setFocus} />
               ) : key === 'body' ? (
@@ -244,6 +280,11 @@ export function Showroom() {
           ))}
         </div>
       </div>
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
       {settings && (
         <CustomerAccount
           chamber={chamber}

@@ -92,7 +92,7 @@ export const MCP_TOOLS = [
     title: '写入你的批注、周信、主题与提示',
     input: CurationInput,
     description:
-      '何时用：这是你在页面上的声音。next：下一次训练的一句提示（画到 next 页顶部，须指向今天或以后有计划的日期）。recap：周信 title/letter（1–5段）、picks（引用本周真实记录的 1–2 个亮点）、focus（主项与理由），画到 recap 页。body：对体重趋势的一句话，画到 body 页。log：按日期对某次训练的一句批注，画到 log 页。theme：本周主题 ink（水墨，日常）或 gold（鎏金，值得庆祝的一周）与理由，跨周延续。week 必须是周一。省略字段保留、null 清空；recap 按字段合并，log 按日期合并。所有文本不用 emoji 或感叹号。每次写入保存版本。',
+      '何时用：这是你在页面上的声音。board：首页的布置——line 是你当下的一句话（画在首页最上，像便条），cards 是卡片顺序，可选 next、week、body、letter、medal，省略用默认顺序。next：下一次训练的一句提示（画到 next 卡上，须指向今天或以后有计划的日期）。recap：周信 title/letter（1–5段）、picks（引用本周真实记录的 1–2 个亮点）、focus（主项与理由），画到 recap 页。body：对体重趋势的一句话，画到 body 页。log：按日期对某次训练的一句批注，画到 log 页。theme：本周主题 ink（水墨，日常）或 gold（鎏金，值得庆祝的一周）与理由，跨周延续。week 必须是周一。省略字段保留、null 清空；recap 按字段合并，log 按日期合并。所有文本不用 emoji 或感叹号。每次写入保存版本。',
   },
   {
     name: 'award',
@@ -164,7 +164,7 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 你是这份档案的管理者，也是这个人的训练搭档。每次相关对话：先调用 get_brief，读现有事实、训练背景、账户时区、实际权限和 guide，再行动。guide.stage 说明档案处于空档案、建档中还是进行中；guide.missing 列出现在缺什么；guide.next_step 是当前最值得做的一件事。写入成功后重新 get_brief，按 guide 补齐仍缺的部分，再把 view_url 给用户。
 
 ## 页面地图：你写的东西出现在哪里
-- next：下一次训练。由 set_plan（按星期几的计划）和 curate.next（你对下一次的一句提示）组成。
+- board（首页）：你布置的板。curate.board.line 是你当下的一句话，画在最上；cards 是卡片顺序（next、week、body、letter、medal）。next 卡由 set_plan 与 curate.next 组成，week 与 body 由代码从记录算出，letter 取最近一封周信，medal 取本周新得的奖章。每张卡有一扇门，把用户带回对话。
 - recap：本周回顾。由 curate.recap（周信 letter、title、picks 亮点、focus 焦点主项）和 curate.theme（本周主题与理由）组成；页末是成就墙，奖章由 award 授予；四项主项的力量曲线、最重记录和训练日历由代码从记录自动生成。
 - body：体重。由 log_weight、set_profile.gain_target（目标带）和 curate.body（你对趋势的一句话）组成；均值和速度由代码计算。
 - log：训练记录。由 log_session（title、各组、用户原话 note）和 curate.log（你对某一天的一句批注）组成。
@@ -186,9 +186,10 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 一次会话不必全部完成；没完成的会留在 guide.missing，下次接着做。
 
 ## 日常会话例程（guide.stage = active）
-- 用户发来训练：log_session 整理保存，note 只放用户原话，不放你的评价。同一天整体覆盖；更正或追加前用 get_brief.session_date 读取完整组，保留未修改内容，session:null 表示当天没有记录。保存后重新 get_brief，根据 week_facts 决定是否写 curate.log 批注和更新 next。用户已明确给出的记录不再征求保存许可。
+- 用户发来训练：log_session 整理保存，note 只放用户原话，不放你的评价。同一天整体覆盖；更正或追加前用 get_brief.session_date 读取完整组，保留未修改内容，session:null 表示当天没有记录。保存后重新 get_brief，根据 week_facts 决定是否写 curate.log 批注和更新 next。用户已明确给出的记录不再征求保存许可；顺手更新 curate.board.line，一句当下的话（记下了、明天练什么、今天歇着）。
 - 用户发来体重：log_weight，单位 lb；训练重量保留用户的原单位。
 - 本周训练完成或到了周末：写周信 curate.recap，像朋友的短笺，1–5 段，记下值得记住的变化和可行的下一步；picks 引用本周真实记录；focus 指向一个主项并说明原因；没有实际计划时不写 next。
+- 每周至少布置一次板面（curate.board）：写 line，按本周重点排 cards；没有新鲜事时省略 cards 保持默认顺序。guide.missing 出现 board 时说明本周还没有 line。
 - 主题：只有两种。ink（水墨）是日常，安静、专注，默认如此；gold（鎏金）留给值得庆祝的一周：主项纪录、里程碑、连续完成。只在真有这样的事时选 gold 并给短理由，下一周按情况回到 ink。选择跨周延续，未来周到期生效；省略保持，null 移除该周选择并回退。主题不是对完成度的奖惩，不为换色而换色。
 - 奖章由你授予（award）。get_brief.medals 列出已有的；week_facts 里的纪录、门槛、突破、连续，是授予的好时机，guide.missing 出现 medal 时说明本周有这样的事却还没有章。名字由你起，雅一点；章上只有一个图样；配一到三段很短的小故事，题材随意，不必和训练有关。一周最多一两枚。也可以和用户约定一枚尚未达成的（date 为 null），达成时补日期、写故事。
 - 忙碌、疲劳、受伤：先理解用户表达的限制，缩短、调整或休息，不责备、不施压；身体不适时不鼓励硬撑，也不作诊断。不把漏练解释成意志力问题，不凭漏记推测情绪，休息不等于失败。不要把临时忙碌永久当作用户特征。

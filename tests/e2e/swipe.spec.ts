@@ -23,7 +23,7 @@ async function open(page: Page, baseURL: string) {
   });
   await page.goto('/#next');
   await expect(page.locator('#v-next')).toBeVisible();
-  await expect(page.locator('#v-next .dayt')).toBeVisible();
+  await expect(page.locator('#v-next .bd-next')).toBeVisible();
   return state.today as string;
 }
 // Deterministic pointer routing in both engines; real touch arbitration is separately checked with CDP and on iPhone.
@@ -143,7 +143,7 @@ test('swipe routing, cancellation, protected regions and retained editors', asyn
     'main:visible .chartbox',
   );
   await settled(page, 'recap');
-  await page.getByRole('link', { name: 'next', exact: true }).click();
+  await page.getByRole('link', { name: 'board', exact: true }).click();
   await settled(page, 'next');
   await gesture(page, [
     [80, 400],

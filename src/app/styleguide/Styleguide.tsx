@@ -405,10 +405,7 @@ export function Styleguide() {
               <b>{themeNames[theme]}</b>主项稳步前进
             </span>
           </div>
-          <p className="bd-presence">
-            <i />
-            <span>昨天的卧推记下了。今天歇一天，明天腿与肩，深蹲还是 175，不急着加。</span>
-          </p>
+          <p className="cl bd-presence">昨天的卧推记下了。今天歇一天，明天腿与肩，深蹲还是 175，不急着加。</p>
           <p className="bd-status">
             <span>
               <b>周一</b>10.19
@@ -480,11 +477,13 @@ export function Styleguide() {
               </a>
             </article>
             <article className="bd-card bd-medal">
-              <Medal motif="135" unit="lb" name="一片冰心" date="2026-10-03" size={96} />
-              <p>
-                <b>本周落下一枚</b>
-                她把片挂上去的时候，没有人看。
-              </p>
+              <div className="bd-kind">
+                medal<span>本周落下</span>
+              </div>
+              <div className="bd-medals">
+                <Medal motif="135" unit="lb" name="一片冰心" date="2026-10-03" size={92} />
+                <p>她把片挂上去的时候，没有人看。</p>
+              </div>
             </article>
           </div>
         </div>

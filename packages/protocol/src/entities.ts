@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EXERCISE_LIBRARY } from './catalog.ts';
 import { Id, Instant, LocalDate, Unit } from './primitives.ts';
-import { NOTE_LIMIT, PRIVACY_VERSION } from './constants.ts';
+import { BOARD_CARDS, NOTE_LIMIT, PRIVACY_VERSION } from './constants.ts';
 export { NOTE_LIMIT, PRIVACY_VERSION };
 const text = (max: number) => z.string().refine(v => Array.from(v).length <= max, `最多 ${max} 字`);
 const prose = (max: number) =>
@@ -135,6 +135,13 @@ const mondayDate = LocalDate.refine(d => new Date(d + 'T00:00:00Z').getUTCDay() 
 export const CurationInput = z.strictObject({
   week: mondayDate,
   theme: themeChoice(Theme),
+  board: z
+    .strictObject({
+      line: prose(120).nullable().optional(),
+      cards: z.array(z.enum(BOARD_CARDS)).max(6).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
   next: z
     .strictObject({ date: LocalDate, text: prose(120).min(1) })
     .nullable()
@@ -299,6 +306,7 @@ export const GuideMissing = z.enum([
   'week_letter',
   'body_note',
   'medal',
+  'board',
 ]);
 export type GuideMissing = z.infer<typeof GuideMissing>;
 export const WeekStatus = z.strictObject({

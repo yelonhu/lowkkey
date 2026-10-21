@@ -49,7 +49,8 @@ test('quiet motion, reading positions, grouped grants and reduced motion', async
   await expect(editor).toBeFocused();
   await expect(page.locator('.note-date h2')).toHaveCSS('text-decoration-line', 'underline');
   await expect(page.getByRole('group', { name: '主题', exact: true })).toHaveCount(0);
-  await page.getByRole('link', { name: 'next', exact: true }).click();
+  await page.getByRole('link', { name: 'board', exact: true }).click();
+  await page.getByRole('button', { name: '完整安排', exact: true }).click();
   const later = page.locator('#v-next details').first();
   await expect(later).toBeVisible();
   // A second click reverses the current animation instead of waiting for it.
@@ -64,7 +65,7 @@ test('quiet motion, reading positions, grouped grants and reduced motion', async
   await page.evaluate(() => window.scrollTo(0, 420));
   const position = await page.evaluate(() => scrollY);
   await page.getByRole('link', { name: 'recap', exact: true }).click();
-  await page.getByRole('link', { name: 'next', exact: true }).click();
+  await page.getByRole('link', { name: 'board', exact: true }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBeCloseTo(position, 0);
   await expect(later).toHaveAttribute('open', '');
   await page.getByRole('button', { name: 'lowkkey，打开设置' }).click();
