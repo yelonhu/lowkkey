@@ -9,22 +9,12 @@ const displayFont =
   'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;1,6..96,400;1,6..96,500&display=swap';
 
 const milestones = [
-  { value: '135', unit: 'lb', caption: '第一片 · 卧推', date: '2026.10.03', glyph: '片' },
-  { value: '225', unit: 'lb', caption: '两片 · 深蹲', date: '2026.11.14', glyph: '片' },
-  { value: '1.0', unit: '×', caption: '超过体重 · 卧推', date: '2026.12.02', glyph: '身' },
-  { value: '徒手', caption: '引体向上 · 八次', date: '2027.01.09', glyph: '手' },
-  { value: '4', unit: '周', caption: '连续四周一次没落', date: '2026.10.26', glyph: '周' },
-  { value: '100', caption: '第一百次训练', date: '2027.03.18', glyph: '百' },
-];
-
-const sleep = [
-  { day: '一', bed: 23.4, wake: 7.2, train: true },
-  { day: '二', bed: 23.9, wake: 7.0, train: false },
-  { day: '三', bed: 0.6, wake: 7.5, train: true },
-  { day: '四', bed: 23.2, wake: 6.9, train: false },
-  { day: '五', bed: 0.2, wake: 8.1, train: true },
-  { day: '六', bed: 1.1, wake: 9.4, train: false, rest: true },
-  { day: '日', bed: 23.5, wake: 8.0, train: false, rest: true },
+  { value: '135', unit: 'lb', caption: '卧推 · 第一片', date: '2026-10-03', serial: 1 },
+  { value: '225', unit: 'lb', caption: '深蹲 · 两片', date: '2026-11-14', serial: 2 },
+  { value: '1.0', unit: '×', caption: '卧推 · 超过体重', date: '2026-12-02', serial: 3 },
+  { value: '徒手', caption: '引体 · 八次', date: '2027-01-09', serial: 4 },
+  { value: '4', unit: '周', caption: '连续四周 · 一次没落', date: '2026-10-26', serial: 5 },
+  { value: '100', caption: '第一百次训练', date: '2027-03-18', serial: 6 },
 ];
 
 function useDisplayFont() {
@@ -85,53 +75,6 @@ function WeekRing({ done, planned }: { done: number; planned: number }) {
         <small> / {planned}</small>
       </b>
     </div>
-  );
-}
-
-function RhythmBand() {
-  const start = 21,
-    span = 14,
-    W = 520,
-    L = 28,
-    R = 12,
-    rowH = 22;
-  const X = (hour: number) => L + (((hour < 12 ? hour + 24 : hour) - start) / span) * (W - L - R);
-  return (
-    <svg className="sg-rhythm" viewBox={`0 0 ${W} ${sleep.length * rowH + 28}`} role="img" aria-label="一周作息带">
-      <defs>
-        <linearGradient id="rh-g" x1="0" x2="1">
-          <stop offset="0" style={{ stopColor: 'var(--g0)' }} />
-          <stop offset="1" style={{ stopColor: 'var(--g2)' }} />
-        </linearGradient>
-      </defs>
-      {[22, 0, 2, 4, 6, 8, 10].map(h => (
-        <g key={h}>
-          <line x1={X(h)} x2={X(h)} y1="14" y2={sleep.length * rowH + 14} className="grid" />
-          <text x={X(h)} y="9" textAnchor="middle" className="axis">
-            {String(h).padStart(2, '0')}
-          </text>
-        </g>
-      ))}
-      {sleep.map((row, i) => {
-        const y = 18 + i * rowH;
-        return (
-          <g key={row.day}>
-            <text x="4" y={y + 12} className="day">
-              {row.day}
-            </text>
-            <rect
-              x={X(row.bed)}
-              y={y + 3}
-              width={X(row.wake) - X(row.bed)}
-              height="12"
-              rx="6"
-              className={'band' + (row.rest ? ' rest' : '')}
-            />
-            {row.train && <circle cx={X(row.wake) + 10} cy={y + 9} r="2.2" className="train" />}
-          </g>
-        );
-      })}
-    </svg>
   );
 }
 
@@ -198,7 +141,7 @@ export function Styleguide() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-  const [variant, setVariant] = useState<MarkVariant>('ring');
+  const [variant, setVariant] = useState<MarkVariant>('plaque');
   return (
     <main className="sg">
       <header className="sg-head">
@@ -289,7 +232,13 @@ export function Styleguide() {
             </div>
           </div>
           <div className="sg-spec">
-            <span>候选 · Bodoni Moda 500 / 56</span>
+            <span>已定 · 基础数字一律 Inter；Bodoni 只给印记与信末日期</span>
+            <p className="sg-note" style={{ margin: 0 }}>
+              清楚为先。显示衬线只出现在有纪念意义的数字上，不进入表格、状态行与正文。
+            </p>
+          </div>
+          <div className="sg-spec">
+            <span>Bodoni Moda 500 / 56 · 只用于印记</span>
             <div className="sg-hero-bodoni">
               161.8<span className="sg-unit">lb</span>
             </div>
@@ -376,14 +325,14 @@ export function Styleguide() {
 
       <section className="sg-sec">
         <h2>
-          印记研究<span>雕刻，不是图章 · 三种做法，同一组里程碑</span>
+          印记研究<span>刻出来的牌，不是徽章 · 字的编排是全部装饰</span>
         </h2>
         <div className="sg-themes" role="group" aria-label="印记做法" style={{ marginBottom: 'var(--s6)' }}>
           {(
             [
-              ['ring', '刻圈'],
-              ['guilloche', '玑镂'],
-              ['seal', '方印'],
+              ['plaque', '牌'],
+              ['tablet', '签'],
+              ['inscription', '铭'],
             ] as const
           ).map(([v, name]) => (
             <button key={v} aria-pressed={variant === v} onClick={() => setVariant(v)}>
@@ -391,16 +340,15 @@ export function Styleguide() {
             </button>
           ))}
         </div>
-        <div className="sg-marks">
+        <div className="sg-marks" data-variant={variant}>
           {milestones.map(m => (
             <figure key={m.caption}>
-              <Mark variant={variant} {...m} />
-              <figcaption>{m.caption}</figcaption>
+              <Mark variant={variant} width="100%" {...m} />
             </figure>
           ))}
         </div>
         <p className="sg-note">
-          刻圈：双层发丝圆，边款沿圆排字，数字居中，最像表盘。玑镂：七十二道放射发丝，像硬币的边，重量感最强。方印：圆角方框，数字在左上、一个字在右下，最接近东方的印，但仍是刻的。
+          牌：双层发丝框，顶上一行拉开字距的标题，中央一个数字，一条短规则线与一枚句点，底下用汉字写的日期，右下角极小的编号。签：竖向的窄板，标题逐字竖排，像书脊上的题签。铭：两条细线之间的一行字，最安静。材质只在线里：鎏金是鎏金的发丝，珍珠是铂金的发丝，水墨是墨线。
         </p>
       </section>
 
@@ -489,30 +437,15 @@ export function Styleguide() {
                 回信 <span aria-hidden="true">↗</span>
               </a>
             </article>
-            <article className="bd-card bd-mark quiet">
-              <Mark variant={variant} size={96} {...milestones[0]} />
-              <p>
-                本周落下一枚印记：卧推第一片。
-                <br />
-                它会留在 recap 页末尾。
-              </p>
+            <article className="bd-card bd-plaque">
+              <Mark variant="plaque" width="100%" {...milestones[0]} />
+              <p>本周落下一块牌。它会留在 recap 页末尾。</p>
             </article>
           </div>
         </div>
         <p className="sg-note">
-          卡片目录固定：presence、next、week、body、letter、mark、focus、rest、rhythm。AI
+          卡片目录固定：presence、next、week、body、letter、mark、focus、rest、context。AI
           只能挑选与排序，不能造卡。门不写入任何事实，只把人带回对话并预填一句话。
-        </p>
-      </section>
-
-      <section className="sg-sec">
-        <h2>
-          作息带<span>rhythm 面板 · 一周的睡眠，训练日有一点</span>
-        </h2>
-        <RhythmBand />
-        <p className="sg-note">
-          横轴从晚上九点到次日十一点。每一条从上床到起床；休息日更淡；起床后的小点是训练日。数据由 AI
-          从对话里听到就写：「昨晚十二点睡，七点起」。
         </p>
       </section>
 

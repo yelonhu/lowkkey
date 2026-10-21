@@ -278,74 +278,108 @@
   color: var(--muted);
 }
 
-/* 印记研究 */
+/* 印记研究：刻出来的牌，不是徽章。 */
 .sg-marks {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--s6) var(--s4);
+  gap: var(--s6) var(--s5);
+}
+.sg-marks[data-variant='plaque'] {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.sg-marks[data-variant='tablet'] {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   justify-items: center;
 }
-.sg-marks figure {
-  text-align: center;
+.sg-marks[data-variant='inscription'] {
+  grid-template-columns: 1fr;
+  max-width: 420px;
 }
-.sg-marks figcaption {
-  margin-top: var(--s2);
-  font: 400 var(--t-micro) / 1.5 var(--sans);
-  color: var(--muted);
-  letter-spacing: 0.04em;
+.sg-marks figure {
+  width: 100%;
+}
+.sg-marks[data-variant='tablet'] figure {
+  width: auto;
 }
 .mk {
   display: block;
+  max-width: 100%;
+  height: auto;
   overflow: visible;
 }
-.mk-hair {
+.mk-frame {
   fill: none;
   stroke-width: 0.75;
+  stroke-opacity: 0.85;
 }
-.mk-faint {
+.mk-inner {
+  fill: none;
   stroke: var(--line);
-}
-.mk-ray {
   stroke-width: 0.5;
-  opacity: 0.55;
 }
-.mk-disc {
-  fill: var(--wash2);
+.mk-eyebrow {
+  font: 400 8.5px / 1 var(--font);
+  fill: var(--ink2);
+  letter-spacing: 0.32em;
 }
 .mk-num {
   font-family: var(--display);
   font-weight: 500;
   fill: var(--ink);
-  font-variation-settings: 'opsz' 48;
-  letter-spacing: -0.01em;
+  /* 低光学尺寸让发丝笔画在屏幕上站得住，1 与 4 不再发虚。 */
+  font-variation-settings: 'opsz' 20;
+  letter-spacing: 0.005em;
 }
 .mk-unit {
-  font-family: var(--sans);
-  font-weight: 400;
-  font-size: 0.34em;
+  font: 400 10px / 1 var(--sans);
   fill: var(--muted);
 }
-.mk-ring-text {
-  font: 400 7.4px / 1 var(--font);
+.mk-unit-sub {
+  font: 400 8px / 1 var(--sans);
+  fill: var(--muted);
+  letter-spacing: 0.08em;
+}
+.mk-rule {
+  stroke: var(--line);
+  stroke-width: 0.75;
+}
+.mk-rule-long {
+  stroke-opacity: 0.7;
+}
+.mk-dot {
+  fill: var(--acc);
+}
+.mk-date {
+  font: 400 7.5px / 1 var(--font);
+  fill: var(--muted);
+  letter-spacing: 0.22em;
+}
+.mk-date-sm {
+  font-size: 7px;
+  letter-spacing: 0.14em;
+}
+.mk-serial {
+  font: 400 6.5px / 1 var(--sans);
+  fill: var(--faint);
+  letter-spacing: 0.1em;
+}
+.mk-vert {
+  font: 400 11.5px / 1 var(--font);
+  fill: var(--ink);
+}
+.mk-line {
+  font: 400 9.5px / 1 var(--font);
   fill: var(--ink2);
   letter-spacing: 0.16em;
 }
-.mk-cap {
-  font: 400 7.5px / 1 var(--font);
-  fill: var(--ink2);
-  letter-spacing: 0.08em;
+.mk-line-num {
+  font: 500 14px / 1 var(--display);
+  fill: var(--ink);
+  letter-spacing: 0;
 }
-.mk-cap.mk-left {
-  letter-spacing: 0.04em;
-}
-.mk-date {
-  font: 400 6.5px / 1 var(--sans);
+.mk-line-unit {
+  font: 400 8.5px / 1 var(--sans);
   fill: var(--muted);
-  letter-spacing: 0.12em;
-}
-.mk-glyph {
-  font: 500 28px / 1 var(--font);
-  fill: var(--acc-ink);
+  letter-spacing: 0.04em;
 }
 
 /* board 原型 */
@@ -483,8 +517,9 @@
   color: var(--ink2);
 }
 .bd-items li b {
-  font: 500 var(--t-lead) / 1 var(--display);
+  font: 600 var(--t-lead) / 1 var(--font);
   color: var(--ink);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 .bd-items li b small {
@@ -498,9 +533,9 @@
   gap: var(--s3);
 }
 .bd-hero b {
-  font: 500 var(--t-hero) / 1 var(--display);
-  font-variation-settings: 'opsz' 72;
-  letter-spacing: -0.01em;
+  font: 600 var(--t-hero) / 1 var(--font);
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
 }
 .bd-hero b small {
   font: 400 var(--t-label) / 1 var(--sans);
@@ -539,7 +574,8 @@
   transform-origin: 50% 50%;
 }
 .bd-ring b {
-  font: 500 var(--t-display) / 1 var(--display);
+  font: 600 var(--t-display) / 1 var(--font);
+  letter-spacing: -0.02em;
 }
 .bd-ring b small {
   font: 400 var(--t-label) / 1 var(--sans);
@@ -559,15 +595,21 @@
   font-size: var(--t-small);
   color: var(--acc-ink);
 }
-.bd-mark {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
+.bd-plaque {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
-.bd-mark p {
-  font-size: var(--t-label);
+.bd-plaque .mk {
+  width: 100%;
+}
+.bd-plaque p {
+  margin-top: var(--s3);
+  font-size: var(--t-small);
   line-height: 1.7;
-  color: var(--ink2);
+  color: var(--muted);
+  text-align: center;
 }
 .door {
   position: absolute;
@@ -602,34 +644,6 @@
   fill: var(--g2);
   stroke: var(--surf);
   stroke-width: 2;
-}
-
-/* 作息带 */
-.sg-rhythm {
-  width: 100%;
-  max-width: 520px;
-}
-.sg-rhythm .axis {
-  font: 400 9px / 1 var(--sans);
-  fill: var(--faint);
-}
-.sg-rhythm .day {
-  font: 400 10px / 1 var(--font);
-  fill: var(--muted);
-}
-.sg-rhythm .band {
-  fill: url(#rh-g);
-  opacity: 0.85;
-}
-.sg-rhythm .band.rest {
-  opacity: 0.35;
-}
-.sg-rhythm .grid {
-  stroke: var(--line);
-  stroke-width: 0.5;
-}
-.sg-rhythm .train {
-  fill: var(--ink);
 }
 
 /* 动效 */

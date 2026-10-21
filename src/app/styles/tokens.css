@@ -48,27 +48,23 @@ html[data-theme='gold'] {
   --wash-bg: linear-gradient(115deg, rgba(205, 174, 112, 0.15), rgba(176, 141, 79, 0.08));
 }
 html[data-theme='pearl'] {
-  --bg: #fafafb;
+  /* 珍珠母与铂金：冷白、银灰、一点点极淡的虹彩，不再有紫蓝。 */
+  --bg: #fbfbfc;
   --surf: #ffffff;
-  --ink: #18181b;
-  --ink2: #3f3f46;
-  --muted: #71717a;
-  --faint: #a9a9b1;
-  --line: #e4e4e8;
-  --line2: #efeff2;
-  --acc: #6f78d3;
-  --acc-ink: #5560c0;
-  --g0: #8a7bd8;
-  --g1: #5b9bd5;
-  --g2: #9aa7b8;
-  --wash: rgba(111, 120, 211, 0.11);
-  --wash2: rgba(111, 120, 211, 0.06);
-  --wash-bg: linear-gradient(
-    115deg,
-    rgba(138, 123, 216, 0.12),
-    rgba(91, 155, 213, 0.09) 55%,
-    rgba(154, 167, 184, 0.08)
-  );
+  --ink: #15161a;
+  --ink2: #3b3e45;
+  --muted: #70757e;
+  --faint: #a8adb5;
+  --line: #e3e5e9;
+  --line2: #eef0f3;
+  --acc: #8e97a3;
+  --acc-ink: #5b6573;
+  --g0: #c9d0d7;
+  --g1: #8e97a3;
+  --g2: #6b7482;
+  --wash: rgba(110, 119, 132, 0.1);
+  --wash2: rgba(110, 119, 132, 0.055);
+  --wash-bg: linear-gradient(115deg, rgba(201, 208, 215, 0.26), rgba(142, 151, 163, 0.1));
 }
 @media (prefers-color-scheme: dark) {
   html[data-theme='ink'] {
@@ -108,27 +104,22 @@ html[data-theme='pearl'] {
     --wash-bg: linear-gradient(115deg, rgba(228, 200, 142, 0.13), rgba(210, 176, 114, 0.07));
   }
   html[data-theme='pearl'] {
-    --bg: #111113;
-    --surf: #18181b;
-    --ink: #ededf0;
-    --ink2: #c4c4cc;
-    --muted: #85858f;
-    --faint: #4f4f58;
-    --line: #27272b;
-    --line2: #1d1d20;
-    --acc: #8f96e8;
-    --acc-ink: #a9aef0;
-    --g0: #a595f0;
-    --g1: #74b2ea;
-    --g2: #b4bfce;
-    --wash: rgba(143, 150, 232, 0.14);
-    --wash2: rgba(143, 150, 232, 0.07);
-    --wash-bg: linear-gradient(
-      115deg,
-      rgba(165, 149, 240, 0.13),
-      rgba(116, 178, 234, 0.09) 55%,
-      rgba(180, 191, 206, 0.07)
-    );
+    --bg: #111214;
+    --surf: #191b1e;
+    --ink: #ecedef;
+    --ink2: #c3c6cb;
+    --muted: #858a92;
+    --faint: #4e535b;
+    --line: #292c31;
+    --line2: #1f2226;
+    --acc: #a9b1bb;
+    --acc-ink: #bfc6cf;
+    --g0: #d6dce3;
+    --g1: #a9b1bb;
+    --g2: #7f8792;
+    --wash: rgba(169, 177, 187, 0.12);
+    --wash2: rgba(169, 177, 187, 0.06);
+    --wash-bg: linear-gradient(115deg, rgba(214, 220, 227, 0.12), rgba(169, 177, 187, 0.06));
   }
 }
 
