@@ -19,7 +19,7 @@ import {
   type Facts,
   exerciseById,
 } from '@lowkkey/protocol';
-import { addDays, briefGuide, getBrief, localToday, mergeCuration, themeState, weekday } from '@lowkkey/core';
+import { addDays, briefGuide, getBrief, localToday, medals, mergeCuration, themeState, weekday } from '@lowkkey/core';
 import { notesSummary } from './notes.ts';
 import { onboarding } from './lifecycle.ts';
 import { StoreError } from './account.ts';
@@ -80,12 +80,14 @@ async function snapshot(db: D1Database, owner: string, now = new Date()) {
   return { facts, revision: Number(rows[0].results[0].data_revision), today, timezone };
 }
 export async function state(db: D1Database, owner: string, now = new Date()): Promise<StateResponse> {
-  const { facts, today, timezone } = await snapshot(db, owner, now);
+  const [{ facts, today, timezone }, notes] = await Promise.all([snapshot(db, owner, now), notesSummary(db, owner)]);
   return {
     ...facts,
     accountId: owner,
     protocol: PROTOCOL_VERSION,
     today,
+    notes,
+    medals: medals(facts, today, notes),
     timezone,
     theme_state: themeState(facts, today),
   };
@@ -105,7 +107,8 @@ export async function brief(
     ...getBrief(facts, now.toISOString(), sessions, facts.timezone),
     timezone: facts.timezone,
     permissions,
-    notes: await notesSummary(db, owner),
+    notes: facts.notes,
+    medals: facts.medals,
     guide,
     onboarding: {
       completed: !!setup.completedAt || setup.hasContent,

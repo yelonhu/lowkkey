@@ -264,7 +264,21 @@ export const NotesSummary = z.strictObject({
   count: z.number().int().nonnegative(),
   latest_date: LocalDate.nullable(),
   updated_at: Instant.nullable(),
+  first_date: LocalDate.nullable().optional(),
+  date_30: LocalDate.nullable().optional(),
 });
+export type NotesSummary = z.infer<typeof NotesSummary>;
+// A medal is a milestone derived from facts; date is the day it was first met, null while waiting.
+export const Medal = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  how: z.string(),
+  lore: z.string(),
+  motif: z.string(),
+  unit: z.string().optional(),
+  date: LocalDate.nullable(),
+});
+export type Medal = z.infer<typeof Medal>;
 
 // The keeper's stateful to-do list. Computed from saved facts, never from the conversation.
 export const GuideMissing = z.enum([
@@ -301,6 +315,7 @@ export const Brief = z.strictObject({
     .object({ completed: z.boolean(), entry: z.enum(['start', 'existing']).nullable(), next_step: z.string() })
     .optional(),
   guide: BriefGuide.optional(),
+  medals: z.array(Medal).optional(),
   session: TrainingSession.nullable().optional(),
   today: z.object({ date: LocalDate, weekday: z.number().int() }),
   next: z.object({ date: LocalDate, rel: z.string(), title: z.string() }).nullable(),

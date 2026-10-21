@@ -1,4 +1,4 @@
-import type { Facts, Pick } from '@lowkkey/protocol';
+import type { Facts, Pick, StateResponse } from '@lowkkey/protocol';
 import { STRENGTH_EXERCISES } from '@lowkkey/protocol/catalog';
 import { LB_PER_KG } from '@lowkkey/protocol/constants';
 import {
@@ -23,7 +23,9 @@ import {
   weekday,
 } from '@lowkkey/core';
 import { Equipment } from '../ui/Graphics.tsx';
+import { Medal } from '../ui/Medal.tsx';
 import { StrengthChart, WeightChart } from '../ui/TrendChart.tsx';
+import { useState } from 'react';
 function ContactSheet({ facts, today, weekOnly }: { facts: Facts; today: string; weekOnly?: string }) {
   const scored = scoredSessions(facts),
     by = new Map(scored.map(s => [s.date, s])),
@@ -155,13 +157,48 @@ function PickCard({ pick, facts, today }: { pick: Pick; facts: Facts; today: str
     </article>
   );
 }
+/** Every medal, earned with its date or waiting as an outline; one tap tells the story. */
+function MedalWall({ medals }: { medals: StateResponse['medals'] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const earned = medals.filter(m => m.date).length;
+  const chosen = medals.find(m => m.id === open);
+  return (
+    <section className="sec" id="recap-medals">
+      <div className="sh">
+        <h2>medals</h2>
+        <span>
+          {earned} / {medals.length}
+        </span>
+      </div>
+      <div className="wall" role="list">
+        {medals.map(m => (
+          <button
+            key={m.id}
+            role="listitem"
+            className="wall-item"
+            aria-pressed={open === m.id}
+            aria-label={m.name + (m.date ? '，' + m.date : '，未获得')}
+            onClick={() => setOpen(open === m.id ? null : m.id)}
+          >
+            <Medal motif={m.motif} unit={m.unit} name={m.name} date={m.date ?? undefined} locked={!m.date} size={84} />
+          </button>
+        ))}
+      </div>
+      {chosen && (
+        <p className="cl sm wall-story" key={chosen.id}>
+          {chosen.how}。{chosen.lore}
+        </p>
+      )}
+    </section>
+  );
+}
 export function RecapView({
   facts,
   today,
   focus,
   setFocus,
 }: {
-  facts: Facts;
+  facts: StateResponse;
   today: string;
   focus: string | null;
   setFocus: (ex: string) => void;
@@ -393,6 +430,7 @@ export function RecapView({
           </div>
         </section>
       )}
+      {facts.medals.length > 0 && <MedalWall medals={facts.medals} />}
       {!facts.sessions.length && !letter && (
         <div className="empty">
           <p className="cl">还没有周信。记下第一次训练之后，这里会出现你的变化和 AI 写给你的信。</p>

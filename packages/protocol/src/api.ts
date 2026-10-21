@@ -16,6 +16,8 @@ import {
   ConsentInput,
   ConsentStatus,
   PrivacyInfo,
+  Medal,
+  NotesSummary,
 } from './entities.ts';
 import { Id, Instant, LocalDate, PROTOCOL_VERSION } from './primitives.ts';
 export const Scope = z.enum(['read', 'write', 'notes:write']);
@@ -26,6 +28,8 @@ export const StateResponse = Facts.extend({
   today: LocalDate,
   timezone: z.string().default('America/Chicago'),
   theme_state: ThemeState,
+  notes: NotesSummary.optional(),
+  medals: z.array(Medal).default([]),
 });
 export type StateResponse = z.infer<typeof StateResponse>;
 export const ApiError = z.object({ error: z.object({ code: z.string(), fields: z.array(z.unknown()).optional() }) });

@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { DailyNote, LocalDate, NoteInput, ReadNotesInput, type NotesPage } from '@lowkkey/protocol';
+import { DailyNote, LocalDate, NoteInput, ReadNotesInput, type NotesPage, type NotesSummary } from '@lowkkey/protocol';
 import { StoreError } from './account.ts';
 
 export async function readNote(db: D1Database, owner: string, date: string): Promise<DailyNote> {
@@ -64,14 +64,26 @@ export async function saveNote(db: D1Database, owner: string, date: string, valu
   if (result) return DailyNote.parse(result);
   throw new StoreError('note_conflict', 409);
 }
-export async function notesSummary(db: D1Database, owner: string) {
-  const row = await db
-    .prepare(
-      "SELECT count(*) AS count,max(date) AS latest_date,max(updated_at) AS updated_at FROM daily_notes WHERE owner_id=? AND text<>''",
-    )
-    .bind(owner)
-    .first<{ count: number; latest_date: string | null; updated_at: string | null }>();
-  return row!;
+export async function notesSummary(db: D1Database, owner: string): Promise<NotesSummary> {
+  const [row, thirtieth] = await Promise.all([
+    db
+      .prepare(
+        "SELECT count(*) AS count,min(date) AS first_date,max(date) AS latest_date,max(updated_at) AS updated_at FROM daily_notes WHERE owner_id=? AND text<>''",
+      )
+      .bind(owner)
+      .first<{ count: number; first_date: string | null; latest_date: string | null; updated_at: string | null }>(),
+    db
+      .prepare("SELECT date FROM daily_notes WHERE owner_id=? AND text<>'' ORDER BY date LIMIT 1 OFFSET 29")
+      .bind(owner)
+      .first<{ date: string }>(),
+  ]);
+  return {
+    count: row!.count,
+    latest_date: row!.latest_date,
+    updated_at: row!.updated_at,
+    first_date: row!.first_date,
+    date_30: thirtieth?.date ?? null,
+  };
 }
 export async function exportNotes(db: D1Database, owner: string) {
   return (

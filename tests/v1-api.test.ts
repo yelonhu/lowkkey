@@ -219,7 +219,9 @@ describe('daily notes', () => {
     expect(note.revision).toBe(1);
     expect(await (await call('/v1/notes/2026-10-12', 'PUT', 'two', input)).json()).toEqual(note);
     expect(((await (await call('/v1/notes', 'GET', 'one')).json()) as { notes: unknown[] }).notes).toEqual([]);
-    expect(((await (await call('/v1/state', 'GET', 'two')).json()) as Record<string, unknown>).notes).toBeUndefined();
+    const stateTwo = (await (await call('/v1/state', 'GET', 'two')).json()) as { notes: { count: number } };
+    expect(stateTwo.notes.count).toBe(1);
+    expect(JSON.stringify(stateTwo)).not.toContain('"text"');
     expect(((await (await call('/v1/onboarding', 'GET', 'two')).json()) as { hasContent: boolean }).hasContent).toBe(
       true,
     );

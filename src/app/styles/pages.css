@@ -1029,3 +1029,27 @@ button:disabled {
   font-size: 12px;
   z-index: 22;
 }
+
+/* 成就墙：每枚奖章是一个可按的格子，按下讲它的故事。 */
+.wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 22px 8px;
+  justify-items: center;
+}
+.wall-item {
+  display: block;
+  padding: 6px 4px;
+  border-radius: 12px;
+  transition: background-color 0.2s;
+}
+.wall-item[aria-pressed='true'] {
+  background: var(--wash2);
+}
+.wall-item .medal b {
+  font-size: 12px;
+}
+.wall-story {
+  margin-top: 16px;
+  animation: quiet-feedback 0.2s ease-out;
+}

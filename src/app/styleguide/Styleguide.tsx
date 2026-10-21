@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { themeNames } from '../shell/theme.ts';
 import { Medal } from '../ui/Medal.tsx';
-import { ACHIEVEMENTS } from '../ui/achievements.ts';
+import { ACHIEVEMENTS } from '@lowkkey/core';
 import './styleguide.css';
 
 type Theme = keyof typeof themeNames;
