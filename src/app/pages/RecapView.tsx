@@ -183,6 +183,7 @@ function MedalWall({ medals }: { medals: StateResponse['medals'] }) {
           >
             <Medal
               motif={m.motif}
+              drawing={m.drawing}
               unit={m.unit}
               name={m.name}
               date={m.date ?? undefined}
@@ -204,6 +205,7 @@ function MedalWall({ medals }: { medals: StateResponse['medals'] }) {
               medalImage({
                 name: chosen.name,
                 motif: chosen.motif,
+                drawing: chosen.drawing,
                 unit: chosen.unit,
                 date: chosen.date,
                 occasion: chosen.occasion,

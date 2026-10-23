@@ -60,6 +60,15 @@ const call = (path: string, method = 'GET', user = 'one', body?: unknown, extra:
 const set = { ex: 'bench_press', load: 100, unit: 'lb', kind: 'external', reps: 8 };
 const item = { ex: 'bench_press', load: 100, unit: 'lb', loadKind: 'external', sets: 3, min: 8, max: 10 };
 describe('v5 account-isolated transactional storage', () => {
+  it('remembers when the pod was last opened, at most once per ten minutes', async () => {
+    expect((await store.brief(db, owner, {}, now)).presence).toEqual({ last_opened_at: null });
+    expect((await call('/v1/state')).status).toBe(200);
+    const first = (await store.brief(db, owner, {}, now)).presence?.last_opened_at;
+    expect(typeof first).toBe('string');
+    expect((await call('/v1/state')).status).toBe(200);
+    expect((await store.brief(db, owner, {}, now)).presence?.last_opened_at).toBe(first);
+    expect((await store.brief(db, other, {}, now)).presence).toEqual({ last_opened_at: null });
+  });
   it('keeps push subscriptions per device, only once the server holds a key', async () => {
     expect(await (await call('/v1/push')).json()).toEqual({ key: null, subscriptions: 0 });
     const subscription = {

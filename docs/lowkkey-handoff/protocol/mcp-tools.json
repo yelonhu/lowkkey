@@ -3,7 +3,7 @@
     {
       "name": "get_brief",
       "title": "读取简报",
-      "description": "何时用：每次相关对话开始，以及每次写入之后。返回账户时区的 today、实际权限、guide（stage/missing/next_step，档案现在缺什么、下一步最值得做什么）、计划、训练背景、体重读数、主项力量、各动作最近两次、本周事实和当前策展；所有派生数值已由代码计算，直接引用。默认最近6次训练，sessions 可选0–30；修改旧训练时传 session_date 读取该日完整组，未找到返回 session:null。notes 只给随手记索引，原文按需调用 read_notes。",
+      "description": "何时用：每次相关对话开始，以及每次写入之后。返回账户时区的 today、实际权限、guide（stage/missing/next_step，档案现在缺什么、下一步最值得做什么）、presence.last_opened_at（用户上次打开舱的时间）、计划、训练背景、这几天的背景 contexts、体重读数、主项力量、各动作最近两次、本周事实、奖章清单（不含故事正文）和当前策展；所有派生数值已由代码计算，直接引用。每个写入工具的返回也带 guide，写完不必再读一次。默认最近6次训练，sessions 可选0–30；修改旧训练时传 session_date 读取该日完整组，未找到返回 session:null。notes 只给随手记索引，原文按需调用 read_notes。",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -167,6 +167,27 @@
                 ],
                 "additionalProperties": false
               },
+              "presence": {
+                "type": "object",
+                "properties": {
+                  "last_opened_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "last_opened_at"
+                ],
+                "additionalProperties": false
+              },
               "medals": {
                 "type": "array",
                 "items": {
@@ -196,20 +217,35 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "drawing": {
+                      "type": "object",
+                      "properties": {
+                        "d": {
+                          "type": "string",
+                          "minLength": 8,
+                          "maxLength": 2400,
+                          "pattern": "^[Mm][0-9 ,.\\-MmLlHhVvCcSsQqTtAaZz\\n]*$"
+                        },
+                        "style": {
+                          "default": "line",
+                          "type": "string",
+                          "enum": [
+                            "line",
+                            "solid"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "d",
+                        "style"
+                      ],
+                      "additionalProperties": false
+                    },
                     "unit": {
                       "type": "string"
                     },
                     "occasion": {
                       "type": "string"
-                    },
-                    "story": {
-                      "minItems": 1,
-                      "maxItems": 3,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      }
                     },
                     "updated_at": {
                       "type": "string",
@@ -221,8 +257,6 @@
                     "key",
                     "date",
                     "name",
-                    "motif",
-                    "story",
                     "updated_at"
                   ],
                   "additionalProperties": false
@@ -2116,6 +2150,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -2352,6 +2458,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -2575,6 +2753,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -2823,6 +3073,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -3104,6 +3426,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -3279,6 +3673,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -3637,6 +4103,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -3998,7 +4536,7 @@
     {
       "name": "award",
       "title": "授予一枚奖章",
-      "description": "何时用：用户真的做到了什么值得记住的事——第一次训练、第一次挂上一片、一个纪录、停滞后的突破、连续几周没落、第一封信、一段艰难的日子还是练了。一周最多一两枚，宁缺毋滥。画到 recap 页末尾的成就墙，本周新得的会出现在首页。key 是稳定的小写标识（同 key 覆盖）；name 是你起的名字，雅一点，二到八个字，不用「第一次」「成就」这类说明文字；motif 是章上唯一的图样：数字是重点时用数字（135、4、100），否则一个字；occasion 一句话说明因何而得；story 是一到三段很短的小故事，题材随意——一个片段、一段小说、她和他、一个清晨——不必和训练有关，但要配得上这个时刻。date 为 null 表示一枚和用户约定、尚未达成的奖章，达成时补上日期并写故事。全部文字不用 emoji 或感叹号。",
+      "description": "何时用：用户真的做到了什么值得记住的事——第一次训练、第一次挂上一片、一个纪录、停滞后的突破、连续几周没落、第一封信、一段艰难的日子还是练了。一周最多一两枚，宁缺毋滥。画到 recap 页末尾的成就墙，本周新得的会出现在首页。key 是稳定的小写标识（同 key 覆盖）；name 是你起的名字，雅一点，二到八个字，不用「第一次」「成就」这类说明文字；章上的图样由你画：drawing.d 是 100×100 画布上的 SVG path 数据（只用 M L H V C S Q T A Z），像印章上的纹样——一只猫、一片叶、一轮月、一副杠铃——线条简洁、形体居中、留白，一笔到底的线描最好看，style 为 line（线描，默认）或 solid（剪影）；画布会自动居中缩放，所以只管形状。数字是重点时可以不画，用 motif 写数字（135、4、100）；汉字只是退而求其次。已有的章若只有一个字，可用同一个 key 重新 award 补上 drawing。occasion 一句话说明因何而得；story 是一到三段很短的小故事，题材随意——一个片段、一段小说、她和他、一个清晨——不必和训练有关，但要配得上这个时刻。date 为 null 表示一枚和用户约定、尚未达成的奖章，达成时补上日期并写故事。全部文字不用 emoji 或感叹号。",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -4027,6 +4565,29 @@
             "type": "string",
             "minLength": 1
           },
+          "drawing": {
+            "type": "object",
+            "properties": {
+              "d": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 2400,
+                "pattern": "^[Mm][0-9 ,.\\-MmLlHhVvCcSsQqTtAaZz\\n]*$"
+              },
+              "style": {
+                "default": "line",
+                "type": "string",
+                "enum": [
+                  "line",
+                  "solid"
+                ]
+              }
+            },
+            "required": [
+              "d"
+            ],
+            "additionalProperties": false
+          },
           "unit": {
             "type": "string"
           },
@@ -4047,7 +4608,6 @@
           "key",
           "date",
           "name",
-          "motif",
           "story"
         ],
         "additionalProperties": false
@@ -4083,6 +4643,30 @@
                 "type": "string",
                 "minLength": 1
               },
+              "drawing": {
+                "type": "object",
+                "properties": {
+                  "d": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 2400,
+                    "pattern": "^[Mm][0-9 ,.\\-MmLlHhVvCcSsQqTtAaZz\\n]*$"
+                  },
+                  "style": {
+                    "default": "line",
+                    "type": "string",
+                    "enum": [
+                      "line",
+                      "solid"
+                    ]
+                  }
+                },
+                "required": [
+                  "d",
+                  "style"
+                ],
+                "additionalProperties": false
+              },
               "unit": {
                 "type": "string"
               },
@@ -4108,7 +4692,6 @@
               "key",
               "date",
               "name",
-              "motif",
               "story",
               "updated_at"
             ],
@@ -4117,6 +4700,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -4271,6 +4926,30 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "drawing": {
+                        "type": "object",
+                        "properties": {
+                          "d": {
+                            "type": "string",
+                            "minLength": 8,
+                            "maxLength": 2400,
+                            "pattern": "^[Mm][0-9 ,.\\-MmLlHhVvCcSsQqTtAaZz\\n]*$"
+                          },
+                          "style": {
+                            "default": "line",
+                            "type": "string",
+                            "enum": [
+                              "line",
+                              "solid"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "d",
+                          "style"
+                        ],
+                        "additionalProperties": false
+                      },
                       "unit": {
                         "type": "string"
                       },
@@ -4296,7 +4975,6 @@
                       "key",
                       "date",
                       "name",
-                      "motif",
                       "story",
                       "updated_at"
                     ],
@@ -4314,6 +4992,78 @@
           "view_url": {
             "type": "string",
             "format": "uri"
+          },
+          "guide": {
+            "type": "object",
+            "properties": {
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "empty",
+                  "setup",
+                  "active"
+                ]
+              },
+              "next_step": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "training_context",
+                    "plan",
+                    "next_note",
+                    "session",
+                    "weight",
+                    "week_letter",
+                    "body_note",
+                    "medal",
+                    "board"
+                  ]
+                }
+              },
+              "week": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "done": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "planned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "start",
+                  "index",
+                  "done",
+                  "planned"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "stage",
+              "next_step",
+              "missing",
+              "week"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

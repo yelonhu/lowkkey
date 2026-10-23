@@ -625,6 +625,27 @@
             ],
             "additionalProperties": false
           },
+          "presence": {
+            "type": "object",
+            "properties": {
+              "last_opened_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "last_opened_at"
+            ],
+            "additionalProperties": false
+          },
           "medals": {
             "type": "array",
             "items": {
@@ -654,20 +675,35 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "drawing": {
+                  "type": "object",
+                  "properties": {
+                    "d": {
+                      "type": "string",
+                      "minLength": 8,
+                      "maxLength": 2400,
+                      "pattern": "^[Mm][0-9 ,.\\-MmLlHhVvCcSsQqTtAaZz\\n]*$"
+                    },
+                    "style": {
+                      "default": "line",
+                      "type": "string",
+                      "enum": [
+                        "line",
+                        "solid"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "d",
+                    "style"
+                  ],
+                  "additionalProperties": false
+                },
                 "unit": {
                   "type": "string"
                 },
                 "occasion": {
                   "type": "string"
-                },
-                "story": {
-                  "minItems": 1,
-                  "maxItems": 3,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
                 },
                 "updated_at": {
                   "type": "string",
@@ -679,8 +715,6 @@
                 "key",
                 "date",
                 "name",
-                "motif",
-                "story",
                 "updated_at"
               ],
               "additionalProperties": false
@@ -2069,6 +2103,30 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "drawing": {
+                  "type": "object",
+                  "properties": {
+                    "d": {
+                      "type": "string",
+                      "minLength": 8,
+                      "maxLength": 2400,
+                      "pattern": "^[Mm][0-9 ,.\\-MmLlHhVvCcSsQqTtAaZz\\n]*$"
+                    },
+                    "style": {
+                      "default": "line",
+                      "type": "string",
+                      "enum": [
+                        "line",
+                        "solid"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "d",
+                    "style"
+                  ],
+                  "additionalProperties": false
+                },
                 "unit": {
                   "type": "string"
                 },
@@ -2094,7 +2152,6 @@
                 "key",
                 "date",
                 "name",
-                "motif",
                 "story",
                 "updated_at"
               ],

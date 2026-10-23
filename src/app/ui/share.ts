@@ -1,4 +1,4 @@
-import { cnDate } from './Medal.tsx';
+import { cnDate, fitPath, type Drawing } from './Medal.tsx';
 
 /**
  * 分享成图. A medal or a letter drawn onto paper the size of a phone screen (1080 wide), in the
@@ -116,7 +116,7 @@ function drawMedal(
   x: number,
   y: number,
   R: number,
-  m: { motif: string; unit?: string; locked: boolean },
+  m: { motif?: string; drawing?: Drawing; unit?: string; locked: boolean },
 ) {
   const u = R / 57;
   const metal = ctx.createLinearGradient(x - R, y - R, x + R, y + R);
@@ -167,21 +167,59 @@ function drawMedal(
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  const numeral = /^[\d.]+$/.test(m.motif),
-    size = (numeral ? (m.motif.length <= 2 ? 42 : m.motif.length === 3 ? 36 : 28) : 40) * u;
-  ctx.font = numeral ? `500 ${size}px ${tok.display}` : `600 ${size}px ${tok.font}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = m.locked ? tok.faint : metal;
-  const baseline = y + size * (numeral ? 0.34 : 0.36);
-  if (!m.locked) {
-    ctx.strokeStyle = tok.ink;
-    ctx.globalAlpha = 0.4;
-    ctx.lineWidth = 0.3 * u;
-    ctx.strokeText(m.motif, x, baseline);
-    ctx.globalAlpha = 1;
+  if (m.drawing) {
+    // The drawing in its own 100-unit space, fitted exactly as the SVG medal fits it.
+    const fit = fitPath(m.drawing.d),
+      solid = m.drawing.style === 'solid',
+      path = new Path2D(m.drawing.d);
+    ctx.save();
+    ctx.translate(x - 60 * u, y - 60 * u);
+    ctx.scale(u, u);
+    ctx.translate(fit.tx, fit.ty);
+    ctx.scale(fit.s, fit.s);
+    const sheen = ctx.createLinearGradient(fit.box.x, fit.box.y, fit.box.x + fit.box.w, fit.box.y + fit.box.h);
+    sheen.addColorStop(0, tok.g0);
+    sheen.addColorStop(0.5, tok.g1);
+    sheen.addColorStop(0.78, tok.g0);
+    sheen.addColorStop(1, tok.g1);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (m.locked) {
+      ctx.strokeStyle = tok.faint;
+      ctx.lineWidth = 1.7 / fit.s;
+      ctx.stroke(path);
+    } else if (solid) {
+      ctx.fillStyle = sheen;
+      ctx.fill(path);
+      ctx.strokeStyle = tok.ink;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 0.5 / fit.s;
+      ctx.stroke(path);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.strokeStyle = sheen;
+      ctx.lineWidth = 1.7 / fit.s;
+      ctx.stroke(path);
+    }
+    ctx.restore();
+  } else {
+    const text = m.motif ?? '',
+      numeral = /^[\d.]+$/.test(text),
+      size = (numeral ? (text.length <= 2 ? 42 : text.length === 3 ? 36 : 28) : 40) * u;
+    ctx.font = numeral ? `500 ${size}px ${tok.display}` : `600 ${size}px ${tok.font}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = m.locked ? tok.faint : metal;
+    const baseline = y + size * (numeral ? 0.34 : 0.36);
+    if (!m.locked) {
+      ctx.strokeStyle = tok.ink;
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 0.3 * u;
+      ctx.strokeText(text, x, baseline);
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillText(text, x, baseline);
   }
-  ctx.fillText(m.motif, x, baseline);
   if (m.unit) {
     ctx.font = `400 ${8 * u}px ${tok.sans}`;
     ctx.fillStyle = tok.muted;
@@ -206,7 +244,8 @@ const blobOf = (canvas: HTMLCanvasElement) =>
 
 export async function medalImage(m: {
   name: string;
-  motif: string;
+  motif?: string;
+  drawing?: Drawing;
   unit?: string;
   date?: string | null;
   occasion?: string;
@@ -219,7 +258,7 @@ export async function medalImage(m: {
   const storyEnd = paragraphs(measure, m.story, 160, 900, 760, 58, 22, false);
   const height = Math.max(1350, storyEnd + 180);
   const { canvas, ctx } = paper(height, tok);
-  drawMedal(ctx, tok, W / 2, 400, 200, { motif: m.motif, unit: m.unit, locked: !m.date });
+  drawMedal(ctx, tok, W / 2, 400, 200, { motif: m.motif, drawing: m.drawing, unit: m.unit, locked: !m.date });
   ctx.textAlign = 'center';
   ctx.font = `600 52px ${tok.font}`;
   ctx.fillStyle = m.date ? tok.ink : tok.faint;

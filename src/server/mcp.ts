@@ -20,8 +20,8 @@ const registeredTools = MCP_TOOLS.map(tool => ({
   output: mcpOutput(tool.name),
 }));
 const rawInput = z.looseObject({});
-const response = (value: unknown, view_url?: string) => {
-  const structuredContent = { result: value, ...(view_url ? { view_url } : {}) };
+const response = (value: unknown, view_url?: string, guide?: unknown) => {
+  const structuredContent = { result: value, ...(view_url ? { view_url } : {}), ...(guide ? { guide } : {}) };
   return { content: [{ type: 'text' as const, text: JSON.stringify(structuredContent) }], structuredContent };
 };
 /** `notify` receives the one or two things worth telling the device: a letter written, a medal earned. */
@@ -31,13 +31,18 @@ export async function mcpResponse(
   principal: Principal,
   notify?: (notice: Notice) => void,
 ): Promise<Response> {
+  const permissions = principal.scopes.filter(
+    (s): s is 'read' | 'write' | 'notes:write' => s === 'read' || s === 'write' || s === 'notes:write',
+  );
   const success = async (name: string, value: unknown, url?: string, activates = false) => {
     try {
       await toolSuccess(db, principal.ownerId, principal.clientId, name, url, activates);
     } catch {
       console.error('MCP_PROGRESS_FAILED');
     }
-    return response(value, url);
+    // A write answers with the guide too, so the keeper sees its next step without another read.
+    const guide = url ? await store.guideFor(db, principal.ownerId, permissions).catch(() => undefined) : undefined;
+    return response(value, url, guide);
   };
   const origin = new URL(request.url).origin;
   const server = new McpServer(
@@ -169,18 +174,7 @@ export async function mcpResponse(
             case 'read_notes':
               return success(tool.name, await readNotes(db, principal.ownerId, args));
             case 'get_brief':
-              return success(
-                tool.name,
-                await store.brief(
-                  db,
-                  principal.ownerId,
-                  args,
-                  new Date(),
-                  principal.scopes.filter(
-                    (s): s is 'read' | 'write' | 'notes:write' => s === 'read' || s === 'write' || s === 'notes:write',
-                  ),
-                ),
-              );
+              return success(tool.name, await store.brief(db, principal.ownerId, args, new Date(), permissions));
           }
         } catch (cause) {
           const error =

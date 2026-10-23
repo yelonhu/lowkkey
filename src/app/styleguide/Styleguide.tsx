@@ -8,8 +8,25 @@ const themes = Object.keys(themeNames) as Theme[];
 const displayFont =
   'https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600&family=Cormorant+Garamond:wght@500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Serif&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap';
 
-// Medals are written by the AI: a name of its choosing, one motif, a short story. These are samples of the form.
-const sampleMedals = [
+// Medals are written by the AI: a name of its choosing, a picture it drew, a short story. These are samples of the form.
+const sampleMedals: {
+  key: string;
+  motif?: string;
+  drawing?: { d: string; style?: 'line' | 'solid' };
+  unit?: string;
+  name: string;
+  date: string | null;
+  story: string[];
+}[] = [
+  {
+    key: 'cat',
+    drawing: {
+      d: 'M28 30 L38 44 C44 40 56 40 62 44 L72 30 L72 56 C72 72 60 82 50 82 C40 82 28 72 28 56 Z M41 58 L41 59 M59 58 L59 59 M48 66 L52 66 L50 69 Z M18 64 L36 66 M18 72 L36 70 M82 64 L64 66 M82 72 L64 70',
+    },
+    name: '予爱',
+    date: '2026-10-21',
+    story: ['机器替我托着一只猫，剩下的都是我自己。'],
+  },
   {
     key: 'first-plate',
     motif: '135',
@@ -166,7 +183,7 @@ function MotionDemo() {
   );
 }
 
-export function Styleguide() {
+export default function Styleguide() {
   useDisplayFont();
   const [theme, setTheme] = useState<Theme>((document.documentElement.dataset.theme as Theme) || 'ink');
   useEffect(() => {
@@ -381,6 +398,7 @@ export function Styleguide() {
             <Medal
               key={m.key}
               motif={m.motif}
+              drawing={m.drawing}
               unit={m.unit}
               name={m.name}
               date={m.date ?? undefined}
@@ -389,7 +407,8 @@ export function Styleguide() {
           ))}
         </div>
         <p className="sg-note">
-          奖章由 AI 授予：名字由它起，雅一点；章上只有一个图样；配一到三段很短的小故事，题材随意。date
+          奖章由 AI 授予：名字由它起，雅一点；章上的图样也由它画——一段 SVG
+          path，线描或剪影，自动居中缩放；数字是重点时写数字。配一到三段很短的小故事，题材随意。date
           为空的是约定好、还在等的一枚。金属随主题：水墨是铂金，鎏金是金。
         </p>
       </section>

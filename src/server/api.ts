@@ -119,7 +119,11 @@ export function createApi(options: { verifyIdentity?: IdentityVerifier } = {}) {
       await notes.saveNote(c.env.DB, c.get('ownerId'), c.req.param('date'), await jsonBody(c.req.raw, 128 * 1024)),
     ),
   );
-  app.get('/v1/state', async c => c.json(await store.state(c.env.DB, c.get('ownerId'))));
+  app.get('/v1/state', async c => {
+    const value = await store.state(c.env.DB, c.get('ownerId'));
+    await store.touchOpened(c.env.DB, c.get('ownerId'));
+    return c.json(value);
+  });
   app.get('/v1/account', async c => {
     const user = await c.env.DB.prepare('SELECT email,timezone,timezone_initialized FROM users WHERE id=?')
       .bind(c.get('ownerId'))

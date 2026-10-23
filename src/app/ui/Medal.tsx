@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useMemo } from 'react';
 
 const digits = '〇一二三四五六七八九';
 const small = (n: number) =>
@@ -15,13 +15,53 @@ export function cnDate(iso: string) {
   return [...String(y)].map(c => digits[Number(c)]).join('') + '·' + small(m) + '·' + small(d);
 }
 
+/** What the AI drew on the medal: SVG path data on a 100×100 canvas, as a line drawing or a silhouette. */
+export type Drawing = { d: string; style?: 'line' | 'solid' };
+export type PathFit = { s: number; tx: number; ty: number; box: { x: number; y: number; w: number; h: number } };
+const NS = 'http://www.w3.org/2000/svg';
+const fits = new Map<string, PathFit>();
+/**
+ * Fit a drawn path into the disc: measured once in a hidden SVG, then centred on (60,60) of the
+ * medal's 120-unit face and scaled to a 56-unit box, so an off-centre or small drawing still sits right.
+ */
+export function fitPath(d: string, box = 56): PathFit {
+  const known = fits.get(d);
+  if (known) return known;
+  let b = { x: 0, y: 0, w: 100, h: 100 };
+  if (typeof document !== 'undefined') {
+    const svg = document.createElementNS(NS, 'svg'),
+      path = document.createElementNS(NS, 'path');
+    svg.setAttribute('width', '0');
+    svg.setAttribute('height', '0');
+    svg.style.position = 'absolute';
+    svg.style.visibility = 'hidden';
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+    document.body.appendChild(svg);
+    try {
+      const bb = path.getBBox();
+      if (bb.width > 0 || bb.height > 0) b = { x: bb.x, y: bb.y, w: bb.width, h: bb.height };
+    } catch {
+      /* An unmeasurable path keeps the whole canvas as its box. */
+    } finally {
+      svg.remove();
+    }
+  }
+  const s = box / Math.max(b.w, b.h, 1);
+  const fit = { s, tx: 60 - (b.x + b.w / 2) * s, ty: 60 - (b.y + b.h / 2) * s, box: b };
+  fits.set(d, fit);
+  return fit;
+}
+
 /**
  * An achievement is a medal: a metal rim, a quiet minute track, one motif in the middle,
- * and the name beneath it. Nothing else is written on it. The metal is the theme's:
- * platinum under ink, gilt under gold. Locked medals are an outline waiting to be earned.
+ * and the name beneath it. The motif is what the AI drew, or failing that a number or a
+ * character. The metal is the theme's: platinum under ink, gilt under gold. Locked medals
+ * are an outline waiting to be earned.
  */
 export function Medal({
   motif,
+  drawing,
   unit,
   name,
   date,
@@ -29,7 +69,8 @@ export function Medal({
   locked = false,
   transition,
 }: {
-  motif: string;
+  motif?: string;
+  drawing?: Drawing;
   unit?: string;
   name: string;
   date?: string;
@@ -39,8 +80,10 @@ export function Medal({
   transition?: string;
 }) {
   const id = useId();
-  const numeral = /^[\d.]+$/.test(motif);
-  const fontSize = numeral ? (motif.length <= 2 ? 42 : motif.length === 3 ? 36 : 28) : 40;
+  const fit = useMemo(() => (drawing ? fitPath(drawing.d) : null), [drawing]);
+  const text = drawing ? '' : (motif ?? '');
+  const numeral = /^[\d.]+$/.test(text);
+  const fontSize = numeral ? (text.length <= 2 ? 42 : text.length === 3 ? 36 : 28) : 40;
   const ticks = Array.from({ length: 60 }, (_, i) => {
     const a = (i / 60) * Math.PI * 2;
     const long = i % 15 === 0;
@@ -56,6 +99,7 @@ export function Medal({
       />
     );
   });
+  const solid = drawing?.style === 'solid';
   return (
     <figure
       className="medal"
@@ -86,16 +130,31 @@ export function Medal({
         <circle cx="60" cy="60" r="50" className="disc" fill={`url(#${id}-disc)`} />
         <circle cx="60" cy="60" r="50" className="edge" />
         {ticks}
-        <text
-          x="60"
-          y={numeral ? 60 + fontSize * 0.34 : 60 + fontSize * 0.36}
-          textAnchor="middle"
-          className={'motif' + (numeral ? '' : ' glyph')}
-          style={{ fontSize }}
-          fill={`url(#${id}-metal)`}
-        >
-          {motif}
-        </text>
+        {drawing && fit ? (
+          <g
+            className="drawing"
+            data-style={solid ? 'solid' : 'line'}
+            transform={`translate(${fit.tx.toFixed(3)} ${fit.ty.toFixed(3)}) scale(${fit.s.toFixed(4)})`}
+          >
+            <path
+              d={drawing.d}
+              fill={solid ? `url(#${id}-metal)` : 'none'}
+              stroke={`url(#${id}-metal)`}
+              strokeWidth={(solid ? 0.5 : 1.7) / fit.s}
+            />
+          </g>
+        ) : (
+          <text
+            x="60"
+            y={numeral ? 60 + fontSize * 0.34 : 60 + fontSize * 0.36}
+            textAnchor="middle"
+            className={'motif' + (numeral ? '' : ' glyph')}
+            style={{ fontSize }}
+            fill={`url(#${id}-metal)`}
+          >
+            {text}
+          </text>
+        )}
         {unit && (
           <text x="60" y="86" textAnchor="middle" className="unit">
             {unit}

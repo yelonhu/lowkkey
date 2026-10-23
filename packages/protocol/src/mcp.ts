@@ -5,6 +5,7 @@ import {
   WriteNoteInput,
   DailyNote,
   Brief,
+  BriefGuide,
   BriefInput,
   Context,
   ContextInput,
@@ -34,7 +35,7 @@ export const MCP_TOOLS = [
     title: '读取简报',
     input: BriefInput,
     description:
-      '何时用：每次相关对话开始，以及每次写入之后。返回账户时区的 today、实际权限、guide（stage/missing/next_step，档案现在缺什么、下一步最值得做什么）、计划、训练背景、体重读数、主项力量、各动作最近两次、本周事实和当前策展；所有派生数值已由代码计算，直接引用。默认最近6次训练，sessions 可选0–30；修改旧训练时传 session_date 读取该日完整组，未找到返回 session:null。notes 只给随手记索引，原文按需调用 read_notes。',
+      '何时用：每次相关对话开始，以及每次写入之后。返回账户时区的 today、实际权限、guide（stage/missing/next_step，档案现在缺什么、下一步最值得做什么）、presence.last_opened_at（用户上次打开舱的时间）、计划、训练背景、这几天的背景 contexts、体重读数、主项力量、各动作最近两次、本周事实、奖章清单（不含故事正文）和当前策展；所有派生数值已由代码计算，直接引用。每个写入工具的返回也带 guide，写完不必再读一次。默认最近6次训练，sessions 可选0–30；修改旧训练时传 session_date 读取该日完整组，未找到返回 session:null。notes 只给随手记索引，原文按需调用 read_notes。',
   },
   {
     name: 'read_notes',
@@ -110,7 +111,7 @@ export const MCP_TOOLS = [
     title: '授予一枚奖章',
     input: MedalInput,
     description:
-      '何时用：用户真的做到了什么值得记住的事——第一次训练、第一次挂上一片、一个纪录、停滞后的突破、连续几周没落、第一封信、一段艰难的日子还是练了。一周最多一两枚，宁缺毋滥。画到 recap 页末尾的成就墙，本周新得的会出现在首页。key 是稳定的小写标识（同 key 覆盖）；name 是你起的名字，雅一点，二到八个字，不用「第一次」「成就」这类说明文字；motif 是章上唯一的图样：数字是重点时用数字（135、4、100），否则一个字；occasion 一句话说明因何而得；story 是一到三段很短的小故事，题材随意——一个片段、一段小说、她和他、一个清晨——不必和训练有关，但要配得上这个时刻。date 为 null 表示一枚和用户约定、尚未达成的奖章，达成时补上日期并写故事。全部文字不用 emoji 或感叹号。',
+      '何时用：用户真的做到了什么值得记住的事——第一次训练、第一次挂上一片、一个纪录、停滞后的突破、连续几周没落、第一封信、一段艰难的日子还是练了。一周最多一两枚，宁缺毋滥。画到 recap 页末尾的成就墙，本周新得的会出现在首页。key 是稳定的小写标识（同 key 覆盖）；name 是你起的名字，雅一点，二到八个字，不用「第一次」「成就」这类说明文字；章上的图样由你画：drawing.d 是 100×100 画布上的 SVG path 数据（只用 M L H V C S Q T A Z），像印章上的纹样——一只猫、一片叶、一轮月、一副杠铃——线条简洁、形体居中、留白，一笔到底的线描最好看，style 为 line（线描，默认）或 solid（剪影）；画布会自动居中缩放，所以只管形状。数字是重点时可以不画，用 motif 写数字（135、4、100）；汉字只是退而求其次。已有的章若只有一个字，可用同一个 key 重新 award 补上 drawing。occasion 一句话说明因何而得；story 是一到三段很短的小故事，题材随意——一个片段、一段小说、她和他、一个清晨——不必和训练有关，但要配得上这个时刻。date 为 null 表示一枚和用户约定、尚未达成的奖章，达成时补上日期并写故事。全部文字不用 emoji 或感叹号。',
   },
   {
     name: 'delete',
@@ -159,6 +160,14 @@ export const MCP_PROMPTS = [
       (args.text ?? ''),
   },
   {
+    name: 'arrange_board',
+    title: '整理板面',
+    description: '为首页写一句当下的话，按本周重点排卡片，顺手看看这几天的背景。',
+    arguments: [],
+    text: () =>
+      '请先 get_brief，然后用 curate.board 整理我的首页：line 写一句你此刻想对我说的话（记下了什么、明天练什么、今天歇着），cards 按本周最值得看的顺序排 next、week、body、letter、medal，没有新鲜事就省略 cards。再看 get_brief.contexts 这几天的背景，如果训练安排需要让路，顺手用 curate.next 改一句提示。写完给我 view_url。',
+  },
+  {
     name: 'weekly_letter',
     title: '写本周周信',
     description: '为本周写一封周信，选亮点并指定焦点主项。',
@@ -203,7 +212,8 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 - 本周训练完成或到了周末：写周信 curate.recap，像朋友的短笺，1–5 段，记下值得记住的变化和可行的下一步；picks 引用本周真实记录；focus 指向一个主项并说明原因；没有实际计划时不写 next。
 - 每周至少布置一次板面（curate.board）：写 line，按本周重点排 cards；没有新鲜事时省略 cards 保持默认顺序。guide.missing 出现 board 时说明本周还没有 line。
 - 主题：只有两种。ink（水墨）是日常，安静、专注，默认如此；gold（鎏金）留给值得庆祝的一周：主项纪录、里程碑、连续完成。只在真有这样的事时选 gold 并给短理由，下一周按情况回到 ink。选择跨周延续，未来周到期生效；省略保持，null 移除该周选择并回退。主题不是对完成度的奖惩，不为换色而换色。
-- 奖章由你授予（award）。get_brief.medals 列出已有的；week_facts 里的纪录、门槛、突破、连续，是授予的好时机，guide.missing 出现 medal 时说明本周有这样的事却还没有章。名字由你起，雅一点；章上只有一个图样；配一到三段很短的小故事，题材随意，不必和训练有关。一周最多一两枚。也可以和用户约定一枚尚未达成的（date 为 null），达成时补日期、写故事。
+- 奖章由你授予（award）。get_brief.medals 列出已有的（不含故事）；week_facts 里的纪录、门槛、突破、连续，是授予的好时机，guide.missing 出现 medal 时说明本周有这样的事却还没有章。名字由你起，雅一点；章上的图样由你画（drawing：SVG path，一只猫、一片叶、一轮月，线描为佳），数字是重点时写数字；配一到三段很短的小故事，题材随意，不必和训练有关。一周最多一两枚。也可以和用户约定一枚尚未达成的（date 为 null），达成时补日期、写故事。
+- get_brief.presence.last_opened_at 是用户上次打开舱的时间：很久没打开时语气可以轻一点，不必每次提起。每个写入的返回都带 guide，按它决定还要不要做下一步。
 - 忙碌、疲劳、受伤：先理解用户表达的限制，缩短、调整或休息，不责备、不施压；身体不适时不鼓励硬撑，也不作诊断。不把漏练解释成意志力问题，不凭漏记推测情绪，休息不等于失败。不要把临时忙碌永久当作用户特征。
 - 日期以档案时区和 today 为准，不确定的历史日期先问。事实已保存但策展失败时清楚说明，只重试失败部分。
 
@@ -217,10 +227,11 @@ export const MCP_INSTRUCTIONS = `lowkkey 是一份由你维护、用户随时打
 ## 声音
 温暖、简洁、具体。可以肯定真实进展，避免空泛夸奖、口号和机械问卷。应用内所有文字不用感叹号和 emoji。署名使用 AI 中性署名，或省略 sign 由服务端生成。`;
 
+/** Writes answer with the saved object, where it shows, and the guide, so the AI knows the next step without another read. */
 export function mcpOutput(name: ToolName) {
   return name === 'get_brief' || name === 'read_notes'
     ? z.object({ result: MCP_OUTPUTS[name] })
-    : z.object({ result: MCP_OUTPUTS[name], view_url: z.url() });
+    : z.object({ result: MCP_OUTPUTS[name], view_url: z.url(), guide: BriefGuide.optional() });
 }
 export function mcpToolList() {
   return MCP_TOOLS.map(tool => ({

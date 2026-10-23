@@ -166,6 +166,25 @@ describe('product onboarding and continuity', () => {
     );
     const waiting = await store.award(db, owner, { ...medal, key: 'bodyweight', date: null, name: '举起自己' }, stamp);
     expect(waiting.date).toBeNull();
+    // The AI draws the picture: path data on a 100×100 canvas, kept verbatim; a medal needs a drawing or a motif.
+    const drawn = {
+      ...medal,
+      key: 'cat',
+      name: '予爱',
+      motif: undefined,
+      drawing: { d: 'M20 20 L80 80 M80 20 L20 80' },
+    };
+    expect((await store.award(db, owner, drawn, stamp)).drawing).toEqual({
+      d: 'M20 20 L80 80 M80 20 L20 80',
+      style: 'line',
+    });
+    await expect(store.award(db, owner, { ...drawn, drawing: { d: '<svg>' } })).rejects.toThrow();
+    await expect(store.award(db, owner, { ...drawn, drawing: undefined })).rejects.toThrow();
+    expect((await store.state(db, owner, stamp)).medals.find(m => m.key === 'cat')).toMatchObject({
+      drawing: { d: 'M20 20 L80 80 M80 20 L20 80', style: 'line' },
+    });
+    expect((await store.brief(db, owner, {}, stamp)).medals?.find(m => m.key === 'cat')).not.toHaveProperty('story');
+    await store.deleteFact(db, owner, { kind: 'medal', key: 'cat' });
     expect((await store.state(db, owner, stamp)).medals.map(m => m.key)).toEqual(['bodyweight', 'first-plate']);
     expect((await store.brief(db, owner, {}, stamp)).medals?.map(m => m.name)).toEqual(['举起自己', '一片冰心']);
     expect(await store.deleteFact(db, owner, { kind: 'medal', key: 'bodyweight' })).toMatchObject({
@@ -259,7 +278,10 @@ describe('product onboarding and continuity', () => {
   it('tells the device once when a letter is written or a medal is earned', async () => {
     notices.length = 0;
     const letter = { week: '2026-10-05', recap: { title: '稳稳地向前', letter: ['这周卧推完成得更稳。'] } };
-    expect((await rpc('tools/call', { name: 'curate', arguments: letter })).result.isError).toBeFalsy();
+    const written = await rpc('tools/call', { name: 'curate', arguments: letter });
+    expect(written.result.isError).toBeFalsy();
+    // Every write answers with the guide, so the keeper knows its next step without another read.
+    expect((written.result.structuredContent as unknown as { guide: { stage: string } }).guide.stage).toBe('active');
     expect((await rpc('tools/call', { name: 'curate', arguments: letter })).result.isError).toBeFalsy();
     await rpc('tools/call', {
       name: 'curate',

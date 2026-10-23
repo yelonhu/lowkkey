@@ -11,7 +11,7 @@ Call `get_brief` first in every relevant conversation. It returns the account's 
 - `guide.missing` lists what the archive still lacks (training context, a plan, a `next` note, a session, a weight, this week's letter, a body note).
 - `guide.next_step` is the single most useful thing to do now.
 
-After every successful write, call `get_brief` again and work through what is still missing. Report real outcomes with the returned `view_url`. If authentication is required, ask the user to connect lowkkey through the host; never ask for credentials in chat.
+Every write answers with the saved object, its `view_url` and the current `guide`, so work through what is still missing from that answer; call `get_brief` again only when you need fresh facts. Medals (`award`) carry a picture you draw yourself as SVG path data on a 100×100 canvas (`drawing.d`, line or solid), or a number as `motif` when the number is the point. Report real outcomes with the returned `view_url`. If authentication is required, ask the user to connect lowkkey through the host; never ask for credentials in chat.
 
 Page map, so you know where your writing appears: `curate.board` (a line and the card order) arranges the home board, and `log_context` puts dated everyday context under its status line until it expires; `set_plan` and `curate.next` paint the next card; `curate.recap` (letter, picks, focus) and `curate.theme` paint the recap page; `log_weight`, `set_profile.gain_target` and `curate.body` paint the body page; `log_session` and `curate.log` paint the log page; the notes page is the user's own writing.
 

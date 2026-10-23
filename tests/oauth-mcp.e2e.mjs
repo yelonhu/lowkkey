@@ -19,7 +19,7 @@ assert.deepEqual(tools.tools.map(t => t.name).sort(), [
   'write_note',
 ]);
 const prompts = await client.rpc('prompts/list', {});
-assert.deepEqual(prompts.prompts.map(p => p.name).sort(), ['log_today', 'start', 'weekly_letter']);
+assert.deepEqual(prompts.prompts.map(p => p.name).sort(), ['arrange_board', 'log_today', 'start', 'weekly_letter']);
 const prompted = await client.rpc('prompts/get', { name: 'log_today', arguments: { text: '卧推 95 × 8' } });
 assert.ok(prompted.messages[0].content.text.includes('卧推 95 × 8'));
 const contract = JSON.parse(await readFile('docs/lowkkey-handoff/protocol/mcp-tools.json', 'utf8'));
@@ -91,7 +91,7 @@ assert.deepEqual(
   (await readonly.rpc('tools/list', {})).tools.map(t => t.name),
   ['get_brief', 'read_notes'],
 );
-assert.equal((await readonly.rpc('prompts/list', {})).prompts.length, 3);
+assert.equal((await readonly.rpc('prompts/list', {})).prompts.length, 4);
 await client.user('/v1/notes/2026-10-08', { text: '原文\n  135lb × 8 🙂', revision: 0 }, 'PUT');
 assert.equal((await readonly.tool('read_notes', {})).notes[0].text, '原文\n  135lb × 8 🙂');
 assert.equal((await readonly.tool('get_brief', {})).notes.count, 1);

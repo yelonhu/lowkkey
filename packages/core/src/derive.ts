@@ -424,7 +424,7 @@ export function getBrief(
   return {
     generated_at: generatedAt,
     today: { date: today, weekday: weekday(today) },
-    medals: facts.medals,
+    medals: facts.medals.map(({ story, ...summary }) => (void story, summary)),
     contexts: facts.contexts.filter(c => c.until >= today).sort((a, b) => a.date.localeCompare(b.date)),
     next: next ? { date: next.date, rel: next.rel, title: next.plan.title } : null,
     plans: facts.plans,

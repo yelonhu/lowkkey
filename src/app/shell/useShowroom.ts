@@ -1,10 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { hasPendingNotes, clearPendingNotes } from '../pages/notes-model.ts';
+import { localToday, themeState } from '@lowkkey/core';
 import type { StateResponse } from '@lowkkey/protocol';
 
+// The last facts stay on this device so the pod opens on them at once; the network copy
+// replaces them a moment later. Signing out, or a session that has ended, clears them.
+const SNAPSHOT = 'lowkkey-state';
+function remembered(): StateResponse | null {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as StateResponse;
+    const today = localToday(new Date(), value.timezone);
+    return { ...value, today, theme_state: themeState(value, today) };
+  } catch {
+    return null;
+  }
+}
+function remember(value: StateResponse | null) {
+  try {
+    if (value) localStorage.setItem(SNAPSHOT, JSON.stringify(value));
+    else localStorage.removeItem(SNAPSHOT);
+  } catch {
+    /* A full or private store just means the next open waits for the network. */
+  }
+}
+
 export function useShowroom() {
-  const [state, setState] = useState<StateResponse | null>(null);
-  const [auth, setAuth] = useState<'loading' | 'required' | 'ready' | 'consent'>('loading');
+  const [state, setState] = useState<StateResponse | null>(remembered);
+  const [auth, setAuth] = useState<'loading' | 'required' | 'ready' | 'consent'>(() => (state ? 'ready' : 'loading'));
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [syncedAt, setSyncedAt] = useState<Date | null>(null),
@@ -12,6 +36,7 @@ export function useShowroom() {
   const generation = useRef(0);
   const clear = useCallback(() => {
     generation.current++;
+    remember(null);
     setState(null);
     setAuth('required');
     setError('');
@@ -32,6 +57,7 @@ export function useShowroom() {
         const denied = await response.json();
         if (epoch !== generation.current) return;
         if (denied.error?.code === 'privacy_required') {
+          remember(null);
           setState(null);
           setAuth('consent');
           setError('');
@@ -41,6 +67,7 @@ export function useShowroom() {
       if (!response.ok) throw new Error('暂时无法读取记录。');
       const value = (await response.json()) as StateResponse;
       if (epoch !== generation.current) return;
+      remember(value);
       setState(value);
       setAuth('ready');
       setError('');

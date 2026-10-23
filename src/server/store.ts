@@ -42,7 +42,8 @@ const medalValue = (r: Row) =>
     key: r.key,
     date: r.date ?? null,
     name: r.name,
-    motif: r.motif,
+    ...(r.motif ? { motif: r.motif } : {}),
+    ...(r.drawing_json ? { drawing: JSON.parse(String(r.drawing_json)) } : {}),
     ...(r.unit == null ? {} : { unit: r.unit }),
     ...(r.occasion == null ? {} : { occasion: r.occasion }),
     story: JSON.parse(String(r.story_json)),
@@ -60,7 +61,7 @@ const planValue = (r: Row) =>
   });
 async function snapshot(db: D1Database, owner: string, now = new Date()) {
   const queries = [
-    'SELECT data_revision,timezone FROM users WHERE id=? AND lifecycle="active"',
+    'SELECT data_revision,timezone,last_opened_at FROM users WHERE id=? AND lifecycle="active"',
     'SELECT * FROM showroom_sessions WHERE owner_id=? ORDER BY date DESC',
     'SELECT * FROM showroom_weights WHERE owner_id=? ORDER BY date',
     'SELECT * FROM showroom_plans WHERE owner_id=? ORDER BY weekday',
@@ -98,7 +99,33 @@ async function snapshot(db: D1Database, owner: string, now = new Date()) {
   };
   const timezone = String(rows[0].results[0].timezone),
     today = localToday(now, timezone);
-  return { facts, revision: Number(rows[0].results[0].data_revision), today, timezone };
+  return {
+    facts,
+    revision: Number(rows[0].results[0].data_revision),
+    today,
+    timezone,
+    lastOpenedAt: rows[0].results[0].last_opened_at ? String(rows[0].results[0].last_opened_at) : null,
+  };
+}
+/** The pod was opened: remembered at most once per ten minutes, so the keeper knows when it last saw the user. */
+export async function touchOpened(db: D1Database, owner: string, now = new Date()) {
+  const stamp = now.toISOString(),
+    before = new Date(now.getTime() - 10 * 60000).toISOString();
+  await db
+    .prepare('UPDATE users SET last_opened_at=? WHERE id=? AND (last_opened_at IS NULL OR last_opened_at<?)')
+    .bind(stamp, owner, before)
+    .run();
+}
+/** The keeper's to-do list for this account, as every write answers with it. */
+export async function guideFor(
+  db: D1Database,
+  owner: string,
+  permissions: ('read' | 'write' | 'notes:write')[],
+  now = new Date(),
+) {
+  const { facts, today } = await snapshot(db, owner, now),
+    setup = await onboarding(db, owner);
+  return briefGuide(facts, today, permissions, setup);
 }
 export async function state(db: D1Database, owner: string, now = new Date()): Promise<StateResponse> {
   const { facts, today, timezone } = await snapshot(db, owner, now);
@@ -119,7 +146,15 @@ export async function brief(
   permissions: ('read' | 'write' | 'notes:write')[] = ['read', 'write'],
 ) {
   const { sessions, session_date } = BriefInput.parse(args),
-    facts = await state(db, owner, now),
+    snap = await snapshot(db, owner, now),
+    facts: StateResponse = {
+      ...snap.facts,
+      accountId: owner,
+      protocol: PROTOCOL_VERSION,
+      today: snap.today,
+      timezone: snap.timezone,
+      theme_state: themeState(snap.facts, snap.today),
+    },
     setup = await onboarding(db, owner);
   const guide = briefGuide(facts, facts.today, permissions, setup);
   return {
@@ -128,6 +163,7 @@ export async function brief(
     permissions,
     notes: await notesSummary(db, owner),
     guide,
+    presence: { last_opened_at: snap.lastOpenedAt },
     onboarding: {
       completed: !!setup.completedAt || setup.hasContent,
       entry: setup.entry,
@@ -323,14 +359,15 @@ export async function award(
       statements: [
         db
           .prepare(
-            'INSERT INTO medals(owner_id,key,date,name,motif,unit,occasion,story_json,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(owner_id,key) DO UPDATE SET date=excluded.date,name=excluded.name,motif=excluded.motif,unit=excluded.unit,occasion=excluded.occasion,story_json=excluded.story_json,updated_at=excluded.updated_at',
+            'INSERT INTO medals(owner_id,key,date,name,motif,drawing_json,unit,occasion,story_json,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(owner_id,key) DO UPDATE SET date=excluded.date,name=excluded.name,motif=excluded.motif,drawing_json=excluded.drawing_json,unit=excluded.unit,occasion=excluded.occasion,story_json=excluded.story_json,updated_at=excluded.updated_at',
           )
           .bind(
             owner,
             saved.key,
             saved.date,
             saved.name,
-            saved.motif,
+            saved.motif ?? '',
+            saved.drawing ? JSON.stringify(saved.drawing) : null,
             saved.unit ?? null,
             saved.occasion ?? null,
             JSON.stringify(saved.story),

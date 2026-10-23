@@ -166,19 +166,36 @@ export const PlanHistory = z.strictObject({
   plans: z.array(Plan),
 });
 export type PlanHistory = z.infer<typeof PlanHistory>;
-// A medal is awarded by the AI for a real moment: a name of its choosing, one motif, a short story.
-// date null is a medal agreed on but not yet earned.
-export const MedalInput = z.strictObject({
+// A medal is awarded by the AI for a real moment: a name of its choosing, a picture it drew
+// (or a number, or a character), a short story. date null is a medal agreed on but not yet earned.
+export const MedalDrawing = z.strictObject({
+  d: z
+    .string()
+    .trim()
+    .min(8)
+    .max(2400)
+    .regex(/^[Mm][0-9 ,.\-MmLlHhVvCcSsQqTtAaZz\n]*$/, 'd 只接受 SVG path 数据：M L H V C S Q T A Z 与数字'),
+  style: z.enum(['line', 'solid']).default('line'),
+});
+export type MedalDrawing = z.infer<typeof MedalDrawing>;
+const medalFields = {
   key: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/, 'key 用小写字母、数字和连字符'),
   date: LocalDate.nullable(),
   name: prose(12).trim().min(1),
-  motif: text(4).trim().min(1),
+  motif: text(4).trim().min(1).optional(),
+  drawing: MedalDrawing.optional(),
   unit: text(6).trim().optional(),
   occasion: prose(60).trim().optional(),
   story: z.array(prose(300).min(1)).min(1).max(3),
+};
+export const MedalInput = z.strictObject(medalFields).refine(v => !!v.motif || !!v.drawing, {
+  message: '章上要有图样：drawing（你画的）或 motif（数字、一个字）',
+  path: ['drawing'],
 });
-export const Medal = MedalInput.extend({ updated_at: Instant });
+export const Medal = z.strictObject({ ...medalFields, updated_at: Instant });
 export type Medal = z.infer<typeof Medal>;
+/** What the brief carries about a medal: everything but the story, which the AI already wrote. */
+export const MedalSummary = Medal.omit({ story: true });
 // A dated piece of everyday life the user mentioned: exam week, a trip, a bad night. It colours the
 // board and the plan while it lasts, then fades on its own. until defaults to the same day.
 const contextFields = { date: LocalDate, text: prose(80).trim().min(1) };
@@ -234,6 +251,8 @@ export const DeleteInput = DeleteFields.refine(v => (v.kind === 'medal' ? !!v.ke
   path: ['date'],
 });
 export const Deleted = DeleteFields.extend({ deleted: z.union([TrainingSession, Weight, Context, Medal]) });
+export const Presence = z.object({ last_opened_at: Instant.nullable() });
+export type Presence = z.infer<typeof Presence>;
 export const BriefInput = z.strictObject({
   sessions: z.number().int().min(0).max(30).default(6),
   session_date: LocalDate.optional(),
@@ -347,7 +366,8 @@ export const Brief = z.strictObject({
     .object({ completed: z.boolean(), entry: z.enum(['start', 'existing']).nullable(), next_step: z.string() })
     .optional(),
   guide: BriefGuide.optional(),
-  medals: z.array(Medal).optional(),
+  presence: Presence.optional(),
+  medals: z.array(MedalSummary).optional(),
   contexts: z.array(Context).optional(),
   session: TrainingSession.nullable().optional(),
   today: z.object({ date: LocalDate, weekday: z.number().int() }),

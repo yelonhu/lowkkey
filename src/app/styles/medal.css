@@ -50,6 +50,20 @@
   font-family: var(--font);
   font-weight: 600;
 }
+/* AI 画的图样：线描用主题金属描一笔，剪影填金属、勾一圈极细的墨线。 */
+.medal .drawing path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.medal .drawing[data-style='solid'] path {
+  stroke: var(--ink);
+  stroke-opacity: 0.35;
+}
+.medal[data-locked] .drawing path {
+  fill: none;
+  stroke: var(--faint);
+  stroke-opacity: 1;
+}
 .medal .unit {
   font: 400 8px / 1 var(--sans);
   fill: var(--muted);

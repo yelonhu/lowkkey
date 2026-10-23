@@ -117,6 +117,16 @@ export const fixtureMedal = {
     '后来她说，那天其实什么都没想，只是觉得该挂了。',
   ],
 };
+export const fixtureCat = {
+  key: 'cat',
+  date: dateAt(-2),
+  name: '予爱',
+  drawing: {
+    d: 'M28 30 L38 44 C44 40 56 40 62 44 L72 30 L72 56 C72 72 60 82 50 82 C40 82 28 72 28 56 Z M41 58 L41 59 M59 58 L59 59 M48 66 L52 66 L50 69 Z M18 64 L36 66 M18 72 L36 70 M82 64 L64 66 M82 72 L64 70',
+  },
+  occasion: '一周里最累的那天还是去了',
+  story: ['机器替我托着一只猫，剩下的都是我自己。'],
+};
 export const fixtureContext = { date: dateAt(-1), until: dateAt(4), text: '考试周，晚上只有一小时能练。' };
 export async function seedShowroom(tool) {
   for (const args of fixturePlans) await tool('set_plan', args);
@@ -128,5 +138,6 @@ export async function seedShowroom(tool) {
   for (const args of fixtureSessions) await tool('log_session', args);
   await tool('curate', fixtureCuration);
   await tool('award', fixtureMedal);
+  await tool('award', fixtureCat);
   await tool('log_context', fixtureContext);
 }

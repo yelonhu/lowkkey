@@ -297,6 +297,7 @@ function MedalCard({ medals, today, door }: { medals: MedalFact[]; today: string
           <Medal
             key={m.key}
             motif={m.motif}
+            drawing={m.drawing}
             unit={m.unit}
             name={m.name}
             date={m.date ?? undefined}
